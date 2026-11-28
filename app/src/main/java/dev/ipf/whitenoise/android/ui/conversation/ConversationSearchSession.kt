@@ -9,13 +9,14 @@ import kotlinx.coroutines.launch
  * Opens one in-chat search session and keeps [bookmark], the reader's position, so its close can return there
  * (#4224). The anchor row of [loadedTimeline] also records the timeline position the close pages back to when a deep
  * search jump evicted that row from the capped window. A shortcut while search is already open keeps the first
- * session's position.
+ * session's position, and a new session retires a return the previous close left paging.
  */
 internal fun ConversationNavigationState.openSearchSession(
     bookmark: ConversationScrollBookmark,
     loadedTimeline: List<TimelineMessage>,
 ) {
     if (searchOpen) return
+    searchJob?.cancel()
     val anchorRow =
         bookmark.anchor.messageId?.let { messageId ->
             loadedTimeline.firstOrNull { it.record.messageIdHex == messageId }

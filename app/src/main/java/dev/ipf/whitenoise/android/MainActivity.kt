@@ -146,7 +146,6 @@ class MainActivity : AppCompatActivity() {
         mainShellStateHolder.clearPendingShareRequest(requestId)
     }
 
-    /** Builds the app root and consumes the launching intent's route. */
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
         val splashInstalledAtMs = SystemClock.elapsedRealtime()
@@ -276,7 +275,7 @@ class MainActivity : AppCompatActivity() {
                         inboundProfilePayload = inboundProfilePayload,
                         onProfilePayloadHandled = { if (inboundProfilePayload == it) inboundProfilePayload = null },
                         inboundNotificationTarget = inboundNotificationTarget,
-                        inboundNotificationRequestId = inboundNotificationRequestId,
+                        currentNotificationRequestId = { inboundNotificationRequestId },
                         onNotificationTargetHandled = ::handleNotificationTarget,
                         inboundShareRequest = inboundShareRequest,
                         onShareRequestHandled = ::handleShareRequest,
@@ -284,9 +283,7 @@ class MainActivity : AppCompatActivity() {
                             if (handled != null && intent?.dataString == handled) {
                                 setIntent(Intent(this@MainActivity, MainActivity::class.java))
                             }
-                            // A chat link that opens nothing hands the foreground back to the chat still on screen.
-                            if (target == null) foregroundConversationDismissal.onNotificationRouteHandled()
-                            target?.let { applyInboundRouting(it, null, null, warmResumeLifecycleClass) }
+                            if (target != null) applyInboundRouting(target, null, null, warmResumeLifecycleClass)
                         },
                         inboundAppUpdateTap = inboundAppUpdateTap,
                         onAppUpdateTapHandled = { handled ->
@@ -462,11 +459,9 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * Merges a parsed inbound route into the pending routes, and a notification target also starts its route trace.
-     * A chat link (#3658) opens through here as a notification target, sharing account switching, app lock and
-     * cold/warm handling, and its stored intent is replaced first so activity recreation cannot resolve it again.
-     */
+    // Merges a parsed inbound route into the pending routes; a notification target also starts its route trace. A chat
+    // link (#3658) opens through here as a notification target, sharing account switching, app lock and cold/warm
+    // handling; its stored intent is replaced first so activity recreation cannot resolve the link again.
     private fun applyInboundRouting(
         target: NotificationTarget?,
         share: ShareRequest?,
@@ -490,7 +485,6 @@ class MainActivity : AppCompatActivity() {
         mainShellStateHolder.acknowledgeInboundShareRequest(handled.requestId)
     }
 
-    /** Starts a foreground entry, noting whether a pending notification or chat link already routes it. */
     override fun onStart() {
         super.onStart()
         warmResumeEpoch += 1
@@ -510,7 +504,6 @@ class MainActivity : AppCompatActivity() {
             foregroundConversationDismissal.onStart(
                 hasPendingNotificationRoute =
                     inboundNotificationTarget != null || appState.signInAlerts.devicesRequest != null,
-                pendingLink = inboundProfilePayload,
             )
             appState.setAppInForeground(
                 foreground = true,

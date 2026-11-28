@@ -80,13 +80,14 @@ class ConversationGroupSubscriptionOwnershipTest {
     @Test
     fun failedOpenClosesNothing() =
         runTest {
-            val handle = FakeGroupHandle()
+            var closes = 0
             val dispatcher = StandardTestDispatcher(testScheduler)
             val subscriptions =
                 ConversationLiveSubscriptions(
                     openTimeline = { _, _, _ -> error("unexpected timeline") },
                     openGroupState = { _, _ ->
-                        openOwnedAcrossDispatch(close = ConversationGroupStateSubscriptionHandle::close) { _ ->
+                        val countClose: (ConversationGroupStateSubscriptionHandle) -> Unit = { closes += 1 }
+                        openOwnedAcrossDispatch(close = countClose) { _ ->
                             withContext(dispatcher) { error("native open failed") }
                         }
                     },
@@ -95,7 +96,7 @@ class ConversationGroupSubscriptionOwnershipTest {
             val failure = runCatching { subscriptions.openGroupState(ACCOUNT, GROUP) }.exceptionOrNull()
 
             assertEquals("native open failed", failure?.message)
-            assertEquals(0, handle.closes)
+            assertEquals(0, closes)
         }
 
     /**

@@ -72,16 +72,6 @@ class ForegroundConversationDismissalCoordinatorTest {
         assertFalse(coordinator.consumeShouldDismissOnResume())
     }
 
-    /** A chat link still pending when the Activity restarts owns that foreground entry too. */
-    @Test
-    fun pendingChatLinkAtStartSkipsTheRetainedConversation() {
-        val coordinator = ForegroundConversationDismissalCoordinator()
-
-        coordinator.onStart(hasPendingNotificationRoute = false, pendingLink = MALFORMED_CHAT_LINK)
-
-        assertFalse(coordinator.consumeShouldDismissOnResume())
-    }
-
     /** A profile link leaves the open chat in front, so resume still dismisses its notifications. */
     @Test
     fun profileLinkStillDismissesTheRetainedConversation() {
@@ -93,16 +83,26 @@ class ForegroundConversationDismissalCoordinatorTest {
         assertTrue(coordinator.consumeShouldDismissOnResume())
     }
 
-    /** A chat link that resolves to nothing hands later unlock dismissal back to the chat still on screen. */
+    /** A malformed chat link still owns its foreground entry, since it shows its notice over the open chat. */
     @Test
-    fun unresolvedChatLinkReleasesTheUnlockGuard() {
+    fun malformedChatLinkBetweenStartAndResumeSkipsTheRetainedConversation() {
         val coordinator = ForegroundConversationDismissalCoordinator()
 
-        coordinator.onStart(hasPendingNotificationRoute = false, pendingLink = CHAT_LINK)
-        assertFalse(coordinator.shouldDismissAfterUnlock())
-        coordinator.onNotificationRouteHandled()
+        coordinator.onStart(hasPendingNotificationRoute = false)
+        coordinator.onInboundRoute(hasNotificationTarget = false, data = MALFORMED_CHAT_LINK)
 
-        assertTrue(coordinator.shouldDismissAfterUnlock())
+        assertFalse(coordinator.consumeShouldDismissOnResume())
+    }
+
+    /** A chat link that arrives while the Activity is already resumed leaves the next plain resume dismissing. */
+    @Test
+    fun chatLinkWhileResumedDoesNotPoisonTheNextPlainResume() {
+        val coordinator = ForegroundConversationDismissalCoordinator()
+
+        coordinator.onInboundRoute(hasNotificationTarget = false, data = CHAT_LINK)
+        coordinator.onStart(hasPendingNotificationRoute = false)
+
+        assertTrue(coordinator.consumeShouldDismissOnResume())
     }
 
     private companion object {

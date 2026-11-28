@@ -49,6 +49,13 @@ class ConversationSearchSessionTest {
             runCurrent()
 
             val secondSession = harness.openAt(anchor("later", listIndex = 30))
+            assertEquals(
+                30,
+                harness.navigation.preSearchScrollAnchor
+                    ?.bookmark
+                    ?.anchor
+                    ?.listIndex,
+            )
             harness.close()
             runCurrent()
             harness.paging.complete(Unit)
@@ -73,6 +80,24 @@ class ConversationSearchSessionTest {
 
             assertEquals(1, harness.returnedTo.size)
             assertTrue(harness.writer.writes.isEmpty())
+        }
+
+    /** Opening a new search while the previous close still pages back leaves the transcript under the new search. */
+    @Test
+    fun reopeningSearchRetiresThePendingReturn() =
+        runTest {
+            val harness = Harness(this)
+            harness.openAt(anchor("reader", listIndex = 12))
+            harness.close()
+            runCurrent()
+
+            harness.openAt(anchor("match", listIndex = 40))
+            harness.paging.complete(Unit)
+            runCurrent()
+
+            assertTrue(harness.returnedTo.isEmpty())
+            assertTrue(harness.writer.writes.isEmpty())
+            assertTrue(harness.navigation.searchOpen)
         }
 
     /** The search shortcut while search is open keeps the position the session opened at. */
@@ -119,8 +144,9 @@ class ConversationSearchSessionTest {
         val paging = CompletableDeferred<Unit>()
         val returnedTo = mutableListOf<ConversationScrollBookmark>()
 
-        /** Opens search at [at] and returns the bookmark the session saved. */
+        /** Settles the reader at [at], opens search there and returns the bookmark the session saved. */
         fun openAt(at: ConversationScrollAnchor): ConversationScrollBookmark {
+            coordinator.settleReadingAt(at)
             val bookmark = coordinator.bookmark(at)
             navigation.openSearchSession(bookmark, loadedTimeline = emptyList())
             return bookmark

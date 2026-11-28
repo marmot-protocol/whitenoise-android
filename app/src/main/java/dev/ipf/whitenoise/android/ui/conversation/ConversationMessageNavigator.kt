@@ -354,6 +354,10 @@ internal class ConversationMessageNavigator(
             if (match != null && controller.loadSearchResultMessageAvailable(match)) {
                 withFrameNanos { }
             }
+            // A saved message that could not be paged back stays the reader's search position, rather than
+            // landing on whatever row now sits at its old list index.
+            val saved = anchor.bookmark.anchor
+            if (saved.messageId != null && resolveScrollAnchorIndex(saved) == null) return@closeSearchSession
             scrollCoordinator.restoreBookmark(
                 anchor.bookmark,
                 expectedIntent = expectedRestoreIntent,

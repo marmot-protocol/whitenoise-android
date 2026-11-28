@@ -195,7 +195,10 @@ internal fun WhiteNoiseApp(
     inboundProfilePayload: String? = null,
     onProfilePayloadHandled: (String) -> Unit = {},
     inboundNotificationTarget: NotificationTarget? = null,
-    inboundNotificationRequestId: Long = 0L,
+    // The Activity's live notification request id. An in-app chat link lookup reads it when it finishes, before the
+    // root recomposes with a newer request (#4186), and composition reads it through the parameter below.
+    currentNotificationRequestId: () -> Long = { 0L },
+    inboundNotificationRequestId: Long = currentNotificationRequestId(),
     onNotificationTargetHandled: (NotificationTarget, Long) -> Unit = { _, _ -> },
     inboundShareRequest: ShareRequest? = null,
     onShareRequestHandled: (ShareRequest) -> Unit = {},
@@ -426,8 +429,8 @@ internal fun WhiteNoiseApp(
         }
     }
     val currentOnChatLinkResolved by rememberUpdatedState(onChatLinkResolved)
-    val currentRouteGeneration by rememberUpdatedState(inboundNotificationRequestId)
-    val inAppChatLinks = remember(scope) { InAppChatLinkLookups(scope) { currentRouteGeneration } }
+    val routeGeneration by rememberUpdatedState(currentNotificationRequestId)
+    val inAppChatLinks = remember(scope) { InAppChatLinkLookups(scope) { routeGeneration() } }
     ChatLinkChoiceSupersededEffect(inboundNotificationRequestId) { chatLinkChoice = null }
     val inAppLinkHandler =
         remember(appState) {

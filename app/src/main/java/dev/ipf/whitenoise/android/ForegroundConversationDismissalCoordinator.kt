@@ -14,15 +14,10 @@ internal class ForegroundConversationDismissalCoordinator {
     private var notificationRouteObserved = false
     private var currentForegroundNotificationOwned = false
 
-    /** Starts a foreground entry that a pending notification route or a pending chat [pendingLink] already owns. */
-    fun onStart(
-        hasPendingNotificationRoute: Boolean,
-        pendingLink: String? = null,
-    ) {
-        val owned = inboundIntentOwnsForeground(hasPendingNotificationRoute, pendingLink)
+    fun onStart(hasPendingNotificationRoute: Boolean) {
         resumePending = true
-        notificationRouteObserved = owned
-        currentForegroundNotificationOwned = owned
+        notificationRouteObserved = hasPendingNotificationRoute
+        currentForegroundNotificationOwned = hasPendingNotificationRoute
     }
 
     fun onNotificationRouteObserved() {
@@ -30,7 +25,10 @@ internal class ForegroundConversationDismissalCoordinator {
         if (resumePending) notificationRouteObserved = true
     }
 
-    /** Notes an inbound intent, which owns this foreground entry when [inboundIntentOwnsForeground] says so. */
+    /**
+     * Notes an inbound intent, which owns this foreground entry when [inboundIntentOwnsForeground] says so. A chat
+     * link from another app reaches a stopped Activity between onStart and onResume, like a notification tap.
+     */
     fun onInboundRoute(
         hasNotificationTarget: Boolean,
         data: String?,
