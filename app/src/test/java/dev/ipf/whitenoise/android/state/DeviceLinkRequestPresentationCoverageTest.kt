@@ -54,6 +54,19 @@ class DeviceLinkRequestPresentationCoverageTest {
         assertTrue(notice.contains("onReview = { watcher.open(request) }"))
     }
 
+    @Test
+    fun signInReviewLeavesTheLinkUnansweredAndOpensDevicesInFront() {
+        val questions = appModuleSource("src/main/java/dev/ipf/whitenoise/android/ui/AppQuestionHosts.kt")
+        assertTrue("questionsBlocked || compromiseDue || alerts.devicesRequest != null" in questions)
+        assertTrue("DeviceLinkRequestHost(appState, blocked = linkBlocked)" in questions)
+
+        val route =
+            appModuleSource("src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInDevicesRoute.kt")
+                .functionBody("SignInDevicesRequestEffect")
+        val close = route.indexOf("appState.deviceLinkRequests.close()")
+        assertTrue(close in 0 until route.indexOf("onOpen()"))
+    }
+
     /** The main source files whose text matches [call], relative to the app module. */
     private fun mainSourcesCalling(call: Regex): Set<String> {
         val root = appModuleFile("src/main/java")

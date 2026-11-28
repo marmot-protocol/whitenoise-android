@@ -28,8 +28,20 @@ internal interface EmojiSetsBackend {
     /** The locally known version of [coordinate], or null once it is gone. */
     suspend fun current(coordinate: String): EmojiSetFfi?
 
-    /** Downloads the cover, or the first emoji when the set has none, for one explicit preview. */
-    suspend fun preview(set: EmojiSetFfi): ByteArray
+    /** Downloads the cover through MDK's hardened fetch, after the user asked to load this set's images. */
+    suspend fun cover(set: EmojiSetFfi): ByteArray
+
+    /** Downloads one emoji of the shown version, after the user asked to load this set's images. */
+    suspend fun emojiImage(
+        set: EmojiSetFfi,
+        shortcode: String,
+    ): ByteArray
+
+    /** Reads one emoji of the installed snapshot from local storage, without contacting its image host. */
+    suspend fun installedEmojiImage(
+        set: EmojiSetFfi,
+        shortcode: String,
+    ): ByteArray
 
     /** A fresh install control. The caller closes it. */
     fun newInstall(): EmojiSetInstall
@@ -81,14 +93,20 @@ internal fun WhiteNoiseAppState.emojiSetsBackend(
 
         override suspend fun current(coordinate: String): EmojiSetFfi? = scoped { emojiSet(account, coordinate) }
 
-        override suspend fun preview(set: EmojiSetFfi): ByteArray =
+        override suspend fun cover(set: EmojiSetFfi): ByteArray =
             scoped {
-                if (set.imageUrl != null) {
-                    fetchEmojiSetCover(account, set.coordinate, set.eventIdHex).bytes
-                } else {
-                    fetchEmojiSetAsset(account, set.coordinate, set.eventIdHex, set.emoji.first().shortcode).bytes
-                }
+                fetchEmojiSetCover(account, set.coordinate, set.eventIdHex).bytes
             }
+
+        override suspend fun emojiImage(
+            set: EmojiSetFfi,
+            shortcode: String,
+        ): ByteArray = scoped { fetchEmojiSetAsset(account, set.coordinate, set.eventIdHex, shortcode).bytes }
+
+        override suspend fun installedEmojiImage(
+            set: EmojiSetFfi,
+            shortcode: String,
+        ): ByteArray = scoped { readInstalledCustomEmoji(account, set.coordinate, shortcode).bytes }
 
         override fun newInstall(): EmojiSetInstall {
             val control = EmojiSetInstallControlFfi()
@@ -117,7 +135,6 @@ internal enum class EmojiSetNotice { Error, NotFound, Changed, Cancelled, Discov
 internal data class EmojiSetsState(
     val sets: List<EmojiSetFfi> = emptyList(),
     val preview: EmojiSetFfi? = null,
-    val artwork: ByteArray? = null,
     val busy: Boolean = false,
     /** The opening relay sync. Rows stay usable; Find, Refresh and the update check wait for it. */
     val discovering: Boolean = false,
@@ -190,7 +207,7 @@ internal class EmojiSetsController(
         }
     }
 
-    /** Opens metadata for an explicit pasted address. Artwork requires its own action. */
+    /** Opens metadata for an explicit pasted address. Images require their own action. */
     suspend fun open(input: String) =
         operate {
             show(backend.fetch(input))
@@ -199,20 +216,14 @@ internal class EmojiSetsController(
 
     /** Opens a version from the current projection. */
     fun show(set: EmojiSetFfi) {
-        state = state.copy(preview = set, artwork = null, notice = null, installedWithSkips = null)
+        state = state.copy(preview = set, notice = null, installedWithSkips = null)
     }
 
     /** Leaves the set preview without discarding the list. */
     fun dismissPreview() {
         if (state.busy) return
-        state = state.copy(preview = null, artwork = null, notice = null, installedWithSkips = null)
+        state = state.copy(preview = null, notice = null, installedWithSkips = null)
         releaseHeldSyncNotice()
-    }
-
-    /** Downloads one explicit preview through MDK's hardened image fetch. */
-    suspend fun loadArtwork() {
-        val set = state.preview ?: return
-        operate(set) { state = state.copy(artwork = backend.preview(set)) }
     }
 
     /** Refreshes the native projection, installs a new version and updates the composer on completion. */
@@ -222,11 +233,11 @@ internal class EmojiSetsController(
             val current = backend.current(set.coordinate)
             if (closed) return@operate
             if (current == null) {
-                state = state.copy(preview = null, artwork = null, notice = EmojiSetNotice.NotFound)
+                state = state.copy(preview = null, notice = EmojiSetNotice.NotFound)
                 return@operate
             }
             if (current.eventIdHex != set.eventIdHex) {
-                state = state.copy(preview = current, artwork = null, notice = EmojiSetNotice.Changed)
+                state = state.copy(preview = current, notice = EmojiSetNotice.Changed)
                 return@operate
             }
             state = state.copy(preview = current)
@@ -264,7 +275,7 @@ internal class EmojiSetsController(
         operate(set) {
             backend.remove(set.coordinate)
             libraryChanged()
-            state = state.copy(preview = backend.current(set.coordinate), artwork = null)
+            state = state.copy(preview = backend.current(set.coordinate))
             refresh()
         }
     }
@@ -349,7 +360,7 @@ internal class EmojiSetsController(
     /** Never retries the install with a different version without a second user decision. */
     @Suppress("TooGenericExceptionCaught") // Refresh failure must not make the old version actionable again.
     private suspend fun reloadChanged(set: EmojiSetFfi?) {
-        state = state.copy(preview = null, artwork = null, notice = EmojiSetNotice.Changed)
+        state = state.copy(preview = null, notice = EmojiSetNotice.Changed)
         try {
             val current = set?.let { backend.current(it.coordinate) }
             state = state.copy(preview = current)

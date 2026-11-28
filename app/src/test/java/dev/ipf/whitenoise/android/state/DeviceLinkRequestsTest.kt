@@ -296,6 +296,29 @@ class DeviceLinkRequestsTest {
             assertTrue(watcher.snapshots.isEmpty())
         }
 
+    @Test
+    fun aSnapshotReadBeforeWipeCannotRestoreThatProfile() =
+        runTest {
+            lateinit var watcher: DeviceLinkRequestWatcher
+            var wipeDuringRead = false
+            watcher =
+                DeviceLinkRequestWatcher(
+                    readSnapshot = { account ->
+                        if (account == "a" && wipeDuringRead) watcher.forgetAccount(account)
+                        snapshot(prompt(account, 10u))
+                    },
+                )
+            val accounts = listOf("a", "b")
+            watcher.refresh(accounts)
+            assertEquals(accounts.toSet(), watcher.snapshots.keys)
+
+            wipeDuringRead = true
+            watcher.refresh(accounts)
+
+            assertEquals(setOf("b"), watcher.snapshots.keys)
+            assertEquals("b", watcher.queue.notice?.accountRef)
+        }
+
     /** Only a link change for a watched profile triggers a re-read, and only of that profile. */
     @Test
     fun onlyAWatchedProfilesLinkChangeRereads() =

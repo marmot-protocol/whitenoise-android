@@ -8,6 +8,8 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithTag
@@ -264,9 +266,9 @@ class DeviceManagementContentTest {
         compose.runOnIdle { assertEquals(1, repairs) }
     }
 
-    /** The warning is shown with the action that marks it seen, described as hiding it on this device only. */
+    /** The warning says what to do and offers only Hide on this device, described as hiding it here only. */
     @Test
-    fun theWarningCanOnlyBeMarkedSeen() {
+    fun theWarningCanOnlyBeHiddenHere() {
         var dismissals = 0
         val warning = CompromiseWarningItemFfi(CompromiseWarningReasonFfi.REJECTED_SIGN_IN, "slot", null, 1u)
         roster(
@@ -275,6 +277,11 @@ class DeviceManagementContentTest {
         )
 
         compose.onNodeWithTag(COMPROMISE_WARNING_TAG).assertExists()
+        compose.onNodeWithText(context.getString(R.string.compromise_warning_title)).assertExists()
+        compose
+            .onNodeWithText(context.getString(R.string.compromise_warning_step_move), substring = true)
+            .assertExists()
+        compose.onNodeWithText(context.getString(R.string.compromise_warning_dismiss)).assertExists()
         compose.onNodeWithText(context.getString(R.string.compromise_warning_dismiss_detail)).assertExists()
         compose.onNodeWithTag(COMPROMISE_WARNING_DISMISS_TAG).performClick()
         compose.runOnIdle { assertEquals(1, dismissals) }
@@ -334,33 +341,64 @@ class DeviceManagementContentTest {
         assertFalse(offersStartFresh(state(emptyList())))
     }
 
-    /** A new sign-in offers Not now and This wasn't me, and each sends its own answer. */
+    /** A new sign-in offers Not now, Mine, don't link and This wasn't me, and each sends its own answer. */
     @Test
-    fun aNewSignInOffersNotNowAndReject() {
+    fun aNewSignInOffersNotNowMineAndReject() {
         assertEquals(SignInAnswerChoice.NotNowOrReject, signInAnswerChoice(signIn("a")))
-        val answers = review(signIn("a"))
+        var mine = 0
+        val answers = review(signIn("a"), onMine = { mine++ })
 
         compose.onNodeWithText(context.getString(R.string.sign_in_question_new)).assertExists()
         compose.onNodeWithText(context.getString(R.string.sign_in_reject_confirm)).assertExists()
         compose.onNodeWithTag(SIGN_IN_NOT_NOW_TAG).performClick()
+        compose.onNodeWithTag(SIGN_IN_MINE_TAG).performClick()
         compose.onNodeWithTag(SIGN_IN_REJECT_TAG).performClick()
         compose.onNodeWithTag(SIGN_IN_DISMISS_TAG).assertDoesNotExist()
+
+        compose.runOnIdle {
+            assertEquals(listOf(SignInResponseFfi.NOT_NOW, SignInResponseFfi.REJECT), answers)
+            assertEquals(1, mine)
+        }
+    }
+
+    /** A sign-in already set aside is not offered Not now again, and one marked as the user's not Mine again. */
+    @Test
+    fun answersAlreadyGivenAreNotOfferedAgain() {
+        review(signIn("a").copy(state = UnrecognizedSignInStateFfi.NOT_NOW), mine = true)
+
+        compose.onNodeWithTag(SIGN_IN_NOT_NOW_TAG).assertDoesNotExist()
+        compose.onNodeWithTag(SIGN_IN_MINE_TAG).assertDoesNotExist()
+        compose.onNodeWithTag(SIGN_IN_CLOSE_TAG).assertExists()
+        compose.onNodeWithTag(SIGN_IN_REJECT_TAG).assertExists()
+        compose.onNodeWithText(context.getString(R.string.sign_in_mine_state)).assertExists()
+    }
+
+    /** A sign-in from before this device asks whether the user still has it and can be marked as not recognized. */
+    @Test
+    fun aSignInFromBeforeThisDeviceCanBeMarkedUnrecognized() {
+        val before = signIn("a", beforeThisDevice = true)
+        assertEquals(SignInAnswerChoice.NotNowOrDontRecognize, signInAnswerChoice(before))
+        val answers = review(before)
+
+        compose.onNodeWithText(context.getString(R.string.sign_in_question_before)).assertExists()
+        compose.onNodeWithText(context.getString(R.string.sign_in_dont_recognize)).assertExists()
+        compose.onNodeWithTag(SIGN_IN_MINE_TAG).assertDoesNotExist()
+        compose.onNodeWithTag(SIGN_IN_NOT_NOW_TAG).performClick()
+        compose.onNodeWithTag(SIGN_IN_REJECT_TAG).performClick()
 
         compose.runOnIdle { assertEquals(listOf(SignInResponseFfi.NOT_NOW, SignInResponseFfi.REJECT), answers) }
     }
 
-    /** A sign-in from before this device asks whether the user still has it and never offers This wasn't me. */
+    /** A row leads with the time and shows the app name as a claim, never as its title. */
     @Test
-    fun aSignInFromBeforeThisDeviceCannotBeRejectedHere() {
-        val before = signIn("a", beforeThisDevice = true)
-        assertEquals(SignInAnswerChoice.NotNowOnly, signInAnswerChoice(before))
-        val answers = review(before)
+    fun aRowLeadsWithTheTimeAndClaimsTheApp() {
+        val list = SignInListState(signIns = listOf(signIn("a")), loaded = true)
+        roster(LinkedDevicesHealth(review = SignInReviewState(list = list, mine = setOf("a"))))
 
-        compose.onNodeWithText(context.getString(R.string.sign_in_question_before)).assertExists()
-        compose.onNodeWithTag(SIGN_IN_REJECT_TAG).assertDoesNotExist()
-        compose.onNodeWithTag(SIGN_IN_NOT_NOW_TAG).performClick()
-
-        compose.runOnIdle { assertEquals(listOf(SignInResponseFfi.NOT_NOW), answers) }
+        val claim = context.getString(R.string.sign_in_claim, signInClientClaim("White Noise"))
+        compose.onNodeWithText(claim, substring = true).performScrollTo().assertExists()
+        compose.onNodeWithText(context.getString(R.string.sign_in_mine_state), substring = true).assertExists()
+        compose.onNode(hasTestTag("sign_ins.row.a") and hasText("White Noise")).assertDoesNotExist()
     }
 
     /** A sign-in another device answered can only be dismissed, which is not a rejection. */
@@ -422,9 +460,23 @@ class DeviceManagementContentTest {
     }
 
     /** Opens the review of [signIn] and returns the answers it sends. */
-    private fun review(signIn: UnrecognizedSignInFfi): List<SignInResponseFfi> {
+    private fun review(
+        signIn: UnrecognizedSignInFfi,
+        mine: Boolean = false,
+        onMine: () -> Unit = {},
+    ): List<SignInResponseFfi> {
         val answers = mutableListOf<SignInResponseFfi>()
-        compose.setContent { WhiteNoiseTheme { SignInReviewDialog(signIn, { answers += it }, onClose = {}) } }
+        compose.setContent {
+            WhiteNoiseTheme {
+                SignInReviewDialog(
+                    signIn,
+                    { answers += it },
+                    onClose = {},
+                    mine = mine,
+                    onMine = onMine,
+                )
+            }
+        }
         return answers
     }
 }

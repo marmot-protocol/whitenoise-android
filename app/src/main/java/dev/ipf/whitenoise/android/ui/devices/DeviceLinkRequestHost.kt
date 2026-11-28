@@ -32,6 +32,7 @@ import dev.ipf.whitenoise.android.state.DeviceRepairConfirmationRequired
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.decline
 import dev.ipf.whitenoise.android.state.link
+import dev.ipf.whitenoise.android.state.onEvent
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import kotlinx.coroutines.delay

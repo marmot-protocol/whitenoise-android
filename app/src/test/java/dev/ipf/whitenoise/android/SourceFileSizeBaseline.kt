@@ -8,7 +8,7 @@ package dev.ipf.whitenoise.android
  */
 internal val sourceFileSizeBaseline: Map<String, Int> =
     mapOf(
-        "dev/ipf/whitenoise/android/MainActivity.kt" to 910,
+        "dev/ipf/whitenoise/android/MainActivity.kt" to 878,
         "dev/ipf/whitenoise/android/amber/AmberActivityCoordinator.kt" to 857,
         "dev/ipf/whitenoise/android/audio/AndroidConversationDictationPlatform.kt" to 672,
         "dev/ipf/whitenoise/android/audio/ConversationDictationController.kt" to 1193,
@@ -77,7 +77,7 @@ internal val sourceFileSizeBaseline: Map<String, Int> =
         "dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt" to 797,
         "dev/ipf/whitenoise/android/ui/group/GroupImageSearch.kt" to 643,
         "dev/ipf/whitenoise/android/ui/medialibrary/MediaLibrary.kt" to 931,
-        "dev/ipf/whitenoise/android/ui/navigation/MainShell.kt" to 2225,
+        "dev/ipf/whitenoise/android/ui/navigation/MainShell.kt" to 2216,
         "dev/ipf/whitenoise/android/ui/profile/AvatarViewer.kt" to 623,
         "dev/ipf/whitenoise/android/ui/profile/ProfileEditScreen.kt" to 1048,
         "dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt" to 1087,

@@ -233,7 +233,10 @@ private fun RenameDeviceDialog(
     )
 }
 
-/** Confirms removing a device, saying what removal does and that it is carried out as the devices are able to. */
+/**
+ * Confirms removing a device, saying what removal does, that it is carried out as the devices are able to, and that
+ * a lost or stolen device may still hold the key.
+ */
 @Composable
 private fun RemoveDeviceDialog(
     name: String,
@@ -242,7 +245,9 @@ private fun RemoveDeviceDialog(
 ) {
     ConfirmDialog(
         title = stringResource(R.string.device_detail_remove),
-        message = stringResource(R.string.device_detail_remove_confirm, name),
+        message =
+            stringResource(R.string.device_detail_remove_confirm, name) + "\n\n" +
+                stringResource(R.string.device_detail_remove_stolen),
         confirmLabel = stringResource(R.string.device_detail_remove),
         onConfirm = onRemove,
         onDismiss = onDismiss,

@@ -439,7 +439,17 @@ private class FakeEmojiSetsBackend : EmojiSetsBackend {
         return set
     }
 
-    override suspend fun preview(set: EmojiSetFfi) = byteArrayOf()
+    override suspend fun cover(set: EmojiSetFfi) = byteArrayOf()
+
+    override suspend fun emojiImage(
+        set: EmojiSetFfi,
+        shortcode: String,
+    ) = byteArrayOf()
+
+    override suspend fun installedEmojiImage(
+        set: EmojiSetFfi,
+        shortcode: String,
+    ) = byteArrayOf()
 
     /** Exercises disposal before the new handle is attached to its controller. */
     override fun newInstall(): EmojiSetInstall {
