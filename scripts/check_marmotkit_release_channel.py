@@ -5,7 +5,10 @@ from pathlib import Path
 import re
 import sys
 
-from prepare_marmotkit_artifact import PreparationError, parse_properties
+if __package__:
+    from .prepare_marmotkit_artifact import PreparationError, parse_properties
+else:
+    from prepare_marmotkit_artifact import PreparationError, parse_properties
 
 
 LOCK = Path("app/src/main/marmotkit/MARMOT_VERSION")
@@ -13,8 +16,8 @@ STABLE_VERSION = re.compile(r"(?:0|[1-9][0-9]*)(?:\.(?:0|[1-9][0-9]*)){2}")
 RELEASE_ROOT = "https://github.com/marmot-protocol/mdk/releases/download"
 
 
-def check_stable_pin(path: Path) -> None:
-    """Require a formal version and matching tag, archive name, and upstream URL."""
+def check_stable_pin(path: Path) -> dict[str, str]:
+    """Return a pin with a formal version and matching tag, archive name, and upstream URL."""
     pin = parse_properties(path)
     version = pin["artifact-id"]
     if STABLE_VERSION.fullmatch(version) is None:
@@ -29,6 +32,7 @@ def check_stable_pin(path: Path) -> None:
     for key, value in expected.items():
         if pin[key] != value:
             raise PreparationError(f"{key} must match the published archive for {version}")
+    return pin
 
 
 def main() -> int:

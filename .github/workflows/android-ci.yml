@@ -158,7 +158,15 @@ jobs:
           github.ref == 'refs/heads/master' ||
           github.event.pull_request.base.ref == 'master' ||
           github.event.merge_group.base_ref == 'refs/heads/master'
-        run: python3 -B scripts/check_marmotkit_release_channel.py
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -B scripts/check_marmotkit_stable_promotion.py
+
+      - name: Verify Stable promotions on develop
+        if: github.event.pull_request.base.ref == 'develop'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -B scripts/check_marmotkit_stable_promotion.py --if-stable
 
       - name: Test conservative CI classification
         run: python3 -m unittest scripts/test_check_ci_changes.py
@@ -320,7 +328,9 @@ jobs:
           python3 .github/scripts/test-apk-size-report.py
 
       - name: Test production release safety gates
-        run: python3 -m unittest scripts/test_release_pipeline.py scripts/test_keystore_gen.py
+        run: >-
+          python3 -m unittest scripts/test_release_pipeline.py scripts/test_keystore_gen.py
+          scripts/test_check_marmotkit_stable_promotion.py
 
       - name: Verify Android release metadata and store assets
         run: ./scripts/check-release-metadata.py

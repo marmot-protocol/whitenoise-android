@@ -574,6 +574,7 @@ class AndroidCiGateTest(unittest.TestCase):
         lookup = 'Look for a verified result on identical content'
         self.assertEqual(steps, ['Checkout', 'Read current full-CI override', classify, lookup,
                                  'Require Stable MarmotKit on master',
+                                 'Verify Stable promotions on develop',
                                  'Test conservative CI classification'])
         for name, command in ((classify, 'python3 -I scripts/check_ci_changes.py'),
                               (lookup, 'python3 -I scripts/ci_reuse.py')):
