@@ -117,7 +117,8 @@ class ChatListProfileReturnSnapCoverageTest {
         )
         assertTrue(
             "the capture must store the visible head in the flow-origin state",
-            "newChatFlowOriginHead = visibleReturnHead()" in chatsScreen.kotlinFunctionBody("captureNewChatFlowOriginHead"),
+            "newChatFlowOriginHead = visibleReturnHead()" in
+                chatsScreen.kotlinFunctionBody("captureNewChatFlowOriginHead"),
         )
 
         val flowHost =

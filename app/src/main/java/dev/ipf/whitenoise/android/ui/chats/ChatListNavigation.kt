@@ -12,12 +12,14 @@ import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 
 /**
- * Opens chats and profiles from the chat list and remembers the list head the return scroll compares against.
+ * Opens chats from the chat list and remembers the list head the return scroll compares against.
  *
  * [rememberChatListNavigation] keys the instance on every value it holds, so a callback still sees the visible rows,
  * flags and callbacks of the composition that created it, and a row lambda that captures it stays memoized across
  * recompositions that leave those values equal, as the lambdas calling the old local functions did.
- * [newChatFlowOriginHeadState] is remembered on the account and runtime generation, as it was as a local.
+ * [newChatFlowOriginHeadState] is remembered on the account and runtime generation, as it was as a local, and
+ * [appState] is the screen's single instance. Profile opens and search recents stay local to the screen so the row
+ * profile callback and the recents writes keep their own, narrower captures.
  */
 @Suppress("LongParameterList") // One field per value the old local functions captured.
 internal class ChatListNavigation(
@@ -26,10 +28,7 @@ internal class ChatListNavigation(
     private val showArchived: Boolean,
     private val advancedFolder: Boolean,
     private val appState: WhiteNoiseAppState,
-    private val searchRecents: GlobalSearchRecents?,
-    private val globalSearchState: GlobalSearchState,
     private val onOpenGroup: (ChatListItem, String?, Boolean, visibleActiveListHead: ChatListReturnHead?) -> Unit,
-    private val onPresentProfile: (npub: String, visibleActiveListHead: ChatListReturnHead?) -> Unit,
 ) {
     private var newChatFlowOriginHead by newChatFlowOriginHeadState
 
@@ -71,18 +70,6 @@ internal class ChatListNavigation(
                 }
         openGroupFromVisibleList(item, messageIdHex, false)
     }
-
-    /** Remembers a chat or profile opened from global search for the blank search page (#4004). */
-    fun recordSearchOpen(entry: GlobalSearchRecent) {
-        searchRecents?.record(globalSearchState.accountScopeToken, entry)
-    }
-
-    /** Presents a profile from the visible list, remembering the list head for the return scroll. */
-    fun presentProfileFromVisibleList(npub: String) {
-        val visibleHead =
-            if (showArchived || advancedFolder) null else chatListReturnHead(visibleItems)
-        onPresentProfile(npub, visibleHead)
-    }
 }
 
 @Composable
@@ -93,10 +80,7 @@ internal fun rememberChatListNavigation(
     showArchived: Boolean,
     advancedFolder: Boolean,
     appState: WhiteNoiseAppState,
-    searchRecents: GlobalSearchRecents?,
-    globalSearchState: GlobalSearchState,
     onOpenGroup: (ChatListItem, String?, Boolean, visibleActiveListHead: ChatListReturnHead?) -> Unit,
-    onPresentProfile: (npub: String, visibleActiveListHead: ChatListReturnHead?) -> Unit,
 ): ChatListNavigation =
     remember(
         newChatFlowOriginHeadState,
@@ -104,10 +88,7 @@ internal fun rememberChatListNavigation(
         showArchived,
         advancedFolder,
         appState,
-        searchRecents,
-        globalSearchState,
         onOpenGroup,
-        onPresentProfile,
     ) {
         ChatListNavigation(
             newChatFlowOriginHeadState = newChatFlowOriginHeadState,
@@ -115,10 +96,7 @@ internal fun rememberChatListNavigation(
             showArchived = showArchived,
             advancedFolder = advancedFolder,
             appState = appState,
-            searchRecents = searchRecents,
-            globalSearchState = globalSearchState,
             onOpenGroup = onOpenGroup,
-            onPresentProfile = onPresentProfile,
         )
     }
 

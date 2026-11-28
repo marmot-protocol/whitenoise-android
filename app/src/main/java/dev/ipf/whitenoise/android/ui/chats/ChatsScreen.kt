@@ -1111,11 +1111,20 @@ internal fun ChatsScreen(
             showArchived = showArchived,
             advancedFolder = advancedFolder,
             appState = appState,
-            searchRecents = searchRecents,
-            globalSearchState = globalSearchState,
             onOpenGroup = onOpenGroup,
-            onPresentProfile = onPresentProfile,
         )
+
+    /** Remembers a chat or profile opened from global search for the blank search page (#4004). */
+    fun recordSearchOpen(entry: GlobalSearchRecent) {
+        searchRecents?.record(globalSearchState.accountScopeToken, entry)
+    }
+
+    /** Presents a profile from the visible list, remembering the list head for the return scroll. */
+    fun presentProfileFromVisibleList(npub: String) {
+        val visibleHead =
+            if (showArchived || advancedFolder) null else chatListReturnHead(visibleItems)
+        onPresentProfile(npub, visibleHead)
+    }
 
     // Taken while the list is still on screen, since it may already include the new chat
     // by the time the flow completes (#3529).
@@ -1845,13 +1854,13 @@ internal fun ChatsScreen(
                         },
                         onOpen = {
                             if (menuActionsCurrent()) {
-                                if (searchActive) chatNavigation.recordSearchOpen(GlobalSearchRecent.Chat(item.group.groupIdHex))
+                                if (searchActive) recordSearchOpen(GlobalSearchRecent.Chat(item.group.groupIdHex))
                                 searchViewport?.selection?.selected = GlobalSearchSelectedResult()
                                 chatNavigation.openGroupFromVisibleList(item, null, false)
                             }
                         },
                         onOpenProfile = { npub ->
-                            if (menuActionsCurrent()) chatNavigation.presentProfileFromVisibleList(npub)
+                            if (menuActionsCurrent()) presentProfileFromVisibleList(npub)
                         },
                         onOpenActions = { touchX ->
                             if (menuActionsCurrent()) {
@@ -2375,12 +2384,12 @@ internal fun ChatsScreen(
                 accountRef = controller.boundAccountRef,
                 existingDirectChat = { npub -> appState.existingDirectChat(npub) },
                 onOpenChat = { chat ->
-                    chatNavigation.recordSearchOpen(GlobalSearchRecent.Chat(chat.group.groupIdHex))
+                    recordSearchOpen(GlobalSearchRecent.Chat(chat.group.groupIdHex))
                     chatNavigation.openGroupFromVisibleList(chat, null, false)
                 },
                 onOpenProfile = { npub ->
-                    chatNavigation.recordSearchOpen(GlobalSearchRecent.Profile(npub))
-                    chatNavigation.presentProfileFromVisibleList(npub)
+                    recordSearchOpen(GlobalSearchRecent.Profile(npub))
+                    presentProfileFromVisibleList(npub)
                 },
             )
             GlobalSearchRecentStrip(
@@ -2390,7 +2399,7 @@ internal fun ChatsScreen(
                 controller = controller,
                 appState = appState,
                 onOpenChat = { chat -> chatNavigation.openGroupFromVisibleList(chat, null, false) },
-                onOpenProfile = chatNavigation::presentProfileFromVisibleList,
+                onOpenProfile = ::presentProfileFromVisibleList,
             )
             ChatListBodyFrame(
                 modifier = Modifier.fillMaxSize(),
