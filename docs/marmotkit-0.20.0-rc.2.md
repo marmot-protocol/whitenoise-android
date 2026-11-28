@@ -1,6 +1,6 @@
-# MarmotKit 0.20.0-rc.2 on Android develop
+# MarmotKit 0.20.0-rc.2 Android qualification
 
-Android develop pins MDK commit `a3228a2c572f2c91bbc5948160bbe890f20888a2` via the [published 0.20.0-rc.2 Android archive](https://github.com/marmot-protocol/mdk/releases/tag/marmotkit-v0.20.0-rc.2). The archive checksum, source and builder commit agree with the [publishing run](https://github.com/marmot-protocol/mdk/actions/runs/45917991806).
+The Android RC2 candidate pinned MDK commit `a3228a2c572f2c91bbc5948160bbe890f20888a2` via the [published 0.20.0-rc.2 Android archive](https://github.com/marmot-protocol/mdk/releases/tag/marmotkit-v0.20.0-rc.2). The archive checksum, source and builder commit agree with the [publishing run](https://github.com/marmot-protocol/mdk/actions/runs/45917991806).
 
 The manifest omits the feature list. The [arm64-v8a](https://github.com/marmot-protocol/mdk/actions/runs/45917991806/job/140265131054), [armeabi-v7a](https://github.com/marmot-protocol/mdk/actions/runs/45917991806/job/140265131088), [x86](https://github.com/marmot-protocol/mdk/actions/runs/45917991806/job/140265131000), and [x86_64](https://github.com/marmot-protocol/mdk/actions/runs/45917991806/job/140265131168) build logs record both exporter flags enabled. The [pinned build script](https://github.com/marmot-protocol/mdk/blob/a3228a2c572f2c91bbc5948160bbe890f20888a2/crates/marmot-uniffi/kotlin-bindings.sh) passes them to Cargo as `otlp-export` and `product-analytics-export`.
 

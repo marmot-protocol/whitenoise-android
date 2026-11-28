@@ -9,6 +9,13 @@ The [official 0.19.0 adoption](marmotkit-0.19.0.md) records Android's pin and
 consumer changes. The [official 0.18.0 adoption](marmotkit-0.18.0.md) records the
 populated upgrade baseline.
 
+For Android develop and internal staging, [the 0.20.0-rc.4 adoption]
+(https://github.com/marmot-protocol/whitenoise-android/pull/4303) records the
+pin and maintainer waiver for the known silent-relay recovery failure. The
+[RC2 qualification](marmotkit-0.20.0-rc.2.md) and November
+[25](marmotkit-nightly-20261125.md) and [26](marmotkit-nightly-20261126.md)
+nightly records cover the agent integration and earlier recovery results.
+
 The [official 0.17.0 adoption](marmotkit-0.17.0.md), the
 [official 0.16.0 adoption](marmotkit-0.16.0.md), the
 [official 0.15.0 release](marmotkit-0.15.0.md), the

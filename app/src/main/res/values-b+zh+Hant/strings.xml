@@ -2137,7 +2137,6 @@
     <string name="setup_finding_unreachable">無法連線至此中繼站。</string>
     <string name="setup_relay_timeout_title">有一個中繼未及時回應</string>
     <string name="setup_finding_timed_out">此次檢查已逾時。</string>
-    <string name="setup_finding_rate_limited">轉送站正在限制請求頻率。請稍後再試。</string>
     <string name="setup_finding_authentication_required">此中繼站要求驗證身分。</string>
     <string name="setup_finding_payment_required">此中繼站要求付費。</string>
     <string name="setup_finding_access_restricted">對此中繼站的存取受到限制。</string>

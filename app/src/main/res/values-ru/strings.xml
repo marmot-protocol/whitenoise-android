@@ -2263,7 +2263,6 @@
     <string name="setup_finding_unreachable">Не удалось связаться с этим реле.</string>
     <string name="setup_relay_timeout_title">Ретранслятор не ответил вовремя</string>
     <string name="setup_finding_timed_out">Время ожидания проверки истекло.</string>
-    <string name="setup_finding_rate_limited">Ретранслятор ограничивает частоту запросов. Повторите попытку чуть позже.</string>
     <string name="setup_finding_authentication_required">Это реле требует аутентификации.</string>
     <string name="setup_finding_payment_required">Это реле требует оплаты.</string>
     <string name="setup_finding_access_restricted">Доступ к этому реле ограничен.</string>

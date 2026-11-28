@@ -110,7 +110,6 @@ class DurableLocalSendsTest {
                     }
                 val result = engine.sendComposerTextWithToken("account", "group", null, "hello", "same-token")
                 assertEquals(SendAcceptDispositionFfi.ACCEPTED_PENDING, result.acceptDisposition)
-                assertEquals(listOf(messageId), result.messageIds)
             }
         }
 

@@ -2182,7 +2182,6 @@
     <string name="setup_finding_unreachable">No se pudo acceder a este relé.</string>
     <string name="setup_relay_timeout_title">Un relay no respondió a tiempo</string>
     <string name="setup_finding_timed_out">Se agotó el tiempo de esta comprobación.</string>
-    <string name="setup_finding_rate_limited">El relé está limitando las solicitudes. Vuelve a intentarlo en breve.</string>
     <string name="setup_finding_authentication_required">Este relé requiere autenticación.</string>
     <string name="setup_finding_payment_required">Este relé requiere un pago.</string>
     <string name="setup_finding_access_restricted">El acceso a este relé está restringido.</string>

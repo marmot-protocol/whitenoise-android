@@ -2182,7 +2182,6 @@
     <string name="setup_finding_unreachable">Non è stato possibile raggiungere questo relay.</string>
     <string name="setup_relay_timeout_title">Un relay non ha risposto in tempo</string>
     <string name="setup_finding_timed_out">Questa verifica ha superato il tempo limite.</string>
-    <string name="setup_finding_rate_limited">Il relay sta limitando le richieste. Riprova tra poco.</string>
     <string name="setup_finding_authentication_required">Questo relay richiede l’autenticazione.</string>
     <string name="setup_finding_payment_required">Questo relay richiede un pagamento.</string>
     <string name="setup_finding_access_restricted">L’accesso a questo relay è limitato.</string>

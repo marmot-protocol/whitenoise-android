@@ -2175,7 +2175,6 @@
     <string name="setup_finding_unreachable">Bu röleye ulaşılamadı.</string>
     <string name="setup_relay_timeout_title">Bir röle zamanında yanıt vermedi</string>
     <string name="setup_finding_timed_out">Bu kontrol zaman aşımına uğradı.</string>
-    <string name="setup_finding_rate_limited">Aktarıcı istekleri sınırlıyor. Birazdan tekrar dene.</string>
     <string name="setup_finding_authentication_required">Bu röle kimlik doğrulaması gerektiriyor.</string>
     <string name="setup_finding_payment_required">Bu röle ödeme gerektiriyor.</string>
     <string name="setup_finding_access_restricted">Bu röleye erişim kısıtlı.</string>

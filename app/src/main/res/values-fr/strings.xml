@@ -2182,7 +2182,6 @@
     <string name="setup_finding_unreachable">Ce relais n’a pas pu être joint.</string>
     <string name="setup_relay_timeout_title">Un relais n’a pas répondu à temps</string>
     <string name="setup_finding_timed_out">Cette vérification a dépassé le délai prévu.</string>
-    <string name="setup_finding_rate_limited">Le relais limite les requêtes. Réessaie dans un instant.</string>
     <string name="setup_finding_authentication_required">Ce relais exige une authentification.</string>
     <string name="setup_finding_payment_required">Ce relais exige un paiement.</string>
     <string name="setup_finding_access_restricted">L’accès à ce relais est restreint.</string>
