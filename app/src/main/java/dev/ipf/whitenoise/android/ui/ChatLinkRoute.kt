@@ -1,11 +1,6 @@
 package dev.ipf.whitenoise.android.ui
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.res.stringResource
@@ -17,9 +12,6 @@ import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.notifications.NotificationTargetKind
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.ChoiceDialog
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
 
 /**
  * Opens a `marmot://` link tapped inside the app, and names the chats such links point at (#3658).
@@ -94,53 +86,6 @@ internal fun chatLinkOutcome(
         is ChatLinkDestination.Open -> ChatLinkOutcome.Open(chatLinkTarget(destination.accountRef, groupIdHex))
         is ChatLinkDestination.Choose ->
             ChatLinkOutcome.Choose(ChatLinkAccountChoice(groupIdHex, destination.accountRefs))
-    }
-}
-
-/**
- * Runs the chat lookups of links tapped inside the app, latest first (#4186). A newer tap cancels an older lookup,
- * and a lookup that finishes after [routeGeneration] moved, because a notification tap or another route arrived
- * while it read, drops its result so the newer navigation keeps the screen.
- */
-internal class InAppChatLinkLookups(
-    private val scope: CoroutineScope,
-    private val routeGeneration: () -> Long,
-) {
-    private var current: Job? = null
-
-    /** Resolves one tapped link with [resolve] and hands a still-current outcome to [apply]. */
-    fun launch(
-        resolve: suspend () -> ChatLinkOutcome?,
-        apply: (ChatLinkOutcome) -> Unit,
-    ) {
-        current?.cancel()
-        val startedAt = routeGeneration()
-        current =
-            scope.launch {
-                val outcome = resolve()
-                if (outcome != null && routeGeneration() == startedAt) apply(outcome)
-            }
-    }
-}
-
-/**
- * Clears a pending chat-link account choice with [clear] when a newer notification route, [routeGeneration],
- * arrives while the chooser waits (#4186). The generation the root composed with is the baseline, so a restored
- * chooser survives activity recreation.
- */
-@Suppress("FunctionNaming")
-@Composable
-internal fun ChatLinkChoiceSupersededEffect(
-    routeGeneration: Long,
-    clear: () -> Unit,
-) {
-    val baseline = remember { mutableLongStateOf(routeGeneration) }
-    val currentClear by rememberUpdatedState(clear)
-    LaunchedEffect(routeGeneration) {
-        if (routeGeneration != baseline.longValue) {
-            baseline.longValue = routeGeneration
-            currentClear()
-        }
     }
 }
 

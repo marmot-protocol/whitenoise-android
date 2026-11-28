@@ -17,6 +17,7 @@ import dev.ipf.whitenoise.android.state.MessageAvailability
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.hiddenMessageIdsInGroup
+import dev.ipf.whitenoise.android.state.isLoadingPage
 import dev.ipf.whitenoise.android.state.loadMessageAvailability
 import dev.ipf.whitenoise.android.state.loadUntilMessageAvailable
 import dev.ipf.whitenoise.android.state.returnToLatestWindow
@@ -351,7 +352,11 @@ internal class ConversationMessageNavigator(
             // window. Page back to its durable local message before asking the
             // coordinator to restore the logical anchor and exact offset.
             val match = anchor.match
-            if (match != null && controller.loadSearchResultMessageAvailable(match)) {
+            if (match != null &&
+                pageBackForSearchReturn({ controller.isLoadingPage }) {
+                    controller.loadSearchResultMessageAvailable(match)
+                }
+            ) {
                 withFrameNanos { }
             }
             // A saved message that could not be paged back stays the reader's search position, rather than

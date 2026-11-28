@@ -275,7 +275,7 @@ class MainActivity : AppCompatActivity() {
                         inboundProfilePayload = inboundProfilePayload,
                         onProfilePayloadHandled = { if (inboundProfilePayload == it) inboundProfilePayload = null },
                         inboundNotificationTarget = inboundNotificationTarget,
-                        currentNotificationRequestId = { inboundNotificationRequestId },
+                        inboundNotificationRequestId = inboundNotificationRequestId,
                         onNotificationTargetHandled = ::handleNotificationTarget,
                         inboundShareRequest = inboundShareRequest,
                         onShareRequestHandled = ::handleShareRequest,
@@ -471,9 +471,9 @@ class MainActivity : AppCompatActivity() {
         // Revoke before ON_RESUME: Compose can still show the old chat when this route arrives.
         if (target != null || share != null || data != null) appState.conversationDictation.clearMicrophoneRecovery()
         val routing = notificationInboundState.route(target, share, data, inboundProfilePayload, inboundShareRequest)
-        foregroundConversationDismissal.onInboundRoute(hasNotificationTarget = target != null, data = data)
         if (target != null) {
             appState.signInAlerts.devicesRequest?.let { appState.signInAlerts.updateDevicesRequest(it) }
+            foregroundConversationDismissal.onNotificationRouteObserved()
             appState.startNotificationRouteTrace(routing.notificationRequestId, lifecycleClass, target)
         }
         inboundProfilePayload = routing.profilePayload

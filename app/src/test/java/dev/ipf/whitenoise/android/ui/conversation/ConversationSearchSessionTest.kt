@@ -1,8 +1,13 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -14,7 +19,8 @@ import org.junit.Test
 /**
  * Closing in-chat search returns the reader to where search opened (#4224). The return can wait at a paging
  * boundary, and a second close of the same session (the toolbar and system Back together) must leave it running,
- * while a newer search session or a reader scroll still supersedes it.
+ * while a newer search session or a reader scroll still supersedes it. A page already in flight delays the return
+ * rather than cancelling it.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ConversationSearchSessionTest {
@@ -123,6 +129,71 @@ class ConversationSearchSessionTest {
             runCurrent()
 
             assertEquals(listOf(ScrollWrite(7, 3)), harness.writer.writes)
+        }
+
+    /** A page already in flight at close holds the return, which pages back once that page ends. */
+    @Test
+    fun returnWaitsForAPageAlreadyInFlight() =
+        runTest {
+            var loading by mutableStateOf(true)
+            var attempts = 0
+            val result =
+                async {
+                    pageBackForSearchReturn({ loading }) {
+                        attempts += 1
+                        true
+                    }
+                }
+            runCurrent()
+            assertEquals(0, attempts)
+
+            loading = false
+            Snapshot.sendApplyNotifications()
+            runCurrent()
+
+            assertTrue(result.await())
+            assertEquals(1, attempts)
+        }
+
+    /** A prefetch that starts before the return pages makes it report no progress, so it retries after that page. */
+    @Test
+    fun returnRetriesAfterAPrefetchTookThePager() =
+        runTest {
+            var loading by mutableStateOf(false)
+            var attempts = 0
+            val result =
+                async {
+                    pageBackForSearchReturn({ loading }) {
+                        attempts += 1
+                        if (attempts == 1) loading = true
+                        attempts > 1
+                    }
+                }
+            runCurrent()
+            assertEquals(1, attempts)
+
+            loading = false
+            Snapshot.sendApplyNotifications()
+            runCurrent()
+
+            assertTrue(result.await())
+            assertEquals(2, attempts)
+        }
+
+    /** A saved message that is really gone fails once, without waiting, when no page is loading. */
+    @Test
+    fun missingMessageFailsAfterOneAttempt() =
+        runTest {
+            var attempts = 0
+
+            val available =
+                pageBackForSearchReturn({ false }) {
+                    attempts += 1
+                    false
+                }
+
+            assertFalse(available)
+            assertEquals(1, attempts)
         }
 
     /** Wires the session functions to a real scroll coordinator with a return held at a paging boundary. */

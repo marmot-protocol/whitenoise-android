@@ -195,10 +195,7 @@ internal fun WhiteNoiseApp(
     inboundProfilePayload: String? = null,
     onProfilePayloadHandled: (String) -> Unit = {},
     inboundNotificationTarget: NotificationTarget? = null,
-    // The Activity's live notification request id. An in-app chat link lookup reads it when it finishes, before the
-    // root recomposes with a newer request (#4186), and composition reads it through the parameter below.
-    currentNotificationRequestId: () -> Long = { 0L },
-    inboundNotificationRequestId: Long = currentNotificationRequestId(),
+    inboundNotificationRequestId: Long = 0L,
     onNotificationTargetHandled: (NotificationTarget, Long) -> Unit = { _, _ -> },
     inboundShareRequest: ShareRequest? = null,
     onShareRequestHandled: (ShareRequest) -> Unit = {},
@@ -260,8 +257,6 @@ internal fun WhiteNoiseApp(
             null
         }
     val visiblePickerRequest = visibleShareRequest.takeUnless { visibleShareDirectGroupId != null }
-    // A chat link resolves over the current screen; only a profile payload swaps in the loading screen (#4186).
-    val payloadShowsRootLoading = remember(inboundProfilePayload) { inboundProfilePayload.showsRootLoading() }
     val inboundRoutePending =
         inboundNotificationTarget != null ||
             inboundProfilePayload != null ||
@@ -310,7 +305,7 @@ internal fun WhiteNoiseApp(
             appState.accountSetup.controller == null &&
             appState.profileSignUpForPresentation == null
     val protectedStartupVisible =
-        payloadShowsRootLoading ||
+        inboundProfilePayload != null ||
             !shouldComposeProtectedMainShell(protectedFirstUsefulSurface)
     val protectedShell =
         rememberProtectedShellSavedState(
@@ -429,9 +424,6 @@ internal fun WhiteNoiseApp(
         }
     }
     val currentOnChatLinkResolved by rememberUpdatedState(onChatLinkResolved)
-    val routeGeneration by rememberUpdatedState(currentNotificationRequestId)
-    val inAppChatLinks = remember(scope) { InAppChatLinkLookups(scope) { routeGeneration() } }
-    ChatLinkChoiceSupersededEffect(inboundNotificationRequestId) { chatLinkChoice = null }
     val inAppLinkHandler =
         remember(appState) {
             InAppLinkHandler(
@@ -442,7 +434,8 @@ internal fun WhiteNoiseApp(
                         appState.presentProfilePayload(link)
                         return@open
                     }
-                    inAppChatLinks.launch(resolve = { resolveChatLinkOutcome(chatLink, appState) }) { outcome ->
+                    scope.launch {
+                        val outcome = resolveChatLinkOutcome(chatLink, appState) ?: return@launch
                         // The app may have locked while the accounts holding the chat were read.
                         if (appState.appLock.screenVisible || appState.appLock.evaluationPending) return@launch
                         showChatLinkOutcome(outcome)
@@ -640,7 +633,7 @@ internal fun WhiteNoiseApp(
                                         }
                                     }
                                     if (
-                                        payloadShowsRootLoading ||
+                                        inboundProfilePayload != null ||
                                         !shouldComposeProtectedMainShell(firstUsefulSurface)
                                     ) {
                                         NotificationRouteStartupSwapTrace(
@@ -660,12 +653,12 @@ internal fun WhiteNoiseApp(
                                             surface =
                                                 when {
                                                     startupError != null -> WarmResumeRenderedSurface.Error
-                                                    payloadShowsRootLoading ->
+                                                    inboundProfilePayload != null ->
                                                         WarmResumeRenderedSurface.FullScreenLoading
                                                     else -> WarmResumeRenderedSurface.StartupLoading
                                                 },
                                         ) {
-                                            if (startupError == null && payloadShowsRootLoading) {
+                                            if (startupError == null && inboundProfilePayload != null) {
                                                 LoadingScreen()
                                             } else {
                                                 StartupLocalProjectionScreen(startupError) {

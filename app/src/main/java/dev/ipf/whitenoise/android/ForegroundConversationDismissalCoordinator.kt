@@ -1,7 +1,5 @@
 package dev.ipf.whitenoise.android
 
-import dev.ipf.whitenoise.android.core.ChatLink
-
 /**
  * Distinguishes a plain foreground resume from a notification-owned route.
  *
@@ -26,17 +24,6 @@ internal class ForegroundConversationDismissalCoordinator {
     }
 
     /**
-     * Notes an inbound intent, which owns this foreground entry when [inboundIntentOwnsForeground] says so. A chat
-     * link from another app reaches a stopped Activity between onStart and onResume, like a notification tap.
-     */
-    fun onInboundRoute(
-        hasNotificationTarget: Boolean,
-        data: String?,
-    ) {
-        if (inboundIntentOwnsForeground(hasNotificationTarget, data)) onNotificationRouteObserved()
-    }
-
-    /**
      * The route now owns the visible conversation directly. Clear only the
      * unlock guard; the pending resume decision still needs to remember that
      * this foreground entry came from a notification.
@@ -55,13 +42,3 @@ internal class ForegroundConversationDismissalCoordinator {
 
     fun shouldDismissAfterUnlock(): Boolean = !currentForegroundNotificationOwned
 }
-
-/**
- * Whether an inbound intent routes this foreground entry itself, so resume must not dismiss the notifications of
- * the conversation that was open before it: a notification tap, or a chat link that resolves to its own chat or
- * notice (#4186). A profile link or a plain launch leaves the open conversation in front and still dismisses.
- */
-internal fun inboundIntentOwnsForeground(
-    hasNotificationTarget: Boolean,
-    data: String?,
-): Boolean = hasNotificationTarget || ChatLink.isChatLink(data)

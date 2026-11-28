@@ -1,8 +1,10 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import androidx.compose.runtime.snapshotFlow
 import dev.ipf.whitenoise.android.core.ConversationSearchMatch
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
@@ -66,3 +68,25 @@ internal fun ConversationNavigationState.closeSearchSession(
             returnTo(anchor)
         }
 }
+
+/**
+ * Pages the window back to the saved position for a search return. A page already in flight, such as an automatic
+ * prefetch, makes [loadMatch] report no progress, so the return waits for that page to end and tries again. A
+ * message that is really gone still ends after one attempt, because nothing is loading when it fails.
+ */
+internal suspend fun pageBackForSearchReturn(
+    isLoadingPage: () -> Boolean,
+    loadMatch: suspend () -> Boolean,
+): Boolean {
+    var attempts = 0
+    var available: Boolean
+    do {
+        snapshotFlow(isLoadingPage).first { !it }
+        available = loadMatch()
+        attempts += 1
+    } while (!available && isLoadingPage() && attempts < SEARCH_RETURN_PAGE_ATTEMPTS)
+    return available
+}
+
+/** Bounds the waits behind other pages, so a reader whose prefetch keeps restarting is not chased forever. */
+private const val SEARCH_RETURN_PAGE_ATTEMPTS = 3
