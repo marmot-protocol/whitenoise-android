@@ -112,6 +112,8 @@ configuration, and check those values in the resulting candidate without
 printing keys. The general runtime-completeness flag does not require these
 optional product fields. Changing them requires a new build and may require
 renewed consent; configured artifacts alone do not prove Aptabase ingestion.
+Record ingestion with the operator using
+[Aptabase qualification](product-analytics.md#aptabase-qualification).
 
 Audit upload credentials are installed only after the user accepts the current
 **Share technical logs** disclosure. The native recording preference alone is
