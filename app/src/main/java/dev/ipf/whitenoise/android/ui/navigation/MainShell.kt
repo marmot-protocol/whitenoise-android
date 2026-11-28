@@ -716,7 +716,7 @@ internal fun MainShell(
                         ownsShareRequest(request)
                     }
                 }.getOrElse {
-                    appState.present(R.string.share_import_storage)
+                    if (ownsShareRequest(request)) appState.present(R.string.share_import_storage)
                     return@stageShare false
                 }
             if (!staged) {

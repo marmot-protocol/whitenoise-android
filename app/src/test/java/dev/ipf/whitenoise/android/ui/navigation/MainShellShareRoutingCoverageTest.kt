@@ -44,7 +44,7 @@ class MainShellShareRoutingCoverageTest {
             mainShellSource()
                 .readText()
                 .substringAfter("if (directGroupId != null) {", missingDelimiterValue = "")
-                .substringBefore("} else {", missingDelimiterValue = "")
+                .substringBefore("} else if (ownsShareRequest(request)) {", missingDelimiterValue = "")
 
         val stageIndex = directShareBranch.indexOf("stageInboundShareForFirstFrame(")
         val clearIndex = directShareBranch.indexOf("clearSharePickerRequest()")
