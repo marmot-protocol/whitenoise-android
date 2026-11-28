@@ -8,6 +8,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StatePage.kt",
         "anchor": "fun StatePage(",
         "test_ids": [
+          "CHL-001",
           "INT-003",
           "INT-004",
           "INT-012"

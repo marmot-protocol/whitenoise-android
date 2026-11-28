@@ -152,6 +152,15 @@
     ],
     "source_coverage": [
       {
+        "surface": "Shared chat state layout",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListEmptyStates.kt",
+        "anchor": "StatePage(",
+        "test_ids": [
+          "CHL-001",
+          "FIND-004"
+        ]
+      },
+      {
         "surface": "R.string.chat_with_support",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListEmptyStates.kt",
         "anchor": "R.string.chat_with_support",

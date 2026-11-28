@@ -124,7 +124,7 @@ class GlobalSearchResultRowTest {
             )
         render(content)
 
-        composeRule.onNodeWithText("No Results").assertIsDisplayed()
+        composeRule.onNodeWithText("No results").assertIsDisplayed()
         composeRule.onNodeWithText("2 filters active").assertIsDisplayed()
     }
 
@@ -221,7 +221,7 @@ class GlobalSearchResultRowTest {
         assertNull(liveRegion("Searching message content…"))
 
         composeRule.runOnIdle { state = GlobalSearchResultsState(generation = 1, batches = 2, endReached = true) }
-        val empty = composeRule.onNodeWithText("No Results", useUnmergedTree = true).fetchSemanticsNode()
+        val empty = composeRule.onNodeWithText("No results", useUnmergedTree = true).fetchSemanticsNode()
         val announced = generateSequence(empty) { it.parent }.any { it.config.contains(SemanticsProperties.LiveRegion) }
         assertTrue(announced)
     }
