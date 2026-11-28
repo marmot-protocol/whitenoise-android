@@ -32,13 +32,14 @@ name: smart-folders-participants-picker-back
     id: folder.addField.PARTICIPANTS
 - tapOn:
     id: folder.addField.PARTICIPANTS
-- tapOn:
-    id: folder.choosePeople
-- back
+- assertVisible:
+    id: folder.peoplePage
+- assertVisible:
+    id: entity.search
 - assertVisible:
     id: folder.conditionDone
     enabled: false
-- tapOn: Cancel
+- back
 - runFlow: ../fixtures/return-from-smart-folder-filter.yaml
 - back
 - assertVisible:

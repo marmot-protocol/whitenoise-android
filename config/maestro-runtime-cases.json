@@ -1743,7 +1743,7 @@
       "manual_ids": [
         "FLD-004"
       ],
-      "assertions": "An empty Participants condition cannot be saved; cancelling creates no folder. Native postcondition requires no persisted custom folder. Matching rules remain separate acceptance.",
+      "assertions": "An empty Participants condition cannot be saved; Back from its page creates no folder. Native postcondition requires no persisted custom folder. Matching rules remain separate acceptance.",
       "postcondition": "folder-absent"
     },
     "smart-folders-participants-picker-back": {
@@ -1751,7 +1751,7 @@
       "manual_ids": [
         "FLD-004"
       ],
-      "assertions": "The participant picker cancels to the still-empty condition and disabled Save. Native postcondition requires no persisted custom folder. Matching rules remain separate acceptance.",
+      "assertions": "The People page lists people inline with search and a disabled Save, and Back closes it without a picker chain. Native postcondition requires no persisted custom folder. Matching rules remain separate acceptance.",
       "postcondition": "folder-absent"
     },
     "smart-folders-condition-rotation": {

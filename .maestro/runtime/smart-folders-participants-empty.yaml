@@ -33,9 +33,11 @@ name: smart-folders-participants-empty
 - tapOn:
     id: folder.addField.PARTICIPANTS
 - assertVisible:
+    id: folder.peoplePage
+- assertVisible:
     id: folder.conditionDone
     enabled: false
-- tapOn: Cancel
+- back
 - runFlow: ../fixtures/return-from-smart-folder-filter.yaml
 - back
 - assertVisible:

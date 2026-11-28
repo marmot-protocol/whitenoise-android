@@ -1,0 +1,164 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderPeopleConditionPage.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "SmartFolderPeopleConditionPage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderPeopleConditionPage.kt",
+        "anchor": "internal fun SmartFolderPeopleConditionPage(",
+        "test_ids": [
+          "FLD-004",
+          "FLD-013"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "smart_folder_add_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderPeopleConditionPage.kt",
+        "anchor": "R.string.smart_folder_add_key",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_invalid_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderPeopleConditionPage.kt",
+        "anchor": "R.string.smart_folder_invalid_key",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_select_people",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderPeopleConditionPage.kt",
+        "anchor": "R.string.smart_folder_select_people",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_cond_add_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderPeopleConditionPage.kt",
+        "anchor": "R.string.explanation_organize_cond_add_key",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_cond_choose_people",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderPeopleConditionPage.kt",
+        "anchor": "R.string.explanation_organize_cond_choose_people",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_cond_mode",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderPeopleConditionPage.kt",
+        "anchor": "R.string.explanation_organize_cond_mode",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_cond_not",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderPeopleConditionPage.kt",
+        "anchor": "R.string.explanation_organize_cond_not",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_cond_options",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderPeopleConditionPage.kt",
+        "anchor": "R.string.explanation_organize_cond_options",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_cond_remove",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderPeopleConditionPage.kt",
+        "anchor": "R.string.explanation_organize_cond_remove",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "folder_search",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderPeopleConditionPage.kt",
+        "anchor": "R.string.folder_search",
+        "test_ids": [
+          "FLD-004",
+          "FLD-013"
+        ]
+      },
+      {
+        "surface": "more_options",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderPeopleConditionPage.kt",
+        "anchor": "R.string.more_options",
+        "test_ids": [
+          "FLD-004",
+          "FLD-013"
+        ]
+      },
+      {
+        "surface": "no_matches",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderPeopleConditionPage.kt",
+        "anchor": "R.string.no_matches",
+        "test_ids": [
+          "FLD-004",
+          "FLD-013"
+        ]
+      },
+      {
+        "surface": "save",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderPeopleConditionPage.kt",
+        "anchor": "R.string.save",
+        "test_ids": [
+          "FLD-004",
+          "FLD-013"
+        ]
+      },
+      {
+        "surface": "smart_folder_ignore",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderPeopleConditionPage.kt",
+        "anchor": "R.string.smart_folder_ignore",
+        "test_ids": [
+          "FLD-004",
+          "FLD-013"
+        ]
+      },
+      {
+        "surface": "smart_folder_include_match",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderPeopleConditionPage.kt",
+        "anchor": "R.string.smart_folder_include_match",
+        "test_ids": [
+          "FLD-004",
+          "FLD-013"
+        ]
+      },
+      {
+        "surface": "smart_folder_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderPeopleConditionPage.kt",
+        "anchor": "R.string.smart_folder_key",
+        "test_ids": [
+          "FLD-004",
+          "FLD-013"
+        ]
+      },
+      {
+        "surface": "smart_folder_negate_condition",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderPeopleConditionPage.kt",
+        "anchor": "R.string.smart_folder_negate_condition",
+        "test_ids": [
+          "FLD-004",
+          "FLD-013"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
