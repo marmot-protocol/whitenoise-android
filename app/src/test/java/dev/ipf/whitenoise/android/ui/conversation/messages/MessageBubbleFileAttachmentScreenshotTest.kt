@@ -943,8 +943,6 @@ open class MessageBubbleFileAttachmentFixtures {
             media = emptyList(),
             replyToMessageIdHex = null,
             thread = null,
-            retentionSeconds = null,
-            retentionExpiresAt = null,
             deleted = false,
             deletionSource = DeletionSourceFfi.UNKNOWN,
             invalidationStatus = null,

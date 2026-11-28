@@ -169,8 +169,6 @@ class PollMediaReplyScreenshotTest : PollMessageTestFixtures() {
             deletionSource = DeletionSourceFfi.UNKNOWN,
             invalidationStatus = null,
             thread = null,
-            retentionSeconds = null,
-            retentionExpiresAt = null,
         )
 
     /** Waits for the scripted unavailable files to settle before capturing their reply presentation. */
