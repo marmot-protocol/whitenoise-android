@@ -31,7 +31,8 @@
         "anchor": "fun ChatFolderPills(",
         "test_ids": [
           "FLD-001",
-          "CHL-002"
+          "CHL-002",
+          "FLD-012"
         ]
       },
       {

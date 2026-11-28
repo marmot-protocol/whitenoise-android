@@ -3,6 +3,7 @@
     <string name="voice_recording_stopped_announcement">Запись остановлена</string>
     <string name="voice_message_seek">Позиция воспроизведения</string>
     <string name="video_failed">Не удалось загрузить видео</string>
+    <string name="video_seek_failed">Не удалось перейти к этому моменту</string>
     <string name="conversation_new_message_from">Новое сообщение от %1$s</string>
     <plurals name="conversation_new_messages">
         <item quantity="one">%1$d новое сообщение</item>
@@ -2974,4 +2975,8 @@
     <string name="dictation_transcribe_voice_messages_title">Автоматически расшифровывать голосовые сообщения</string>
     <string name="dictation_transcribe_voice_messages_subtitle">Показывает расшифровки загруженных голосовых сообщений в чате. Требуется Offline Speech to Text.</string>
     <string name="toast_unsupported_link">Эта ссылка не поддерживается.</string>
+    <string name="private_key_reminder_title">Сохраните закрытый ключ</string>
+    <string name="private_key_reminder_body">Если вы потеряете этот телефон, сохранить свой профиль и контакты можно будет только с помощью ключа.</string>
+    <string name="private_key_reminder_save">Сохранить ключ</string>
+    <string name="private_key_reminder_not_now">Не сейчас</string>
 </resources>

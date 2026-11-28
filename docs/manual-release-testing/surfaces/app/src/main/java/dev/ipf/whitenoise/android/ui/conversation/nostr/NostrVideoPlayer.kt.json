@@ -91,6 +91,14 @@
         "test_ids": [
           "RDR-004"
         ]
+      },
+      {
+        "surface": "R.string.video_seek_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrVideoPlayer.kt",
+        "anchor": "R.string.video_seek_failed",
+        "test_ids": [
+          "RDR-004"
+        ]
       }
     ]
   },

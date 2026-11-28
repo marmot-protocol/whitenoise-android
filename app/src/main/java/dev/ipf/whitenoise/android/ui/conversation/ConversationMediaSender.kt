@@ -115,11 +115,12 @@ internal class ConversationMediaSender(
         }
     }
 
-    /** Keeps the reviewed file until the optimistic row is seeded; that row's retained bytes then own every retry. */
+    /** Queues the retained audio only when [retireDraft] has committed the reviewed take's retirement. */
     fun sendVoiceAttachment(
         file: java.io.File,
         durationMs: Long,
         canSend: () -> Boolean,
+        retireDraft: () -> Boolean = { true },
         onQueued: (Boolean) -> Unit,
     ) {
         val replyTarget = controller.replyingTo?.messageIdHex
@@ -151,6 +152,7 @@ internal class ConversationMediaSender(
                         outboundVisibleStartedAtElapsedMs = outboundVisibleStartedAtElapsedMs,
                         replyTarget = replyTarget,
                         replyVersion = replyVersion,
+                        beforeQueue = retireDraft,
                     ) ?: return@launchMutation
                 // The seeded row owns the take from here, reply or not: its retained bytes back Retry and Discard.
                 accepted = true

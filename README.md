@@ -74,7 +74,7 @@ batch related edits into one candidate push, reuse matching results, retry diagn
 transient failures selectively, and request preview APKs only when testing needs them.
 Core code validation and final readiness/merge requirements remain mandatory.
 
-Every pull request to `master` and every push to `master` starts
+Every pull request to `master` or `develop` and every push to `master` starts
 `.github/workflows/android-ci.yml`. The workflow uses read-only credentials and public build inputs. Existing detekt findings remain frozen in
 `config/detekt/detekt-baseline.xml`.
 

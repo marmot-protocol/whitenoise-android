@@ -204,6 +204,7 @@ internal fun ChatsScreen(
     onGroupCreateFlowSuperseded: () -> Unit = {},
     diagnosticsPrompt: @Composable () -> Unit = {},
     onFirstRunHelp: ((Boolean) -> Unit)? = null,
+    onSavePrivateKey: (() -> Unit)? = null,
 ) {
     androidx.compose.runtime.LaunchedEffect(Unit) {
         appState.recordProductObservation(dev.ipf.whitenoise.android.state.ProductObservation.INBOX)
@@ -2434,6 +2435,7 @@ internal fun ChatsScreen(
                 },
                 notice = {
                     ChatListPersistentNotices(appState, historyNotices, showChatListNotices, sourceList.isNotEmpty())
+                    PrivateKeyReminder(appState, controller, showChatListNotices, onSavePrivateKey)
                 },
             ) {
                 val unreadOwnerAvailable =
@@ -2446,8 +2448,10 @@ internal fun ChatsScreen(
                     val emptyPageScroll = key(listEmpty, showArchived, unreadOnly) { rememberScrollState() }
                     val unreadRefreshPending = unreadOnly && completeUnreadSnapshot == null
                     val failedUnreadSnapshot = unreadOnly && unreadReadFailed
+                    val loadingSource = controller.isLoading && sourceList.isEmpty()
+                    val blockingLoad = loadFailurePlacement == LoadFailurePlacement.FullScreen
                     val activeEmptyPageScroll =
-                        emptyPageScroll.takeUnless { unreadRefreshPending || failedUnreadSnapshot }
+                        emptyPageScroll.takeUnless { unreadRefreshPending || failedUnreadSnapshot || loadingSource || blockingLoad }
                     ChatListUnreadPullSurface(
                         unreadOnly = unreadOnly,
                         actionsAvailable = unreadActionsAvailable,
@@ -2475,7 +2479,7 @@ internal fun ChatsScreen(
                         val keepChatListMounted =
                             !browsingAttachments &&
                                 (unreadOnly || visibleItems.isNotEmpty() || messageResultsMode) &&
-                                loadFailurePlacement != LoadFailurePlacement.FullScreen &&
+                                !blockingLoad &&
                                 !blockLocalSearchRows(
                                     loading = messageResultsPending,
                                     hasLocalRows = visibleItems.isNotEmpty() || messageResultsMode,
@@ -2571,11 +2575,11 @@ internal fun ChatsScreen(
                                     }
                                 }
                             unreadRefreshPending && listEmpty -> LoadingScreen()
-                            controller.isLoading && sourceList.isEmpty() -> {
+                            loadingSource -> {
                                 val slowCopy = stringResource(R.string.chat_list_startup_slow)
                                 LoadingScreen(message = slowCopy.takeIf { controller.startupTakingLonger })
                             }
-                            loadFailurePlacement == LoadFailurePlacement.FullScreen ->
+                            blockingLoad ->
                                 ErrorContent(
                                     stringResource(R.string.couldnt_load_chats),
                                     requireNotNull(controller.error),

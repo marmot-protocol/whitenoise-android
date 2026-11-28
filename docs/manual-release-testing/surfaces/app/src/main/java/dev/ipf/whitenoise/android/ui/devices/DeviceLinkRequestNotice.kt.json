@@ -1,0 +1,94 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestNotice.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "DeviceLinkRequestNotice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestNotice.kt",
+        "anchor": "fun DeviceLinkRequestNotice(",
+        "test_ids": [
+          "SET-061",
+          "SET-075"
+        ]
+      },
+      {
+        "surface": "DeviceLinkRequestBanner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestNotice.kt",
+        "anchor": "fun DeviceLinkRequestBanner(",
+        "test_ids": [
+          "SET-061",
+          "SET-075"
+        ]
+      },
+      {
+        "surface": "DeviceLinkNoticeBanner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestNotice.kt",
+        "anchor": "fun DeviceLinkNoticeBanner(",
+        "test_ids": [
+          "SET-061",
+          "SET-075"
+        ]
+      },
+      {
+        "surface": "DeviceLinkDevicesWindow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestNotice.kt",
+        "anchor": "fun DeviceLinkDevicesWindow(",
+        "test_ids": [
+          "SET-075"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.link_request_notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestNotice.kt",
+        "anchor": "R.string.link_request_notice",
+        "test_ids": [
+          "SET-061"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.link_request_notice_other_profile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestNotice.kt",
+        "anchor": "R.string.link_request_notice_other_profile",
+        "test_ids": [
+          "SET-061"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.link_request_repeated_notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestNotice.kt",
+        "anchor": "R.string.link_request_repeated_notice",
+        "test_ids": [
+          "SET-075"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.link_request_repeated_notice_other_profile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestNotice.kt",
+        "anchor": "R.string.link_request_repeated_notice_other_profile",
+        "test_ids": [
+          "SET-075"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.link_request_not_now",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestNotice.kt",
+        "anchor": "R.string.link_request_not_now",
+        "test_ids": [
+          "SET-061",
+          "SET-075"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.link_request_review",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestNotice.kt",
+        "anchor": "R.string.link_request_review",
+        "test_ids": [
+          "SET-061",
+          "SET-075"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

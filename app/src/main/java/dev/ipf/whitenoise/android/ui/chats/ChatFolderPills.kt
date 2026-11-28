@@ -151,8 +151,7 @@ internal fun ChatFolderPills(
 }
 
 /**
- * One folder destination filter; the shared chip owns the pill shape, selected fill and long-press semantics.
- * Folder rows stay borderless in every theme, AMOLED included, so a row of pills reads as one strip.
+ * One folder destination filter. On AMOLED the active pill uses a gray outline as its selection cue.
  */
 @Suppress("LongParameterList", "FunctionNaming")
 @Composable
@@ -186,7 +185,6 @@ internal fun ChatFolderPill(
         contentDescription = description,
         onLongClick = onLongClick,
         longClickLabel = if (onLongClick == null) null else stringResource(R.string.edit),
-        border = null,
     )
 }
 

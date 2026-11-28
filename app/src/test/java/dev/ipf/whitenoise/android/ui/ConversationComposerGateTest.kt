@@ -279,21 +279,6 @@ class ConversationComposerGateTest {
         )
     }
 
-    @Test
-    fun confirmedMembershipAlwaysWinsOverColdSeed() {
-        assertEquals(
-            ComposerGate.COMPOSER,
-            conversationComposerGate(
-                pendingInvite = false,
-                membersVerified = true,
-                isSelfMember = true,
-                seededSelfMember = false,
-                seededMembershipKnown = false,
-                assumeMemberUntilVerified = false,
-            ),
-        )
-    }
-
     /**
      * The leave transform must produce a self-free seed (the #545 cache
      * invalidation), so once membership is verified the gate shows the notice

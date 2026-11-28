@@ -3,6 +3,7 @@
     <string name="voice_recording_stopped_announcement">Aufnahme beendet</string>
     <string name="voice_message_seek">Wiedergabeposition</string>
     <string name="video_failed">Video konnte nicht geladen werden</string>
+    <string name="video_seek_failed">Sprung zu dieser Stelle nicht möglich</string>
     <string name="conversation_new_message_from">Neue Nachricht von %1$s</string>
     <plurals name="conversation_new_messages">
         <item quantity="one">%1$d neue Nachricht</item>
@@ -2891,4 +2892,8 @@
     <string name="dictation_transcribe_voice_messages_title">Sprachnachrichten automatisch transkribieren</string>
     <string name="dictation_transcribe_voice_messages_subtitle">Zeigt Transkripte heruntergeladener Sprachnachrichten beim Lesen des Chats an. Offline Speech to Text ist erforderlich.</string>
     <string name="toast_unsupported_link">Dieser Link wird nicht unterstützt.</string>
+    <string name="private_key_reminder_title">Speichere deinen privaten Schlüssel</string>
+    <string name="private_key_reminder_body">Wenn du dieses Handy verlierst, kannst du deine Identität und deine Kontakte nur mit deinem Schlüssel behalten.</string>
+    <string name="private_key_reminder_save">Schlüssel speichern</string>
+    <string name="private_key_reminder_not_now">Nicht jetzt</string>
 </resources>

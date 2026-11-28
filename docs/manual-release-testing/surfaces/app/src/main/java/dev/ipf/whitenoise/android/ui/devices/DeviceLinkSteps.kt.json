@@ -283,6 +283,22 @@
         "test_ids": [
           "SET-061"
         ]
+      },
+      {
+        "surface": "Linked devices: R.string.link_request_dont_link",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkSteps.kt",
+        "anchor": "R.string.link_request_dont_link",
+        "test_ids": [
+          "SET-075"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.link_request_review_devices",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkSteps.kt",
+        "anchor": "R.string.link_request_review_devices",
+        "test_ids": [
+          "SET-075"
+        ]
       }
     ]
   },

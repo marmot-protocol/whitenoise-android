@@ -11,8 +11,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
@@ -29,11 +27,13 @@ import androidx.compose.ui.test.assertTouchHeightIsEqualTo
 import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
@@ -42,20 +42,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
-import dev.ipf.marmotkit.AccountSummaryFfi
-import dev.ipf.marmotkit.AppBlobEndpointFfi
-import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
-import dev.ipf.marmotkit.AppGroupRecordFfi
-import dev.ipf.marmotkit.AppProtocolProfileFfi
-import dev.ipf.marmotkit.EncryptedMediaVersionFfi
-import dev.ipf.marmotkit.SelfMembershipFfi
-import dev.ipf.whitenoise.android.core.GroupTitleCopy
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.state.ChatNotifyMode
 import dev.ipf.whitenoise.android.state.ConversationController
-import dev.ipf.whitenoise.android.state.DraftPersistence
-import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.HeaderShortcut
 import dev.ipf.whitenoise.android.state.MarmotWindowTestFakes
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -143,6 +133,47 @@ class ConversationTopBarSemanticsTest {
         composeRule
             .onNodeWithTag(CONVERSATION_TOP_BAR_TAG)
             .captureRoboImage("src/test/snapshots/conversation_header_compact_timer_light.png")
+    }
+
+    /** A timer too long for a crowded 320dp header ends in an ellipsis instead of silently losing digits. */
+    @Test
+    @Config(qualifiers = SMALL_PHONE)
+    fun overlongHeaderTimerEllipsizesInsteadOfClipping() {
+        val appState = appState()
+        appState.markDisappearingTooltipShown()
+        val retention = 9_000_000_000_000_000_001uL
+        val controller = ConversationController(appState, group().copy(disappearingMessageSecs = retention))
+        render(appState, controller, actions = {
+            ConversationHeaderShortcuts(
+                HeaderShortcut.entries.toList(),
+                capacity = it,
+                muteControl = muteControl(appState),
+                onSearch = {},
+                readAloudOn = false,
+                onMembers = {},
+                onAddMembers = {},
+            )
+        })
+        val layouts = mutableListOf<TextLayoutResult>()
+        composeRule
+            .onNodeWithText("$retention seconds", useUnmergedTree = true)
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+
+        assertTrue("the shortened timer must end in an ellipsis", layouts.single().isLineEllipsized(0))
+    }
+
+    /** The header timer's tooltip spells out a duration too long for the header, so anyone can read it in full. */
+    @Test
+    @Config(qualifiers = SMALL_PHONE)
+    fun overlongHeaderTimerReadsInFullInItsTooltip() {
+        val appState = appState()
+        val retention = 9_000_000_000_000_000_001uL
+        val controller = ConversationController(appState, group().copy(disappearingMessageSecs = retention))
+        render(appState, controller)
+
+        composeRule
+            .onNode(hasText("$retention seconds") and hasAnyAncestor(hasTestTag("conversation.timer.tooltip")))
+            .assertExists()
     }
 
     /** Keeps the automatic-timer explanation inside the available window. */
@@ -510,46 +541,19 @@ class ConversationTopBarSemanticsTest {
             CompositionLocalProvider(LocalLayoutDirection provides direction) {
                 WhiteNoiseTheme(darkTheme = dark, fontScale = fontScale) {
                     Surface {
-                        TopBar(appState, controller, compactHeight, frozen.value, onOpenDetails, actions)
+                        TopBarUnderTest(
+                            appState,
+                            controller,
+                            OPEN_DETAILS_DESCRIPTION,
+                            compactHeight,
+                            frozen.value,
+                            onOpenDetails,
+                            actions,
+                        )
                     }
                 }
             }
         }
-    }
-
-    @Composable
-    @Suppress("LongParameterList")
-    private fun TopBar(
-        appState: WhiteNoiseAppState,
-        controller: ConversationController,
-        compactHeight: Boolean = false,
-        frozen: Boolean = false,
-        onOpenDetails: () -> Unit = {},
-        actions: @Composable RowScope.(capacity: Int) -> Unit = {},
-    ) {
-        ConversationTopBar(
-            selectionMode = false,
-            selectedCount = 0,
-            onCloseSelection = {},
-            searchOpen = false,
-            searchQuery = "",
-            onSearchQueryChange = {},
-            onClearSearch = {},
-            onCloseSearch = {},
-            onSearchAction = {},
-            searchFocusRequester = remember { FocusRequester() },
-            appState = appState,
-            controller = controller,
-            groupTitleCopy = GroupTitleCopy.Default,
-            openedAsDmHint = false,
-            freezeRoutePresentation = frozen,
-            openDetailsDescription = OPEN_DETAILS_DESCRIPTION,
-            onOpenDetails = onOpenDetails,
-            onBack = {},
-            compactHeight = compactHeight,
-            performanceSelectorsEnabled = true,
-            actions = actions,
-        )
     }
 
     /** Records the header with [shortcuts] chosen, using an unmuted conversation's mute control. */
@@ -620,80 +624,10 @@ class ConversationTopBarSemanticsTest {
     )
 
     /** Builds an app state with the test account active. */
-    private fun appState() =
-        WhiteNoiseAppState(
-            context = context,
-            draftStore = DraftStore(EmptyDraftPersistence()),
-            accountIdHexResolver = { ACCOUNT_ID },
-            accounts =
-                listOf(
-                    AccountSummaryFfi(
-                        label = ACCOUNT_REF,
-                        accountIdHex = ACCOUNT_ID,
-                        localSigning = true,
-                        externalSigning = false,
-                        signedOut = false,
-                        running = true,
-                        unlinked = false,
-                    ),
-                ),
-            activeAccountRef = ACCOUNT_REF,
-        )
+    private fun appState() = topBarTestAppState(context, ACCOUNT_REF, ACCOUNT_ID)
 
-    private fun group() =
-        AppGroupRecordFfi(
-            groupIdHex = GROUP_ID,
-            protocolProfile = AppProtocolProfileFfi.LEGACY,
-            endpoint = "wss://relay.example",
-            profilePresent = true,
-            name = "Benchmark group",
-            description = "",
-            admins = listOf(ACCOUNT_ID),
-            relays = emptyList(),
-            nostrGroupIdHex = "03".repeat(32),
-            avatarUrl = null,
-            avatarDim = null,
-            avatarThumbhash = null,
-            imageHashHex = null,
-            encryptedMedia =
-                AppGroupEncryptedMediaComponentFfi(
-                    componentId = 0x8008u,
-                    component = "marmot.group.encrypted-media.v1",
-                    required = true,
-                    version = EncryptedMediaVersionFfi.V1,
-                    mediaFormat = "encrypted-media-v1",
-                    allowedLocatorKinds = listOf("blossom-v1"),
-                    defaultBlobEndpoints =
-                        listOf(
-                            AppBlobEndpointFfi(
-                                locatorKind = "blossom-v1",
-                                baseUrl = "https://blossom.example",
-                            ),
-                        ),
-                ),
-            disappearingMessageSecs = 0uL,
-            archived = false,
-            pendingConfirmation = false,
-            unrecoverable = false,
-            selfMembership = SelfMembershipFfi.MEMBER,
-            leaveRequestPending = false,
-            leaveRequestedAtMs = null,
-            leaveBlocked = false,
-            disbanding = false,
-            disbandRequest = null,
-            disbanded = false,
-            welcomerAccountIdHex = null,
-            viaWelcomeMessageIdHex = null,
-        )
-
-    private class EmptyDraftPersistence : DraftPersistence {
-        override fun read(): Map<String, String> = emptyMap()
-
-        override fun write(
-            key: String,
-            value: String?,
-        ) = Unit
-    }
+    /** Builds the test group with the test account as its admin. */
+    private fun group() = topBarTestGroup(GROUP_ID, adminId = ACCOUNT_ID)
 
     private companion object {
         const val ACCOUNT_REF = "personal"

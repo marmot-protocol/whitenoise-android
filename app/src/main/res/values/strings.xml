@@ -3,6 +3,7 @@
     <string name="voice_recording_stopped_announcement">Recording stopped</string>
     <string name="voice_message_seek">Playback position</string>
     <string name="video_failed">Video couldn\'t load</string>
+    <string name="video_seek_failed">Couldn’t seek to this point</string>
     <string name="conversation_new_message_from">New message from %1$s</string>
     <plurals name="conversation_new_messages">
         <item quantity="one">%1$d new message</item>
@@ -1327,6 +1328,10 @@
     <string name="group_history_may_be_incomplete">Some earlier messages in this chat may be missing.</string>
     <string name="group_history_before_rejoin">You rejoined this chat. Messages from before you rejoined may be missing.</string>
     <string name="account_history_may_be_incomplete">Some messages may be missing from this account. White Noise couldn’t confirm that every message arrived.</string>
+    <string name="private_key_reminder_title">Save your private key</string>
+    <string name="private_key_reminder_body">If you lose this phone, your key is the only way to keep this identity and your contacts.</string>
+    <string name="private_key_reminder_save">Save key</string>
+    <string name="private_key_reminder_not_now">Not now</string>
     <string name="history_notice_dismiss_failed">Couldn\'t dismiss the history notice. Try again.</string>
     <string name="group_rejoin_title">Rejoin group?</string>
     <string name="group_rejoin_invited_by">Invited by %1$s\n%2$s</string>

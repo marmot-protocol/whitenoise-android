@@ -1,0 +1,53 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupLocalRemoval.kt",
+  "legacy_sha256": "05eaca06ac4427db8d8ffd7bc53d7c02b69dedc24d53ff7bfab97ae0ef938518",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Quiet local-delete cleanup recovery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupLocalRemoval.kt",
+        "anchor": "\"local delete client cleanup deferred\"",
+        "test_ids": [
+          "CHL-024",
+          "CHL-025"
+        ]
+      },
+      {
+        "surface": "Recoverable explicit local-delete gesture",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupLocalRemoval.kt",
+        "anchor": "internal suspend fun WhiteNoiseAppState.deleteChatGroupLocalWithRecovery(",
+        "test_ids": [
+          "CHL-010",
+          "CHL-024"
+        ]
+      },
+      {
+        "surface": "chat-list local delete transport recovery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupLocalRemoval.kt",
+        "anchor": "deleteChatGroupLocalWithRecovery",
+        "test_ids": [
+          "CHL-010"
+        ]
+      },
+      {
+        "surface": "Draft cleanup after a committed local reset",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupLocalRemoval.kt",
+        "anchor": "cleanupStep(\"native draft\")",
+        "test_ids": [
+          "GRP-033"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Delayed local-delete cleanup preserves a voice take saved after rejoin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupLocalRemoval.kt",
+        "anchor": "if (!captureIsCurrent()) return@withContext false",
+        "test_ids": [
+          "MED-061"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

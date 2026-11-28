@@ -2,7 +2,6 @@ package dev.ipf.whitenoise.android.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
@@ -19,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.conversation.animatedMenuImeBackdrop
 import dev.ipf.whitenoise.android.ui.conversation.awaitMenuImeRestore
 import dev.ipf.whitenoise.android.ui.conversation.captureMenuImeBackdrop
+import dev.ipf.whitenoise.android.ui.conversation.heldImeBottomPadding
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -40,18 +40,25 @@ class MenuImeBackdropTest {
     private var live by mutableIntStateOf(0)
     private var displayed = 0
 
-    /** Mounts a measured backdrop fixture with a frozen inset and a manually advanced clock. */
-    private fun content(initial: Int?) {
+    /**
+     * Mounts a measured backdrop fixture with a frozen inset and a manually advanced clock, padded the way
+     * ConversationScreen pads its transcript. [onComposed] runs after each composition of the caller.
+     */
+    private fun content(
+        initial: Int?,
+        onComposed: () -> Unit = {},
+    ) {
         frozen = initial
         composeRule.mainClock.autoAdvance = false
         composeRule.setContent {
             CompositionLocalProvider(LocalDensity provides Density(1f)) {
                 val held =
-                    animatedMenuImeBackdrop(frozen, returning, { live }) {
+                    animatedMenuImeBackdrop(frozen, { returning }, { live }) {
                         frozen = null
                         returning = false
                     }
-                Box(Modifier.size(400.dp).padding(bottom = (held ?: live).dp)) {
+                SideEffect(onComposed)
+                Box(Modifier.size(400.dp).heldImeBottomPadding { held?.invoke() ?: live }) {
                     Box(Modifier.fillMaxSize().onSizeChanged { displayed = 400 - it.height })
                 }
             }
@@ -86,7 +93,7 @@ class MenuImeBackdropTest {
         var compositions = 0
         frozen = null
         composeRule.setContent {
-            animatedMenuImeBackdrop(frozen, returning, { live }) {}
+            animatedMenuImeBackdrop(frozen, { returning }, { live }) {}
             SideEffect { compositions++ }
         }
         for (hold in listOf<Int?>(null, 320)) {
@@ -99,6 +106,29 @@ class MenuImeBackdropTest {
                 assertEquals("Inset frames must not subscribe the conversation", settled, compositions)
             }
         }
+    }
+
+    /**
+     * Checks that a whole hand-back, from the returning flag through release, animates the held geometry in layout
+     * and recomposes its caller at most once: for the release that hands the inset back to the live keyboard.
+     */
+    @Test
+    fun activeReturnAnimatesGeometryWithoutRecomposingTheCaller() {
+        var compositions = 0
+        content(320) { compositions++ }
+        val before = compositions
+        composeRule.runOnIdle {
+            live = 180
+            returning = true
+        }
+        val samples = List(20) { frame() }
+        assertTrue("The held geometry must still animate: $samples", samples.distinct().size > 2)
+        composeRule.runOnIdle { assertNull("The hand-back must finish and release", frozen) }
+        assertEquals(180, displayed)
+        assertTrue(
+            "The hand-back may recompose the caller once, for the release: ${compositions - before}",
+            compositions - before <= 1,
+        )
     }
 
     /** Checks that opening with no keyboard leaves geometry tracking live insets. */

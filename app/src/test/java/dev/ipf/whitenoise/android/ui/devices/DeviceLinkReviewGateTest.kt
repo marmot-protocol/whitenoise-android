@@ -105,9 +105,10 @@ class DeviceLinkReviewGateTest {
         compose.onNodeWithText(COMPARISON).assertExists()
     }
 
-    /** Reads both profiles, then shows the request profile "b" holds while [active] decides which branch runs. */
+    /** Reads both profiles, opens the notice for profile "b"'s request and shows it while [active] picks the branch. */
     private fun showRequestOnB() {
-        runBlocking { watcher.refresh(accounts, blocked = false) }
+        runBlocking { watcher.refresh(accounts) }
+        watcher.open(watcher.queue.notice!!)
         compose.setContent {
             val scope = rememberCoroutineScope()
             val request = watcher.queue.presented ?: return@setContent
@@ -120,7 +121,7 @@ class DeviceLinkReviewGateTest {
                     profileName = "Work",
                     onReview = {
                         active = "b"
-                        scope.launch { watcher.refresh(accounts, blocked = false) }
+                        scope.launch { watcher.refresh(accounts) }
                     },
                 ) { Text(COMPARISON) }
             }

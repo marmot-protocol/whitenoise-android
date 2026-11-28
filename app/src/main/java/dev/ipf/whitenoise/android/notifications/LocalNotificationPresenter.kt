@@ -558,7 +558,6 @@ class LocalNotificationPresenter(
                                                     update.isDm,
                                                     conversationTitleOverride,
                                                     ConversationVibrationPattern.SYSTEM_DEFAULT,
-                                                    update.accountRef,
                                                 ),
                                             ).filter { it.channel == category }
                                     }.orEmpty() +
@@ -812,11 +811,12 @@ class LocalNotificationPresenter(
                     // the one first post. Redacted and hidden-preview posts keep only the generic shortcut.
                     val heldShortcutId =
                         messagingPost?.takeIf { !redactContent && previewToken.allowed }?.let { messaging ->
+                            // The channel write's cleanup check covers this shortcut, so cleanup cannot be undone.
                             publishShortcutBeforePost(update, notificationContent, messaging, directShareEligible) {
-                                profileAllowsPost() && showGenerationAllowsPost()
+                                channelWriteAllowed()
                             }
                         } ?: reactorIdentity?.let {
-                            publishReactionShortcutBeforePost(update, notificationContent) {
+                            publishReactionShortcutBeforePost(update, notificationContent, channelWriteEpoch) {
                                 profileAllowsPost() && showGenerationAllowsPost()
                             }?.also(builder::setShortcutId)
                         }
@@ -959,7 +959,7 @@ class LocalNotificationPresenter(
                                             )
                                             if (carried.isNullOrEmpty() &&
                                                 emojiArtifact == null &&
-                                                !notification.extras.containsKey(EXTRA_QUICK_REACTION_ROWS)
+                                                !notification.extras.containsKey(EXTRA_QUICK_REACTION_CHIPS)
                                             ) {
                                                 false
                                             } else {
@@ -977,7 +977,7 @@ class LocalNotificationPresenter(
                                                         messageIdHex = update.messageIdHex,
                                                     ),
                                                 )
-                                                builder.extras.remove(EXTRA_QUICK_REACTION_ROWS)
+                                                builder.extras.remove(EXTRA_QUICK_REACTION_CHIPS)
                                                 builder.extras.remove(EXTRA_QUICK_REACTION_TARGET)
                                                 val cleanNotification = buildSettled(true)
                                                 val retryResult =

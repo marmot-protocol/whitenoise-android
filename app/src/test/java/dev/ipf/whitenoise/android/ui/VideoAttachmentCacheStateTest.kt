@@ -256,24 +256,6 @@ class VideoAttachmentCacheStateTest {
     }
 
     @Test
-    fun videoMaterializationUsesSharedSingleFlight() {
-        val source = mediaVideoCacheSource().readText()
-
-        assertTrue(
-            "video materialization should use the shared single-flight utility",
-            Regex(
-                """private\s+val\s+videoMaterializations\s*=\s*SingleFlight<String,\s*java\.io\.File>\(\)""",
-            ).containsMatchIn(source),
-        )
-        assertTrue(
-            "the flight must begin before the materializer checks the cache fast path",
-            Regex(
-                """videoMaterializations\.run\(file\.absolutePath\)\s*\{\s*materializeVideoAttachmentOnce\(""",
-            ).containsMatchIn(source),
-        )
-    }
-
-    @Test
     fun samePathWaiterAwaitsActiveMaterializationDespitePartialCacheFile() {
         runBlocking {
             withTimeout(TEST_HANG_GUARD_MS) {

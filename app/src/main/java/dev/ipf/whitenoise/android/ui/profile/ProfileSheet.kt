@@ -748,6 +748,7 @@ internal fun ProfileSheet(
                         onRetry = { openOrCreateProfileChat(error.retryGroupIdHex) },
                         onInvite = {
                             if (owner.canAct()) {
+                                appState.noteNotificationMoment()
                                 launchInviteShare(context, inviteMessage, inviteTitle)
                                     .onFailure { appState.presentOutboundShareFailure("PROFILE_INVITE_SHARE", it) }
                             }

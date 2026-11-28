@@ -3,6 +3,7 @@
     <string name="voice_recording_stopped_announcement">Enregistrement arrêté</string>
     <string name="voice_message_seek">Position de lecture</string>
     <string name="video_failed">La vidéo n\u0027a pas pu être chargée</string>
+    <string name="video_seek_failed">Impossible d’accéder à ce passage</string>
     <string name="conversation_new_message_from">Nouveau message de %1$s</string>
     <plurals name="conversation_new_messages">
         <item quantity="one">%1$d nouveau message</item>
@@ -2879,4 +2880,8 @@
     <string name="dictation_transcribe_voice_messages_title">Transcrire automatiquement les messages vocaux</string>
     <string name="dictation_transcribe_voice_messages_subtitle">Affiche les transcriptions des messages vocaux téléchargés dans la conversation. Nécessite Offline Speech to Text.</string>
     <string name="toast_unsupported_link">Ce lien n’est pas pris en charge.</string>
+    <string name="private_key_reminder_title">Enregistrez votre clé privée</string>
+    <string name="private_key_reminder_body">Si vous perdez ce téléphone, seule votre clé vous permettra de conserver votre identité et vos contacts.</string>
+    <string name="private_key_reminder_save">Enregistrer la clé</string>
+    <string name="private_key_reminder_not_now">Pas maintenant</string>
 </resources>

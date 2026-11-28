@@ -7,11 +7,13 @@ import yaml
 
 CONTEXT = 'Android merge authorization'
 RESERVED=[CONTEXT,'Android merge queue canary hold']
-# Existing publishers need these capabilities, never statuses/checks writes.
+# These jobs need scoped writes, never statuses/checks writes.
 WRITE_ALLOW = {
     # Cancels a failed or dropped merge-group run; it runs no repository code.
     ('android-ci.yml', 'merge-group-fail-fast'): {'actions'},
     ('android-pr-preview-publish.yml', 'publish'): {'contents', 'pull-requests'},
+    # Deletes release assets using the trusted close-event cleanup script.
+    ('android-pr-preview-cleanup.yml', 'prune'): {'contents'},
     ('android-release-distribute.yml', 'github-draft'): {'contents'},
     ('dependency-submission.yml', None): {'contents'},
     ('pr-screenshots.yml', None): {'issues', 'pull-requests'},

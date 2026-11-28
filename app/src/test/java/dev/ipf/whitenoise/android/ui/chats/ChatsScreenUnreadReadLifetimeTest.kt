@@ -278,13 +278,7 @@ class ChatsScreenUnreadReadLifetimeTest {
         mount(model, fontScale = 2f)
         val surface = rule.onNodeWithTag("chats.unread_surface")
         surface.performUnreadFilterAction(rule)
-        val title = rule.activity.getString(R.string.chat_rows_no_unread_title)
-        awaitProgress { rule.onAllNodesWithText(title).fetchSemanticsNodes().isNotEmpty() }
-        val page = rule.onNode(hasScrollAction() and hasAnyDescendant(hasText(title)), useUnmergedTree = true)
-        val scrollRange = page.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange]
-        page.performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, scrollRange.maxValue()) }
-        rule.waitForIdle()
-        assertTrue("The unread empty page must be scrolled", scrollRange.value() > 0f)
+        scrollUnreadEmptyPage()
 
         rule.runOnIdle {
             model.beforeSnapshotRead = { error("Synthetic unread read refusal") }
@@ -301,6 +295,47 @@ class ChatsScreenUnreadReadLifetimeTest {
         }
         rule.onNodeWithTag("chats.unread_filter").assertDoesNotExist()
         rule.onNodeWithTag("chat.row.$ACTION_SURVIVOR").assertExists()
+    }
+
+    /** An ordinary full-screen load failure replaces the scrolled empty page and still allows a pull to clear. */
+    @Test
+    @Config(qualifiers = "en-w240dp-h300dp-mdpi")
+    fun mountedSourceFailureAllowsPullAfterScrolledEmptyState() {
+        val model = OffWindowActionFixture(scope).also { fixture = it }
+        model.state.swipePreferences.setPullUnread(true)
+        val folders = model.state.chatFolderPreferences
+        val folder = checkNotNull(folders.createFolder(ACTION_ACCOUNT, "Archived chats"))
+        folders.setFolderRule(ACTION_ACCOUNT, folder.id, ChatFolderRule(archivedOnly = true, includeMuted = true))
+        mount(model, folder.id, fontScale = 2f)
+        val surface = rule.onNodeWithTag("chats.unread_surface")
+        surface.performUnreadFilterAction(rule)
+        scrollUnreadEmptyPage()
+
+        rule.runOnIdle {
+            model.controller.publishInitialLoadFailureForTest(
+                ErrorPresentation(AppText.Resource(R.string.error_try_again), "Synthetic list failure"),
+            )
+        }
+        val error = rule.onNodeWithText(rule.activity.getString(R.string.couldnt_load_chats))
+        error.assertExists()
+        val distance = with(rule.density) { 100.dp.toPx() }
+        surface.performTouchInput {
+            down(Offset(width * 0.75f, height * 0.5f))
+            moveBy(Offset(0f, distance), 120)
+            up()
+        }
+        rule.onNodeWithTag("chats.unread_filter").assertDoesNotExist()
+        error.assertExists()
+    }
+
+    private fun scrollUnreadEmptyPage() {
+        val title = rule.activity.getString(R.string.chat_rows_no_unread_title)
+        awaitProgress { rule.onAllNodesWithText(title).fetchSemanticsNodes().isNotEmpty() }
+        val page = rule.onNode(hasScrollAction() and hasAnyDescendant(hasText(title)), useUnmergedTree = true)
+        val scrollRange = page.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange]
+        page.performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, scrollRange.maxValue()) }
+        rule.waitForIdle()
+        assertTrue("The unread empty page must be scrolled", scrollRange.value() > 0f)
     }
 
     /** An unrelated read chat with no roster cannot fail an unread participant-folder request. */

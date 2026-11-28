@@ -3,6 +3,7 @@
     <string name="voice_recording_stopped_announcement">录音已停止</string>
     <string name="voice_message_seek">播放位置</string>
     <string name="video_failed">视频加载失败</string>
+    <string name="video_seek_failed">无法跳转到此时间点</string>
     <string name="conversation_new_message_from">来自 %1$s 的新消息</string>
     <plurals name="conversation_new_messages">
         <item quantity="other">%1$d 条新消息</item>
@@ -2828,4 +2829,8 @@
     <string name="dictation_transcribe_voice_messages_title">自动转写语音消息</string>
     <string name="dictation_transcribe_voice_messages_subtitle">在查看聊天时显示已下载语音消息的转写文本。 需要 Offline Speech to Text。</string>
     <string name="toast_unsupported_link">不支持此链接。</string>
+    <string name="private_key_reminder_title">保存您的私钥</string>
+    <string name="private_key_reminder_body">如果您丢失了这部手机，只有使用私钥才能保留您的身份和联系人。</string>
+    <string name="private_key_reminder_save">保存密钥</string>
+    <string name="private_key_reminder_not_now">暂不</string>
 </resources>

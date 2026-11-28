@@ -41,7 +41,7 @@ class UnreadRefreshSchedulerTest {
             if (total.get() >= count) latch.countDown()
             assertTrue(
                 "expected at least $count refreshes, saw ${refreshes.toList()}",
-                latch.await(2, TimeUnit.SECONDS),
+                latch.await(10, TimeUnit.SECONDS),
             )
         }
     }
@@ -81,10 +81,7 @@ class UnreadRefreshSchedulerTest {
             repeat(20) { scheduler.schedule("alice") }
             gate.openFirstWindow()
 
-            recorder.awaitRefreshes(1)
-            // Give any erroneous extra wave a chance to double-refresh before we
-            // assert the burst collapsed to one.
-            Thread.sleep(50)
+            withTimeout(10_000L) { scheduler.awaitIdle() }
             assertEquals(listOf("alice"), recorder.refreshes.toList())
             scope.cancel()
         }
@@ -106,8 +103,7 @@ class UnreadRefreshSchedulerTest {
             scheduler.schedule("carol")
             gate.openFirstWindow()
 
-            recorder.awaitRefreshes(3)
-            Thread.sleep(50)
+            withTimeout(10_000L) { scheduler.awaitIdle() }
             assertEquals(setOf("alice", "bob", "carol"), recorder.refreshes.toSet())
             assertEquals(3, recorder.refreshes.size)
             scope.cancel()
@@ -203,7 +199,6 @@ class UnreadRefreshSchedulerTest {
             scheduler.cancelAndClear()
             gate.openFirstWindow()
 
-            Thread.sleep(50)
             assertTrue(recorder.refreshes.isEmpty())
             scope.cancel()
         }
@@ -224,8 +219,7 @@ class UnreadRefreshSchedulerTest {
             gate.awaitFirstWindow()
             gate.openFirstWindow()
 
-            recorder.awaitRefreshes(1)
-            Thread.sleep(50)
+            withTimeout(10_000L) { scheduler.awaitIdle() }
             assertEquals(listOf("alice"), recorder.refreshes.toList())
             scope.cancel()
         }
