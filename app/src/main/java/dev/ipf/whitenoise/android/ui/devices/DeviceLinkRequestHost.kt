@@ -200,7 +200,7 @@ internal fun WhiteNoiseAppState.profileName(accountRef: String): String {
 }
 
 /**
- * The active profile's request over the whole window. Link device and Not now go to MDK through a controller bound
+ * The active profile's request over the whole window. Link device and Don't link go to MDK through a controller bound
  * to this profile and runtime; closing the window only returns the request to the chat list's notice. A failed
  * command is shown once and leaves the request, and the choices entered, in place. Touches that began before the
  * window appeared are ignored, and a repeated request's Review devices runs [onReviewDevices].

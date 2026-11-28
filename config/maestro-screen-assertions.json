@@ -2203,8 +2203,8 @@
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestNotice.kt",
       "symbol": "DeviceLinkDevicesWindow",
       "bindings": [],
-      "remaining": "Opening Devices from a repeated request requires a second installation. SET-075 covers entering Devices from the warning and returning to Chats.",
-      "second_device": ["SET-075"]
+      "remaining": "Opening Devices from a link request requires a second installation. SET-075 covers the repeated warning and return to Chats. SET-079 covers the consent report handoff.",
+      "second_device": ["SET-075", "SET-079"]
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkConsent.kt",

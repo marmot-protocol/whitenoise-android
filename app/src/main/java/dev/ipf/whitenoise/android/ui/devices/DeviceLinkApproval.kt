@@ -127,9 +127,8 @@ internal fun rememberApprovalDraft() =
 /**
  * A link request as the approving device shows it. While MDK shows the code, the new device's name is on the step
  * itself, so the user sees what it will be called before linking, and an empty field shows the default it gets.
- * Link device stays one tap: the device joins the account's chats with their history (both on, as MDK offers them),
- * and Options opens those two choices for anyone who wants to change them. The choices stay as entered if a
- * submission fails. [onLink] receives them, [onDecline] is Not now and [onClose] leaves without answering.
+ * Both sharing choices are visible and start on, as MDK offers them. The choices stay as entered if a submission
+ * fails. [onLink] receives them, Don't link calls [onDecline], and [onClose] leaves without answering.
  *
  * Link can be tapped only [DEVICE_LINK_ARM_DELAY_MS] after the code first appears. A [repeated] request offers no
  * Link at all: it warns instead, with Don't link ([onDecline]) and Review devices ([onReviewDevices]).
