@@ -14,6 +14,7 @@ internal fun File.motionOwnerSource(): String {
                     "ConversationMessageDragSelection.kt",
                     "ConversationReadAloudFollow.kt",
                     "ConversationBodyExpansionPosition.kt",
+                    "ConversationUnreadMentionJump.kt",
                 )
             "ChatsScreen.kt" -> listOf("ChatListActions.kt", "ChatListDragSelection.kt", "ChatListNavigation.kt")
             "ConversationMediaDraft.kt" -> listOf("ConversationMediaDraftPhotos.kt")

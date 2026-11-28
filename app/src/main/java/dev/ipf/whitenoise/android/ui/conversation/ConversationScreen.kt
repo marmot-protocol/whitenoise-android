@@ -126,7 +126,6 @@ import dev.ipf.whitenoise.android.state.isLoadingOlder
 import dev.ipf.whitenoise.android.state.isLoadingPage
 import dev.ipf.whitenoise.android.state.isUserBlocked
 import dev.ipf.whitenoise.android.state.loadTeamReporting
-import dev.ipf.whitenoise.android.state.loadUntilMessageAvailable
 import dev.ipf.whitenoise.android.state.logUnreadCountDivergence
 import dev.ipf.whitenoise.android.state.markComposerReadyForPresentationTiming
 import dev.ipf.whitenoise.android.state.markInboundMessageVisibleForHostPerformance
@@ -141,7 +140,6 @@ import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.sendSticker
 import dev.ipf.whitenoise.android.state.setUserBlocked
 import dev.ipf.whitenoise.android.state.snapshotReply
-import dev.ipf.whitenoise.android.state.tracedPagingSection
 import dev.ipf.whitenoise.android.state.transcriptPresentationNeedsRetry
 import dev.ipf.whitenoise.android.state.transcriptRosterError
 import dev.ipf.whitenoise.android.state.unreadCountDivergenceReport
@@ -2011,99 +2009,28 @@ internal fun ConversationScreen(
             cachedItemHeightPx = navigationState.timelineItemHeightsPx[targetMessageId],
         )
 
-    /**
-     * The oldest unread mention, waiting for entry positioning and searching past the window if needed. Null when the
-     * request was superseded or nothing was found; a search that ran out of history retires the seed.
-     */
-    suspend fun nextUnreadMentionTarget(isCurrent: () -> Boolean): String? {
-        val search =
-            mentionSeed.jumpTarget(
-                awaitAnchored = { snapshotFlow { initialTimelineAnchored }.first { it } },
-                loadedTarget = { unreadMentionMessageIds.firstOrNull() },
-            ) {
-                resolveFirstUnreadMention(
-                    readAnchorMessageId = readAnchorMessageId,
-                    firstUnreadMessageId = entryFirstUnreadMessageId,
-                    timeline = { controller.timeline },
-                    mentionsActiveAccount = mentionsSelf,
-                    loadMessage = { controller.loadUntilMessageAvailable(it) },
-                    hasMoreAfter = { controller.hasMoreAfterTimeline },
-                    loadNewer = {
-                        snapshotFlow { controller.isLoadingPage }.first { !it }
-                        isCurrent() && controller.loadNewerTimelinePage()
-                    },
-                    isCurrent = isCurrent,
-                )
-            }
-        if (!isCurrent()) return null
-        if (search !is ConversationMentionSearch.Found) {
-            if (search == ConversationMentionSearch.Exhausted) mentionSeed.retire()
-            appState.present(R.string.toast_original_message_unavailable)
-        }
-        return (search as? ConversationMentionSearch.Found)?.messageId
-    }
-
-    /** Visits the oldest unread mention, marks it read and highlights it; a later navigation supersedes it. */
-    fun jumpToNextUnreadMention() {
-        if (unreadMentionMessageIds.isEmpty() && !mentionSeed.active) return
-        navigationState.searchJob?.cancel()
-        navigationState.targetHighlight.clear()
-        navigationState.navigateReplyJob?.cancel()
-        val navigationRequest = navigationState.targetNavigation.begin()
-        navigationState.navigateReplyJob =
-            scope.launch {
-                tracedPagingSection(ConversationMentionJumpTrace.TOTAL) {
-                    val targetMessageId = nextUnreadMentionTarget { navigationRequest.isCurrent() } ?: return@launch
-                    val available =
-                        tracedPagingSection(ConversationMentionJumpTrace.AVAILABILITY) {
-                            controller.loadUntilMessageAvailable(targetMessageId)
-                        }
-                    if (!navigationRequest.isCurrent()) return@launch
-                    if (!available) {
-                        appState.present(R.string.toast_original_message_unavailable)
-                        return@launch
-                    }
-                    val timelineIndex =
-                        controller.timeline
-                            .filterNot { MessageProjector.isEdit(it.record) }
-                            .indexOfFirst { it.record.messageIdHex == targetMessageId }
-                    if (timelineIndex < 0) {
-                        appState.present(R.string.toast_original_message_unavailable)
-                        return@launch
-                    }
-                    if (!navigationRequest.isCurrent()) return@launch
-                    val reached =
-                        scrollCoordinator.jumpToMentionReadingStart(
-                            targetMessageId = targetMessageId,
-                            resolveTargetIndex = { currentTimelineListIndex(targetMessageId) },
-                            readLayout = { index -> mentionJumpLayout(targetMessageId, index) },
-                            onCompleted = {
-                                if (navigationRequest.isCurrent()) {
-                                    scrollCoordinator.settleLandingAt(
-                                        currentScrollAnchor(),
-                                        conversationLandingAtNewestEdge(
-                                            atNaturalTail = timelineViewport.isAtNaturalTail,
-                                            hasMoreAfter = controller.hasMoreAfterTimeline,
-                                        ),
-                                    )
-                                }
-                            },
-                        )
-                    if (!reached || !navigationRequest.isCurrent()) return@launch
-                    // Keep the landing point on the same process-track family as the async approach.
-                    tracedPagingSection(ConversationMentionJumpTrace.LANDED) { Unit }
-                    // Mark read up to the visited mention so the count — and the
-                    // chat-list @-badge — decrement in step; advance the local read
-                    // anchor so the chip's derived count updates immediately.
-                    readAnchorMessageId = targetMessageId
-                    mentionSeed.visited(targetMessageId)
-                    controller.markReadUpTo(targetMessageId)
-                    tracedPagingSection(ConversationMentionJumpTrace.HIGHLIGHT) {
-                        messageNavigator.showTransientMessageHighlight(targetMessageId)
-                    }
-                }
-            }
-    }
+    val unreadMentionJump =
+        rememberConversationUnreadMentionJump(
+            appState = appState,
+            controller = controller,
+            scope = scope,
+            navigationState = navigationState,
+            scrollCoordinator = scrollCoordinator,
+            timelineViewport = timelineViewport,
+            mentionSeed = mentionSeed,
+            currentTimelineListIndex = ::currentTimelineListIndex,
+            currentScrollAnchor = ::currentScrollAnchor,
+            mentionJumpLayout = ::mentionJumpLayout,
+            inputs =
+                ConversationUnreadMentionJump.Inputs(
+                    entryFirstUnreadMessageId = entryFirstUnreadMessageId,
+                    mentionsSelf = mentionsSelf,
+                    messageNavigator = messageNavigator,
+                    unreadMentionMessageIds = { unreadMentionMessageIds },
+                    initialTimelineAnchored = { initialTimelineAnchored },
+                    readAnchor = readAnchor,
+                ),
+        )
 
     LaunchedEffect(controller) {
         navigationState.initialTimelineLoadStarted = true
@@ -4539,7 +4466,7 @@ internal fun ConversationScreen(
                                         val showMentionJump = !selectionMode && unreadMentionCount > 0
                                         ConversationNavigationControl(visible = showMentionJump) {
                                             ConversationJumpToMentionButton(shownMentionCount[0]) {
-                                                jumpToNextUnreadMention()
+                                                unreadMentionJump.jumpToNextUnreadMention()
                                             }
                                         }
                                         ConversationNavigationControl(

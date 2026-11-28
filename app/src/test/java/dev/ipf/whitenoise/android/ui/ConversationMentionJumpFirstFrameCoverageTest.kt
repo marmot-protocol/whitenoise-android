@@ -103,9 +103,15 @@ class ConversationMentionJumpFirstFrameCoverageTest {
             "the control's visibility follows that count",
             "val showMentionJump = !selectionMode && unreadMentionCount > 0" in body,
         )
+        val jump =
+            appModuleSource("src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationUnreadMentionJump.kt")
+        assertTrue(
+            "the jump reads the anchored state through the screen, at tap time",
+            "initialTimelineAnchored = { initialTimelineAnchored }" in body,
+        )
         assertTrue(
             "a tap before entry positioning waits for it instead of being dropped",
-            "awaitAnchored = { snapshotFlow { initialTimelineAnchored }.first { it } }" in body,
+            "awaitAnchored = { snapshotFlow { inputs.initialTimelineAnchored() }.first { it } }" in jump,
         )
     }
 
