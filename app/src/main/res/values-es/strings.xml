@@ -771,6 +771,8 @@
     <string name="diagnostic_sent_ping_to_self">Ping enviado a si mismo en %1$s</string>
     <string name="diagnostic_send_to_self_failed">Error al enviarse a si mismo: %1$s</string>
     <string name="clear">Borrar</string>
+    <string name="diagnostics_clear_title">¿Borrar los eventos de diagnóstico?</string>
+    <string name="diagnostics_clear_detail">Se perderán los eventos que se muestran aquí. No se puede deshacer.</string>
     <string name="paste">Pegar</string>
     <string name="paste_from_clipboard">Pegar desde el portapapeles</string>
     <string name="paste_dictation_transcript">Pegar transcripción</string>
@@ -1718,6 +1720,8 @@
     <string name="emoji_sets_not_found">No se encontró este conjunto o imagen. Revisa el enlace o inténtalo de nuevo.</string>
     <string name="emoji_sets_changed">Este conjunto cambió. Revisa la nueva versión antes de instalarla.</string>
     <string name="emoji_sets_cancelled">Instalación cancelada.</string>
+    <string name="emoji_sets_remove_title">¿Quitar %1$s?</string>
+    <string name="emoji_sets_remove_detail">Quita el conjunto y sus imágenes de este dispositivo. Para volver a usarlo, tendrás que descargarlo de nuevo.</string>
     <string name="emoji_sets_discovery_incomplete">No se pudo contactar con algunos relés. Puede que los resultados estén incompletos.</string>
     <plurals name="emoji_sets_skipped">
         <item quantity="one">Instalado con %1$d entrada omitida.</item>

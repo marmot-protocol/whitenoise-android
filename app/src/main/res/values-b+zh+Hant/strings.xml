@@ -754,6 +754,8 @@
     <string name="diagnostic_sent_ping_to_self">已在 %1$s 向自己傳送 ping</string>
     <string name="diagnostic_send_to_self_failed">傳送給自己失敗：%1$s</string>
     <string name="clear">清除</string>
+    <string name="diagnostics_clear_title">清除診斷事件？</string>
+    <string name="diagnostics_clear_detail">此處顯示的事件將會遺失，且無法復原。</string>
     <string name="paste">貼上</string>
     <string name="paste_from_clipboard">從剪貼簿貼上</string>
     <string name="paste_dictation_transcript">貼上轉寫內容</string>
@@ -1691,6 +1693,8 @@
     <string name="emoji_sets_not_found">找不到此表情包或圖片。請檢查連結或再試一次。</string>
     <string name="emoji_sets_changed">此表情包已變更。請先查看新版本再安裝。</string>
     <string name="emoji_sets_cancelled">已取消安裝。</string>
+    <string name="emoji_sets_remove_title">移除 %1$s？</string>
+    <string name="emoji_sets_remove_detail">將從此裝置移除該表情包及其圖片。如需再次使用，需要重新下載。</string>
     <string name="emoji_sets_discovery_incomplete">部分中繼站無法連線。結果可能不完整。</string>
     <plurals name="emoji_sets_skipped">
         <item quantity="other">已安裝，略過了 %1$d 項。</item>

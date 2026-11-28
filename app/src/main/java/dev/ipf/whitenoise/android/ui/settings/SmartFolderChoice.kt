@@ -9,8 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -30,9 +28,9 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.DisclosureChevron
 import dev.ipf.whitenoise.android.ui.common.Explanation
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
-import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
-import dev.ipf.whitenoise.android.ui.design.AnimatedDropdownMenu
 
 /** One recognizable add action shared by simple, advanced and nested rules. */
 @Composable
@@ -59,6 +57,11 @@ internal fun FolderAddFilterButton(
     }
 }
 
+/**
+ * A small inline choice that stays with the rule it qualifies (docs/ui-patterns.md, single-choice pickers): the
+ * button shows the current value and opens the shared menu, where each option is a radio choice and the current one
+ * is checked. Choosing applies at once and closes.
+ */
 @Composable
 internal fun <T> FolderChoice(
     label: String,
@@ -75,22 +78,14 @@ internal fun <T> FolderChoice(
         ) {
             FolderButtonLabel(label, R.drawable.ic_expand_more, open)
         }
-        val menuScrollState = rememberScrollState()
-        AnimatedDropdownMenu(
-            scrollState = menuScrollState,
-            modifier = Modifier.scrollEdgeFade(menuScrollState, stableRenderTarget = true),
+        WhiteNoiseDropdownMenu(
             expanded = open,
             onDismissRequest = { open = false },
-        ) { surface ->
-            options.forEach { (value, title) ->
-                DropdownMenuItem(text = { Text(title) }, onClick = {
-                    surface.close {
-                        open = false
-                        onSelect(value)
-                    }
-                })
-            }
-        }
+            items =
+                options.map { (value, title) ->
+                    WhiteNoiseMenuItem(label = title, selected = title == label, onClick = { onSelect(value) })
+                },
+        )
     }
 }
 

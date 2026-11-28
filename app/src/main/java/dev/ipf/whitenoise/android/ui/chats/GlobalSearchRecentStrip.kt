@@ -43,7 +43,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.SectionHeader
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAnchoredMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.theme.Dimens
@@ -183,7 +183,10 @@ internal fun GlobalSearchRecentSection(
 internal val GlobalSearchRecentAvatarSize = 52.dp
 private val RecentTileWidth = 76.dp
 
-/** One destination: tap opens it, long press offers Remove, which screen readers also get as an action. */
+/**
+ * One destination: tap opens it, long press offers Remove on the shared touch-anchored item menu, which screen
+ * readers also get as an action.
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Suppress("FunctionNaming")
 @Composable
@@ -214,18 +217,18 @@ private fun GlobalSearchRecentTile(
         ) {
             content()
         }
-        WhiteNoiseDropdownMenu(
+        // The same touch-anchored item menu as a held chat row, so every row or result hold reads alike.
+        WhiteNoiseAnchoredMenu(
             expanded = menuOpen,
             onDismissRequest = { menuOpen = false },
+            anchorSpacing = 8.dp,
             items =
                 listOf(
                     WhiteNoiseMenuItem(
                         label = removeLabel,
                         icon = R.drawable.ic_close,
-                        onClick = {
-                            menuOpen = false
-                            onRemove()
-                        },
+                        onClick = onRemove,
+                        modifier = Modifier.testTag("$tag.remove"),
                     ),
                 ),
         )

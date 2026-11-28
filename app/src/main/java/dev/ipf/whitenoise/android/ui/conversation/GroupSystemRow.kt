@@ -14,13 +14,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -37,7 +33,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.AnnotatedString
@@ -61,12 +56,11 @@ import dev.ipf.whitenoise.android.core.GroupSystemSubjectLink
 import dev.ipf.whitenoise.android.core.MessageDebugClassifier
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.DisclosureChevron
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.rememberGroupSystemCopy
-import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
-import dev.ipf.whitenoise.android.ui.design.AnimatedDropdownMenu
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
 import dev.ipf.whitenoise.android.ui.theme.Radii
-import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 
 /** Flat inset the prototype gives a system-event row on both sides. */
 private val GroupSystemRowVerticalPadding = 8.dp
@@ -315,6 +309,7 @@ private fun GroupSystemSummaryAndWave(
     }
 }
 
+/** The summary's hold menu: one error-coloured Delete for me, on the shared menu anchored to the summary. */
 @Composable
 @Suppress("FunctionNaming")
 internal fun GroupSystemSummaryMenu(
@@ -322,26 +317,19 @@ internal fun GroupSystemSummaryMenu(
     onDismiss: () -> Unit,
     onDelete: (() -> Unit)?,
 ) {
-    val menuScrollState = rememberScrollState()
-    AnimatedDropdownMenu(
-        scrollState = menuScrollState,
-        modifier = Modifier.scrollEdgeFade(menuScrollState, stableRenderTarget = true),
+    WhiteNoiseDropdownMenu(
         expanded = expanded,
         onDismissRequest = onDismiss,
-        shape = MenuDefaults.shape,
-        border = amoledSurfaceBorderStroke(),
-    ) { surface ->
-        DropdownMenuItem(
-            text = { Text(stringResource(R.string.delete_for_me)) },
-            leadingIcon = { Icon(painterResource(R.drawable.ic_delete), contentDescription = null) },
-            onClick = {
-                surface.close {
-                    onDismiss()
-                    onDelete?.invoke()
-                }
-            },
-        )
-    }
+        items =
+            listOf(
+                WhiteNoiseMenuItem(
+                    label = stringResource(R.string.delete_for_me),
+                    icon = R.drawable.ic_delete,
+                    destructive = true,
+                    onClick = { onDelete?.invoke() },
+                ),
+            ),
+    )
 }
 
 @Composable

@@ -2,6 +2,8 @@
 
 package dev.ipf.whitenoise.android.ui.devices
 
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -78,6 +80,7 @@ internal fun UnlinkedAccountPromptGate(
 /**
  * The prompt itself. Back and a tap outside never close it, because that would return to chats of an account that
  * cannot be used. [onClose] is offered only after a removal failed, so a device that cannot remove is not stuck.
+ * Remove is destructive and takes the error colour. It cannot use ConfirmDialog, which always shows Cancel.
  */
 @Composable
 internal fun UnlinkedAccountPrompt(
@@ -91,7 +94,12 @@ internal fun UnlinkedAccountPrompt(
         title = { Text(stringResource(R.string.device_unlinked_title)) },
         text = { Text(stringResource(R.string.unlinked_account_remove_detail)) },
         confirmButton = {
-            TextButton(onClick = onRemove, modifier = Modifier.testTag(UNLINKED_ACCOUNT_REMOVE_TAG)) {
+            // Removing the account deletes its local data, so the confirm takes the error colour.
+            TextButton(
+                onClick = onRemove,
+                modifier = Modifier.testTag(UNLINKED_ACCOUNT_REMOVE_TAG),
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+            ) {
                 Text(stringResource(R.string.unlinked_account_remove_confirm))
             }
         },

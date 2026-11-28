@@ -771,6 +771,8 @@
     <string name="diagnostic_sent_ping_to_self">Ping para si mesmo enviado em %1$s</string>
     <string name="diagnostic_send_to_self_failed">Falha ao enviar para si mesmo: %1$s</string>
     <string name="clear">Limpar</string>
+    <string name="diagnostics_clear_title">Limpar os eventos de diagnóstico?</string>
+    <string name="diagnostics_clear_detail">Os eventos mostrados aqui serão perdidos. Não é possível desfazer.</string>
     <string name="paste">Colar</string>
     <string name="paste_from_clipboard">Colar da área de transferência</string>
     <string name="paste_dictation_transcript">Colar transcrição</string>
@@ -1718,6 +1720,8 @@
     <string name="emoji_sets_not_found">Conjunto ou imagem não encontrado. Verifique o link ou tente novamente.</string>
     <string name="emoji_sets_changed">Este conjunto mudou. Revise a nova versão antes de instalar.</string>
     <string name="emoji_sets_cancelled">Instalação cancelada.</string>
+    <string name="emoji_sets_remove_title">Remover %1$s?</string>
+    <string name="emoji_sets_remove_detail">Remove o conjunto e as imagens dele deste dispositivo. Para usá-lo de novo, você precisará baixá-lo outra vez.</string>
     <string name="emoji_sets_discovery_incomplete">Alguns relays não puderam ser alcançados. Os resultados podem estar incompletos.</string>
     <plurals name="emoji_sets_skipped">
         <item quantity="one">Instalado com %1$d item ignorado.</item>

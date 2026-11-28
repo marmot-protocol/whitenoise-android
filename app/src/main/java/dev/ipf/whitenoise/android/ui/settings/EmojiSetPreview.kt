@@ -23,7 +23,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -38,6 +41,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.EmojiSetsState
 import dev.ipf.whitenoise.android.ui.EmojiArtImage
 import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseFilledTonalButton
@@ -172,7 +176,10 @@ private fun EmojiSetCover(images: EmojiSetImages?) {
     }
 }
 
-/** Install, update, check or remove; during an install, only its measured progress and Cancel. */
+/**
+ * Install, update, check or remove; during an install, only its measured progress and Cancel. Remove confirms first,
+ * since getting the set back means downloading it again.
+ */
 @Suppress("LongParameterList")
 @Composable
 private fun EmojiSetActions(
@@ -221,8 +228,25 @@ private fun EmojiSetActions(
                     ) { Text(stringResource(R.string.emoji_sets_check_update)) }
             }
             if (installed != null) {
+                var confirmRemove by remember(set.coordinate) { mutableStateOf(false) }
+                if (confirmRemove) {
+                    // Removal deletes the downloaded images, and downloading them again is not an Undo.
+                    ConfirmDialog(
+                        title = stringResource(R.string.emoji_sets_remove_title, set.displayTitle()),
+                        message = stringResource(R.string.emoji_sets_remove_detail),
+                        confirmLabel = stringResource(R.string.remove),
+                        destructive = true,
+                        onConfirm = {
+                            confirmRemove = false
+                            onRemove()
+                        },
+                        onDismiss = { confirmRemove = false },
+                        confirmTag = "emoji_sets.remove.confirm",
+                        cancelTag = "emoji_sets.remove.cancel",
+                    )
+                }
                 WhiteNoiseOutlinedButton(
-                    onClick = onRemove,
+                    onClick = { confirmRemove = true },
                     enabled = !state.busy,
                     modifier = Modifier.explain(R.string.remove, R.string.explanation_organize_emoji_remove),
                 ) {

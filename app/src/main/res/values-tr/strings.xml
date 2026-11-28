@@ -769,6 +769,8 @@
     <string name="diagnostic_sent_ping_to_self">Kendine ping %1$s içinde gönderildi</string>
     <string name="diagnostic_send_to_self_failed">Kendine gönderme başarısız: %1$s</string>
     <string name="clear">Temizle</string>
+    <string name="diagnostics_clear_title">Tanılama olayları temizlensin mi?</string>
+    <string name="diagnostics_clear_detail">Burada gösterilen olaylar kaybolacak. Bu işlem geri alınamaz.</string>
     <string name="paste">Yapıştır</string>
     <string name="paste_from_clipboard">Panodan yapıştır</string>
     <string name="paste_dictation_transcript">Dökümü yapıştır</string>
@@ -1714,6 +1716,8 @@
     <string name="emoji_sets_not_found">Set veya görsel bulunamadı. Bağlantıyı kontrol edin veya tekrar deneyin.</string>
     <string name="emoji_sets_changed">Bu set değişti. Yüklemeden önce yeni sürümü inceleyin.</string>
     <string name="emoji_sets_cancelled">Yükleme iptal edildi.</string>
+    <string name="emoji_sets_remove_title">%1$s kaldırılsın mı?</string>
+    <string name="emoji_sets_remove_detail">Seti ve görsellerini bu cihazdan kaldırır. Yeniden kullanmak için seti tekrar indirmeniz gerekir.</string>
     <string name="emoji_sets_discovery_incomplete">Bazı rölelere ulaşılamadı. Sonuçlar eksik olabilir.</string>
     <plurals name="emoji_sets_skipped">
         <item quantity="one">Yüklendi, %1$d giriş atlandı.</item>

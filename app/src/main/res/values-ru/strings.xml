@@ -807,6 +807,8 @@
     <string name="diagnostic_sent_ping_to_self">Пинг себе отправлен в %1$s</string>
     <string name="diagnostic_send_to_self_failed">Не удалось отправить себе: %1$s</string>
     <string name="clear">Очистить</string>
+    <string name="diagnostics_clear_title">Очистить события диагностики?</string>
+    <string name="diagnostics_clear_detail">События, показанные здесь, будут потеряны. Это действие нельзя отменить.</string>
     <string name="paste">Вставить</string>
     <string name="paste_from_clipboard">Вставить из буфера обмена</string>
     <string name="paste_dictation_transcript">Вставить расшифровку</string>
@@ -1803,6 +1805,8 @@
     <string name="emoji_sets_not_found">Набор или изображение не найдены. Проверьте ссылку или попробуйте ещё раз.</string>
     <string name="emoji_sets_changed">Набор изменился. Проверьте новую версию перед установкой.</string>
     <string name="emoji_sets_cancelled">Установка отменена.</string>
+    <string name="emoji_sets_remove_title">Удалить %1$s?</string>
+    <string name="emoji_sets_remove_detail">Набор и его изображения будут удалены с этого устройства. Чтобы снова им пользоваться, его придётся скачать заново.</string>
     <string name="emoji_sets_discovery_incomplete">Некоторые реле недоступны. Результаты могут быть неполными.</string>
     <plurals name="emoji_sets_skipped">
         <item quantity="one">Установлено, пропущена %1$d запись.</item>

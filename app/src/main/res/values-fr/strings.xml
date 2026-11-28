@@ -771,6 +771,8 @@
     <string name="diagnostic_sent_ping_to_self">Ping envoyé à soi-même dans %1$s</string>
     <string name="diagnostic_send_to_self_failed">Échec de l’envoi à soi-même : %1$s</string>
     <string name="clear">Effacer</string>
+    <string name="diagnostics_clear_title">Effacer les événements de diagnostic ?</string>
+    <string name="diagnostics_clear_detail">Les événements affichés ici seront perdus. Cette action est irréversible.</string>
     <string name="paste">Coller</string>
     <string name="paste_from_clipboard">Coller depuis le presse-papiers</string>
     <string name="paste_dictation_transcript">Coller la transcription</string>
@@ -1729,6 +1731,8 @@
     <string name="emoji_sets_not_found">Ensemble ou image introuvable. Vérifiez le lien ou réessayez.</string>
     <string name="emoji_sets_changed">Cet ensemble a changé. Vérifiez la nouvelle version avant de l’installer.</string>
     <string name="emoji_sets_cancelled">Installation annulée.</string>
+    <string name="emoji_sets_remove_title">Retirer %1$s ?</string>
+    <string name="emoji_sets_remove_detail">Retire l’ensemble et ses images de cet appareil. Pour l’utiliser à nouveau, vous devrez le télécharger de nouveau.</string>
     <string name="emoji_sets_discovery_incomplete">Certains relais sont injoignables. Les résultats peuvent être incomplets.</string>
     <plurals name="emoji_sets_skipped">
         <item quantity="one">Installé, %1$d entrée ignorée.</item>

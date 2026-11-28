@@ -8,8 +8,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -32,13 +30,13 @@ import dev.ipf.whitenoise.android.state.FolderField
 import dev.ipf.whitenoise.android.state.FolderMode
 import dev.ipf.whitenoise.android.state.SmartFolderCodec
 import dev.ipf.whitenoise.android.state.SmartFolderFilter
+import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.SectionHeader
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.WhiteNoisePickerItem
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
-import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
-import dev.ipf.whitenoise.android.ui.design.AnimatedDropdownMenu
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 /** Shared by the live editing session and render tests; replacement is always an explicit draft edit. */
@@ -173,30 +171,24 @@ internal fun SmartFolderRulePanel(
         )
     }
     pendingPayload?.let { payload ->
-        WhiteNoiseAlertDialog(
-            onDismissRequest = { pendingPayload = null },
-            title = { Text(stringResource(R.string.smart_folder_replace)) },
-            text = { Text(stringResource(R.string.smart_folder_replace_hint)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        SmartFolderCodec.decode(payload)?.let(onChange)
-                        pendingPayload = null
-                    },
-                    modifier =
-                        Modifier
-                            .testTag("folder.confirmPreset")
-                            .explainOnLongPress(
-                                Explanation(
-                                    stringResource(R.string.smart_folder_replace),
-                                    stringResource(R.string.explanation_organize_replace_rules),
-                                ),
-                            ),
-                ) { Text(stringResource(R.string.smart_folder_replace)) }
+        ConfirmDialog(
+            title = stringResource(R.string.smart_folder_replace),
+            message = stringResource(R.string.smart_folder_replace_hint),
+            confirmLabel = stringResource(R.string.smart_folder_replace),
+            destructive = true,
+            onConfirm = {
+                SmartFolderCodec.decode(payload)?.let(onChange)
+                pendingPayload = null
             },
-            dismissButton = {
-                TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
-            },
+            onDismiss = { pendingPayload = null },
+            confirmTag = "folder.confirmPreset",
+            confirmModifier =
+                Modifier.explainOnLongPress(
+                    Explanation(
+                        stringResource(R.string.smart_folder_replace),
+                        stringResource(R.string.explanation_organize_replace_rules),
+                    ),
+                ),
         )
     }
 }
@@ -262,6 +254,7 @@ private fun SmartFolderAutomaticRules(
     }
 }
 
+/** The presets overflow: commands that replace the rules, anchored to their ⋮ button on the shared menu. */
 @Composable
 private fun SmartFolderPresetMenu(onSelect: (Boolean) -> Unit) {
     var open by rememberSaveable { mutableStateOf(false) }
@@ -281,38 +274,30 @@ private fun SmartFolderPresetMenu(onSelect: (Boolean) -> Unit) {
         ) {
             Icon(painterResource(R.drawable.ic_more_vert), presetsLabel)
         }
-        val menuScrollState = rememberScrollState()
-        AnimatedDropdownMenu(
-            scrollState = menuScrollState,
-            modifier = Modifier.scrollEdgeFade(menuScrollState, stableRenderTarget = true),
+        WhiteNoiseDropdownMenu(
             expanded = open,
             onDismissRequest = { open = false },
-        ) { surface ->
-            listOf(true, false).forEach { allRead ->
-                val title = if (allRead) R.string.smart_folder_preset_read else R.string.smart_folder_preset_mentions
-                DropdownMenuItem(
-                    modifier =
-                        Modifier.explainOnLongPress(
-                            Explanation(
-                                stringResource(title),
-                                stringResource(
-                                    if (allRead) {
-                                        R.string.explanation_organize_preset_read
-                                    } else {
-                                        R.string.explanation_organize_preset_mentions
-                                    },
+            items =
+                listOf(true, false).map { allRead ->
+                    val title = if (allRead) R.string.smart_folder_preset_read else R.string.smart_folder_preset_mentions
+                    WhiteNoiseMenuItem(
+                        label = stringResource(title),
+                        onClick = { onSelect(allRead) },
+                        modifier =
+                            Modifier.explainOnLongPress(
+                                Explanation(
+                                    stringResource(title),
+                                    stringResource(
+                                        if (allRead) {
+                                            R.string.explanation_organize_preset_read
+                                        } else {
+                                            R.string.explanation_organize_preset_mentions
+                                        },
+                                    ),
                                 ),
                             ),
-                        ),
-                    text = { Text(stringResource(title)) },
-                    onClick = {
-                        surface.close {
-                            open = false
-                            onSelect(allRead)
-                        }
-                    },
-                )
-            }
-        }
+                    )
+                },
+        )
     }
 }

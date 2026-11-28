@@ -31,8 +31,6 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -85,11 +83,13 @@ import dev.ipf.whitenoise.android.media.editor.PhotoEditorSourceInfo
 import dev.ipf.whitenoise.android.media.editor.PhotoStrokeMode
 import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.ui.common.ChoiceDialog
+import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.nativePageBody
-import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.conversation.media.AttachmentViewerChrome
 import dev.ipf.whitenoise.android.ui.conversation.media.AttachmentViewerChromeDefaults
@@ -255,27 +255,20 @@ internal fun PhotoEditorScreen(
     }
     if (showDiscardDialog) {
         key(stateHolder, discardEnabled) {
-            WhiteNoiseAlertDialog(
-                onDismissRequest = { showDiscardDialog = false },
-                title = { Text(stringResource(R.string.photo_editor_discard_title)) },
-                text = { Text(stringResource(R.string.photo_editor_discard_message)) },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            close {
-                                if (discardEnabled) {
-                                    showDiscardDialog = false
-                                    currentOnCancel()
-                                }
-                            }
-                        },
-                    ) { Text(stringResource(R.string.photo_editor_discard)) }
-                },
-                dismissButton = {
-                    TextButton(onClick = dismiss) {
-                        Text(stringResource(R.string.photo_editor_keep_editing))
+            ConfirmDialog(
+                title = stringResource(R.string.photo_editor_discard_title),
+                message = stringResource(R.string.photo_editor_discard_message),
+                confirmLabel = stringResource(R.string.photo_editor_discard),
+                dismissLabel = stringResource(R.string.photo_editor_keep_editing),
+                destructive = true,
+                emojiLabels = false,
+                onConfirm = {
+                    if (discardEnabled) {
+                        showDiscardDialog = false
+                        currentOnCancel()
                     }
                 },
+                onDismiss = { showDiscardDialog = false },
             )
         }
     }
@@ -320,7 +313,7 @@ internal fun PhotoEditorScreen(
     }
 }
 
-/** The editor's viewer chrome: Close, title with history and quality, Save, then the existing More menu. */
+/** The editor's viewer chrome: Close, title with history and quality, Save, then the shared ⋮ More menu. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Suppress("LongMethod", "LongParameterList")
@@ -337,7 +330,6 @@ private fun PhotoEditorTopBar(
     val saving = state.isSaving
     var expanded by remember { mutableStateOf(false) }
     val resetLabel = stringResource(R.string.photo_editor_reset)
-    val menuScrollState = rememberScrollState()
     AttachmentViewerChrome(
         title = stringResource(R.string.photo_editor_title),
         onClose = onCancel,
@@ -380,31 +372,22 @@ private fun PhotoEditorTopBar(
         overflow = {
             Box {
                 IconButton(onClick = { expanded = true }, enabled = !saving) {
-                    Icon(painterResource(R.drawable.ic_more_horiz), stringResource(R.string.more_options))
+                    Icon(painterResource(R.drawable.ic_more_vert), stringResource(R.string.more_options))
                 }
-                DropdownMenu(
+                WhiteNoiseDropdownMenu(
                     expanded = expanded,
                     onDismissRequest = { expanded = false },
-                    scrollState = menuScrollState,
-                    modifier = Modifier.scrollEdgeFade(menuScrollState, stableRenderTarget = true),
-                ) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.photo_editor_reset)) },
-                        enabled = holder.hasUnsavedChanges && !saving,
-                        modifier = Modifier.semantics { contentDescription = resetLabel },
-                        onClick = {
-                            expanded = false
-                            holder.reset()
-                        },
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.help)) },
-                        onClick = {
-                            expanded = false
-                            onHelp()
-                        },
-                    )
-                }
+                    items =
+                        listOf(
+                            WhiteNoiseMenuItem(
+                                label = stringResource(R.string.photo_editor_reset),
+                                enabled = holder.hasUnsavedChanges && !saving,
+                                modifier = Modifier.semantics { contentDescription = resetLabel },
+                                onClick = holder::reset,
+                            ),
+                            WhiteNoiseMenuItem(label = stringResource(R.string.help), onClick = onHelp),
+                        ),
+                )
             }
         },
     )

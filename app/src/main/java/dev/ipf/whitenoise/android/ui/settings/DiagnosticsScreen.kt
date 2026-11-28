@@ -52,6 +52,7 @@ import dev.ipf.whitenoise.android.state.bootstrapRelayCount
 import dev.ipf.whitenoise.android.state.requireCreatedGroupId
 import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.ClipboardCopier
+import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
@@ -225,7 +226,10 @@ private fun copyPerformanceLogs(clipboard: ClipboardCopier) {
     if (lines.isNotEmpty()) clipboard.copy(lines.joinToString("\n"))
 }
 
-/** Presents real diagnostic events in the prototype's card, split by [AppDivider]; operational data stays in Health. */
+/**
+ * Presents real diagnostic events in the prototype's card, split by [AppDivider]; operational data stays in Health.
+ * Clear is destructive: it is error-coloured in the actions menu and confirms that the entries will be lost.
+ */
 @Composable
 @Suppress("FunctionNaming", "LongMethod", "LongParameterList")
 internal fun DiagnosticsContent(
@@ -240,6 +244,23 @@ internal fun DiagnosticsContent(
 ) {
     var showActions by remember { mutableStateOf(false) }
     var showHealth by remember { mutableStateOf(false) }
+    var confirmClear by remember { mutableStateOf(false) }
+    if (confirmClear) {
+        // Clearing drops the in-memory event log for good, so it names that loss before it runs.
+        ConfirmDialog(
+            title = stringResource(R.string.diagnostics_clear_title),
+            message = stringResource(R.string.diagnostics_clear_detail),
+            confirmLabel = stringResource(R.string.clear),
+            destructive = true,
+            onConfirm = {
+                confirmClear = false
+                onClear()
+            },
+            onDismiss = { confirmClear = false },
+            confirmTag = "diagnostics.clear.confirm",
+            cancelTag = "diagnostics.clear.cancel",
+        )
+    }
     if (showHealth) {
         DiagnosticsHealthSheet(
             state = state,
@@ -290,8 +311,9 @@ internal fun DiagnosticsContent(
                             WhiteNoiseMenuItem(
                                 label = stringResource(R.string.clear),
                                 icon = R.drawable.ic_delete,
-                                onClick = onClear,
+                                onClick = { confirmClear = true },
                                 enabled = entries.isNotEmpty(),
+                                destructive = true,
                                 modifier = Modifier.testTag("diagnostics.action.clear"),
                             ),
                         ),
