@@ -246,9 +246,12 @@
     <string name="error_missing_key_package_for">Aucune clé de discussion utilisable n’a été trouvée pour %1$s. Demandez-lui d’installer ou de mettre à jour White Noise et de l’ouvrir, puis réessayez.</string>
     <string name="invite_to_white_noise">Inviter sur White Noise</string>
     <string name="invite_friends">Inviter des amis</string>
-    <string name="invite_to_white_noise_description">%1$s n\'est pas encore sur White Noise. Partagez l\'application pour démarrer une discussion sécurisée.</string>
-    <string name="unknown_invite_to_white_noise_description">Cet utilisateur n\'est pas encore sur White Noise. Partagez l\'application pour démarrer une discussion sécurisée.</string>
     <string name="invite_message">Rejoignez-moi sur White Noise. Pas de numéro de téléphone. Pas de surveillance. Juste une vraie confidentialité. Téléchargez ici : https://www.whitenoise.chat/download</string>
+    <string name="start_chat_not_on_white_noise_for">%1$s n’est pas encore sur White Noise</string>
+    <string name="start_chat_not_on_white_noise">Cette personne n’est pas encore sur White Noise</string>
+    <string name="start_chat_not_on_white_noise_detail">Envoyez-lui une invitation. Quand elle aura installé et ouvert White Noise, réessayez.</string>
+    <string name="send_invite">Envoyer une invitation</string>
+    <string name="invite_message_personal">Je suis %1$s sur White Noise, une messagerie privée qui ne demande pas de numéro de téléphone. Installe-la, touche Nouveau chat et colle ma clé pour m’écrire : %2$s\nTéléchargement : https://www.whitenoise.chat/download</string>
     <string name="error_invalid_identity_reference">Ce destinataire n’est pas une clé publique Nostr valide. Utilisez un npub, un lien de profil ou une clé publique hex.</string>
     <string name="error_group_create_failed_retry">Un problème est survenu lors de la configuration de la discussion chiffrée. Vérifiez votre connexion et réessayez.</string>
     <string name="error_no_group_members_selected">Aucune des personnes sélectionnées n’a pu être ajoutée. Demandez-leur de vérifier la configuration de leur discussion ou modifiez votre sélection.</string>

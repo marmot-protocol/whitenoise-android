@@ -306,9 +306,13 @@
     <string name="error_missing_key_package_for">We couldn’t find a usable chat key for %1$s. Ask them to install or update White Noise and open it, then retry.</string>
     <string name="invite_to_white_noise">Invite to White Noise</string>
     <string name="invite_friends">Invite friends</string>
-    <string name="invite_to_white_noise_description">%1$s isn\'t on White Noise yet. Share the app to start a secure chat.</string>
-    <string name="unknown_invite_to_white_noise_description">This user isn\'t on White Noise yet. Share the app to start a secure chat.</string>
     <string name="invite_message">Join me on White Noise. No phone number. No surveillance. Just real privacy. Download it here: https://www.whitenoise.chat/download</string>
+    <string name="start_chat_not_on_white_noise_for">%1$s isn’t on White Noise yet</string>
+    <string name="start_chat_not_on_white_noise">This person isn’t on White Noise yet</string>
+    <string name="start_chat_not_on_white_noise_detail">Send them an invite. When they’ve installed White Noise and opened it, try again.</string>
+    <string name="send_invite">Send invite</string>
+    <!-- %1$s is the sender’s profile name; %2$s is their full npub public key. Keep the download URL unchanged. -->
+    <string name="invite_message_personal">I’m %1$s on White Noise, a private messenger that doesn’t need a phone number. Install it, tap New chat and paste my key to message me: %2$s\nDownload: https://www.whitenoise.chat/download</string>
     <string name="error_invalid_identity_reference">That recipient is not a valid Nostr public key. Use an npub, profile link, or hex public key.</string>
     <string name="error_group_create_failed_retry">Something went wrong while setting up encrypted chat. Check your connection and try again.</string>
     <string name="error_no_group_members_selected">None of the selected people could be added. Ask them to check their chat setup, or edit your selection.</string>
