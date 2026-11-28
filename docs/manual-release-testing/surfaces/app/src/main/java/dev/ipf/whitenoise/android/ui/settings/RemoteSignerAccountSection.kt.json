@@ -32,6 +32,12 @@
     ],
     "settings_controls": [
       {
+        "surface": "Account Keys reports a browser launch failure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RemoteSignerAccountSection.kt",
+        "anchor": "R.string.remote_signer_approval_open_failed",
+        "test_ids": ["ONB-029"]
+      },
+      {
         "surface": "R.string.cancel",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RemoteSignerAccountSection.kt",
         "anchor": "R.string.cancel",

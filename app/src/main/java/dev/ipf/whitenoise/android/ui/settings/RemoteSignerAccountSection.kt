@@ -1,9 +1,5 @@
 package dev.ipf.whitenoise.android.ui.settings
 
-import android.content.ActivityNotFoundException
-import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -32,8 +28,10 @@ import dev.ipf.whitenoise.android.state.reconnectRemoteSigner
 import dev.ipf.whitenoise.android.state.reviewRemoteSignerPermissions
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.RemoteSignerFlow
 import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.RemoteSignerPermissionReview
+import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.openRemoteSignerApproval
 import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.remoteSignerApprovalHost
 
 /** What the user can do for a remote-signer account from Account keys. */
@@ -111,7 +109,7 @@ internal fun rememberRemoteSignerAccountActions(
     val context = LocalContext.current
     var dialog by remember(account) { mutableStateOf<RemoteSignerAccountAction?>(null) }
     var review by remember(account) { mutableStateOf<Nip46PermissionsFfi?>(null) }
-    var approvalOpened by remember(account, status?.requestId) { mutableStateOf(false) }
+    var approvalOpened by remember(account, status?.requestId, status?.authUrl) { mutableStateOf(false) }
     RemoteSignerAccountDialogs(appState, account, dialog, review) {
         dialog = null
         review = null
@@ -122,8 +120,10 @@ internal fun rememberRemoteSignerAccountActions(
             when (action) {
                 RemoteSignerAccountAction.Retry -> appState.reconnectRemoteSigner(account)
                 // I've finished appears only after Android accepted the page, so an unseen check is never confirmed.
-                RemoteSignerAccountAction.OpenApproval ->
-                    approvalOpened = it.authUrl?.let { url -> openApprovalPage(context, url) } == true
+                RemoteSignerAccountAction.OpenApproval -> {
+                    approvalOpened = it.authUrl?.let(context::openRemoteSignerApproval) == true
+                    if (!approvalOpened) appState.present(R.string.remote_signer_approval_open_failed)
+                }
                 RemoteSignerAccountAction.FinishApproval ->
                     it.requestId?.let { request -> appState.completeRemoteSignerApproval(account, request) }
                 RemoteSignerAccountAction.ReviewPermissions -> review = appState.reviewRemoteSignerPermissions(account)
@@ -133,7 +133,7 @@ internal fun rememberRemoteSignerAccountActions(
     }
 }
 
-/** Disconnect confirmation, renewed permission review and the re-pair flow for one account. */
+/** Hosts disconnect, re-pairing, and permission re-review with independently scrolling grants. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun RemoteSignerAccountDialogs(
@@ -169,7 +169,7 @@ internal fun RemoteSignerAccountDialogs(
             ownerKey = permissions,
             onDismissRequest = onDismiss,
             title = { Text(stringResource(R.string.remote_signer_review_title)) },
-            text = { RemoteSignerPermissionReview(permissions) },
+            text = { RemoteSignerPermissionReview(permissions, Modifier.fadingVerticalScroll()) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -177,24 +177,12 @@ internal fun RemoteSignerAccountDialogs(
                         appState.launchMutation { appState.approveRemoteSignerPermissions(account, permissions) }
                     },
                     modifier = Modifier.testTag("remote_signer.account.approve"),
-                ) { Text(stringResource(R.string.remote_signer_review_approve)) }
+                ) {
+                    Text(stringResource(R.string.remote_signer_review_approve))
+                }
             },
             dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
         )
-    }
-}
-
-/** Opens only an https approval page in the user's browser; returns whether Android accepted it. */
-private fun openApprovalPage(
-    context: Context,
-    url: String,
-): Boolean {
-    if (remoteSignerApprovalHost(url) == null) return false
-    return try {
-        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE))
-        true
-    } catch (_: ActivityNotFoundException) {
-        false
     }
 }
 

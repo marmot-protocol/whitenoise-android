@@ -40,6 +40,7 @@ import dev.ipf.whitenoise.android.notifications.NotificationTapTokens
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.notifications.PinnedShortcutTapGate
 import dev.ipf.whitenoise.android.notifications.PinnedShortcutTapState
+import dev.ipf.whitenoise.android.notifications.SignInAlertNavigation
 import dev.ipf.whitenoise.android.notifications.inboundNotificationHandledMatchesCurrent
 import dev.ipf.whitenoise.android.notifications.notificationTapLifecycle
 import dev.ipf.whitenoise.android.notifications.routeInboundIntent
@@ -58,6 +59,7 @@ import dev.ipf.whitenoise.android.state.WarmResumeTrace
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.actionColorArgb
 import dev.ipf.whitenoise.android.state.shouldReattachAppUnlockPrompt
+import dev.ipf.whitenoise.android.state.signInAlerts
 import dev.ipf.whitenoise.android.ui.WhiteNoiseApp
 import dev.ipf.whitenoise.android.ui.common.ProvideWindowLayout
 import dev.ipf.whitenoise.android.ui.common.releaseSecureFlag
@@ -223,7 +225,11 @@ class MainActivity : AppCompatActivity() {
             }).also(AndroidFramePerformanceReporter::start)
     }
 
-    private fun syncSystemBarsAndHostReadiness(darkTheme: Boolean) {
+    private fun syncSystemBarsAndHostReadiness(
+        darkTheme: Boolean,
+        notificationPending: Boolean,
+    ) {
+        if (!notificationPending) foregroundConversationDismissal.onNotificationRouteHandled()
         val controller = WindowCompat.getInsetsController(window, window.decorView)
         controller.isAppearanceLightStatusBars = !darkTheme
         controller.isAppearanceLightNavigationBars = !darkTheme
@@ -250,7 +256,8 @@ class MainActivity : AppCompatActivity() {
                 window.applyPreComposeWindowBackground(state.themeMode, systemDarkTheme)
                 onDispose { }
             }
-            SideEffect { syncSystemBarsAndHostReadiness(darkTheme) }
+            val notificationPending = inboundNotificationTarget != null || state.signInAlerts.devicesRequest != null
+            SideEffect { syncSystemBarsAndHostReadiness(darkTheme, notificationPending) }
             WhiteNoiseTheme(
                 darkTheme = darkTheme,
                 amoled = state.themeMode.isAmoled,
@@ -404,9 +411,19 @@ class MainActivity : AppCompatActivity() {
         retainPendingShareOnRecreation: Boolean = false,
         lifecycleClass: WarmResumeLifecycleClass = warmResumeLifecycleClass,
     ) {
-        val opensProfileChooser = notificationProfileTileRoute.accept(intent)
-        if (opensProfileChooser || AppUpdateNavigation.isUpdateTap(intent)) {
-            if (!opensProfileChooser) {
+        val signInAlertAccount = SignInAlertNavigation.accountRef(intent, notificationTapTokens)
+        val opensProfileChooser = signInAlertAccount == null && notificationProfileTileRoute.accept(intent)
+        signInAlertAccount?.let {
+            SignInAlertNavigation.open(
+                it,
+                appState,
+                pinTapGate,
+                notificationInboundState,
+                foregroundConversationDismissal,
+            )
+        }
+        if (signInAlertAccount != null || opensProfileChooser || AppUpdateNavigation.isUpdateTap(intent)) {
+            if (signInAlertAccount == null && !opensProfileChooser) {
                 pinTapGate.supersede()
                 inboundAppUpdateTap += 1
             }
@@ -422,23 +439,15 @@ class MainActivity : AppCompatActivity() {
         val pinTarget = pinTapGate.target(this, intent)
         val retainNotification = retainPendingShareOnRecreation && inboundNotificationTarget != null
         val parsedTarget =
-            if (retainNotification) {
-                null
-            } else {
-                pinTarget ?: NotificationNavigation.parse(
-                    intent,
-                    importReplyDraft = !retainPendingShareOnRecreation,
-                    isTrustedTargetSignature = notificationTapTokens::isValidTarget,
-                ) { notificationKey, tapToken ->
-                    notificationTapTokens.isValid(notificationKey, tapToken)
-                }
-            }
-        val parsedShare =
-            if (retainPendingShareOnRecreation && inboundShareRequest != null) {
-                null
-            } else {
-                parseShareRequest(intent)
-            }
+            parseNotificationTarget(
+                intent,
+                retainPendingShareOnRecreation,
+                retainNotification,
+                pinTarget,
+                notificationTapTokens,
+            )
+        val retainedShare = retainPendingShareOnRecreation && inboundShareRequest != null
+        val parsedShare = parseShareRequest(intent.takeUnless { retainedShare })
         val profileData = intent?.dataString.takeUnless { retainNotification }
         pinTapGate.supersedeForRoute(parsedTarget != null, parsedShare != null, profileData)
         applyInboundRouting(parsedTarget, parsedShare, profileData, lifecycleClass)
@@ -463,6 +472,7 @@ class MainActivity : AppCompatActivity() {
         if (target != null || share != null || data != null) appState.conversationDictation.clearMicrophoneRecovery()
         val routing = notificationInboundState.route(target, share, data, inboundProfilePayload, inboundShareRequest)
         if (target != null) {
+            appState.signInAlerts.devicesRequest?.let { appState.signInAlerts.updateDevicesRequest(it) }
             foregroundConversationDismissal.onNotificationRouteObserved()
             appState.startNotificationRouteTrace(routing.notificationRequestId, lifecycleClass, target)
         }
@@ -492,7 +502,8 @@ class MainActivity : AppCompatActivity() {
             // retained-conversation dismissal until onResume has observed
             // whether this foreground entry is actually routing elsewhere.
             foregroundConversationDismissal.onStart(
-                hasPendingNotificationRoute = inboundNotificationTarget != null,
+                hasPendingNotificationRoute =
+                    inboundNotificationTarget != null || appState.signInAlerts.devicesRequest != null,
             )
             appState.setAppInForeground(
                 foreground = true,
@@ -753,7 +764,7 @@ class MainActivity : AppCompatActivity() {
                         )
                     ) {
                         appUnlockPromptHostState.clear()
-                        appState.appLock.markUnlockFailed(appLockAuthErrorMessage(errorCode, errString))
+                        appState.appLock.markUnlockFailed(appLockAuthErrorMessage(errorCode))
                         attachedAppUnlockSessionId = null
                         attachedAppUnlockHostId = null
                         traceAppUnlock(sessionId, "prompt-terminated")
@@ -775,36 +786,6 @@ class MainActivity : AppCompatActivity() {
                 "lifecycle_class=${warmResumeLifecycleClass.name.lowercase()}",
         )
     }
-
-    private fun foregroundReturnExpiryElapsedRealtime(
-        nowElapsedRealtime: Long,
-        hostResumed: Boolean,
-    ): Long? {
-        if (hostResumed) return null
-        return nowElapsedRealtime.coerceAtMost(Long.MAX_VALUE - APP_UNLOCK_FOREGROUND_HANDOFF_MILLIS) +
-            APP_UNLOCK_FOREGROUND_HANDOFF_MILLIS
-    }
-
-    private fun appLockAuthErrorMessage(
-        errorCode: Int,
-        @Suppress("UNUSED_PARAMETER") errString: CharSequence,
-    ): AppText =
-        when (errorCode) {
-            BiometricPrompt.ERROR_CANCELED,
-            BiometricPrompt.ERROR_USER_CANCELED,
-            BiometricPrompt.ERROR_NEGATIVE_BUTTON,
-            -> AppText.Resource(R.string.app_lock_auth_cancelled)
-            BiometricPrompt.ERROR_LOCKOUT,
-            BiometricPrompt.ERROR_LOCKOUT_PERMANENT,
-            -> AppText.Resource(R.string.app_lock_auth_locked)
-            BiometricPrompt.ERROR_TIMEOUT -> AppText.Resource(R.string.app_lock_auth_timed_out)
-            BiometricPrompt.ERROR_HW_NOT_PRESENT,
-            BiometricPrompt.ERROR_HW_UNAVAILABLE,
-            BiometricPrompt.ERROR_NO_BIOMETRICS,
-            BiometricPrompt.ERROR_NO_DEVICE_CREDENTIAL,
-            -> AppText.Resource(R.string.app_lock_auth_unavailable)
-            else -> AppText.Resource(R.string.app_lock_auth_failed)
-        }
 
     private fun retainAppLockBackgroundSecureFlagIfNeeded() {
         if (!::appState.isInitialized || !appState.appLock.shouldSecureWindowWhileBackgrounded()) return
@@ -868,7 +849,6 @@ private val Configuration.isNightModeActive: Boolean
 internal const val BENCHMARK_RECREATE_ACTIVITY_EXTRA =
     "dev.ipf.whitenoise.android.extra.BENCHMARK_RECREATE_ACTIVITY"
 private val appUnlockHostIds = AtomicLong()
-private const val APP_UNLOCK_FOREGROUND_HANDOFF_MILLIS = 5_000L
 
 internal class AppUnlockPromptHostState : ViewModel() {
     var sessionId: Long? = null
@@ -877,5 +857,22 @@ internal class AppUnlockPromptHostState : ViewModel() {
     fun clear() {
         sessionId = null
         expectedCipher = null
+    }
+}
+
+private fun parseNotificationTarget(
+    intent: Intent?,
+    retainPendingShareOnRecreation: Boolean,
+    retainNotification: Boolean,
+    pinTarget: NotificationTarget?,
+    tokens: NotificationTapTokens,
+): NotificationTarget? {
+    if (retainNotification) return null
+    return pinTarget ?: NotificationNavigation.parse(
+        intent,
+        importReplyDraft = !retainPendingShareOnRecreation,
+        isTrustedTargetSignature = tokens::isValidTarget,
+    ) { notificationKey, tapToken ->
+        tokens.isValid(notificationKey, tapToken)
     }
 }

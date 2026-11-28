@@ -108,7 +108,7 @@ class NotificationAccountIsolationNavigationTest {
         assertEquals(SHARED_GROUP, holder.selectedChat.value?.id)
         awaitCondition { gate.draftReadCount.get() >= 6 }
         composeRule.runOnIdle {
-            holder.selectedChat.value = null
+            holder.closeForTest()
             state.setAppInForeground(false)
             state.setAppInForeground(true)
         }

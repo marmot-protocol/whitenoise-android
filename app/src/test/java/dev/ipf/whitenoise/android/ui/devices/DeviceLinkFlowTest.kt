@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.devices
 
 import android.content.Context
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -102,7 +103,7 @@ class DeviceLinkFlowTest {
     fun onlyComparingOffersLinkAndNotNowOnTheApprovingDevice() {
         val comparing = deviceLinkRequestStep(DeviceLinkPromptStateFfi.Comparing(CODE)) { "" }
         assertEquals(DeviceLinkAction.Link, comparing.primary)
-        assertEquals(DeviceLinkAction.NotNow, comparing.secondary)
+        assertEquals(DeviceLinkAction.DontLink, comparing.secondary)
         assertEquals(CODE, comparing.code)
         listOf(
             DeviceLinkPromptStateFfi.Preparing,
@@ -164,8 +165,8 @@ class DeviceLinkFlowTest {
         request(DeviceLinkPromptStateFfi.Comparing(CODE), onLink = { linked = it })
 
         compose.onNodeWithTag(DEVICE_LINK_LABEL_TAG).performScrollTo().performTextReplacement("  Desk  ")
-        compose.onNodeWithTag(DEVICE_LINK_OPTIONS_TAG).performScrollTo().performClick()
         compose.onNodeWithTag(DEVICE_LINK_BRING_HISTORY_TAG).performScrollTo().performClick()
+        compose.mainClock.advanceTimeBy(DEVICE_LINK_ARM_DELAY_MS + 100L)
         compose.onNodeWithTag(DEVICE_LINK_PRIMARY_TAG).performScrollTo().performClick()
 
         compose.runOnIdle {
@@ -187,22 +188,29 @@ class DeviceLinkFlowTest {
                 }
             }
         }
-        compose.onNodeWithTag(DEVICE_LINK_OPTIONS_TAG).performScrollTo().performClick()
         compose.onNodeWithTag(DEVICE_LINK_BRING_HISTORY_TAG).performScrollTo().performClick()
         compose.runOnIdle { blocked.value = true }
         compose.onNodeWithTag(DEVICE_LINK_PRIMARY_TAG).assertDoesNotExist()
-        compose.runOnIdle { blocked.value = false }
-        compose.onNodeWithTag(DEVICE_LINK_PRIMARY_TAG).performScrollTo().performClick()
+        compose.runOnIdle {
+            blocked.value = false
+            Snapshot.sendApplyNotifications()
+        }
+        val link = compose.onNodeWithTag(DEVICE_LINK_PRIMARY_TAG).performScrollTo()
+        compose.mainClock.advanceTimeBy(DEVICE_LINK_ARM_DELAY_MS + 100L)
+        link.assertIsEnabled().performClick()
         compose.runOnIdle {
             assertEquals(false, linked?.bringHistory)
             request.value = request.value.copy(promptId = "second")
+            Snapshot.sendApplyNotifications()
         }
-        compose.onNodeWithTag(DEVICE_LINK_PRIMARY_TAG).performScrollTo().performClick()
+        link.performScrollTo()
+        compose.mainClock.advanceTimeBy(DEVICE_LINK_ARM_DELAY_MS + 100L)
+        link.assertIsEnabled().performClick()
         compose.runOnIdle { assertEquals(true, linked?.bringHistory) }
     }
 
     /**
-     * Both choices start on, as MDK offers them, and one tap links with the options closed. The empty name field
+     * Both visible choices start on, as MDK offers them. The empty name field
      * is on the step and shows the default name, which is the one sent.
      */
     @Test
@@ -213,7 +221,8 @@ class DeviceLinkFlowTest {
         val placeholder = context.getString(R.string.link_request_default_label)
         compose.onNodeWithTag(DEVICE_LINK_LABEL_TAG).performScrollTo().assertIsDisplayed()
         compose.onNodeWithText(placeholder, useUnmergedTree = true).assertIsDisplayed()
-        compose.onNodeWithTag(DEVICE_LINK_ADD_TO_CHATS_TAG).assertDoesNotExist()
+        compose.onNodeWithTag(DEVICE_LINK_ADD_TO_CHATS_TAG).assertExists()
+        compose.mainClock.advanceTimeBy(DEVICE_LINK_ARM_DELAY_MS + 100L)
         compose.onNodeWithTag(DEVICE_LINK_PRIMARY_TAG).performScrollTo().performClick()
 
         compose.runOnIdle { assertEquals(DeviceLinkChoices(label = placeholder), linked) }
@@ -232,6 +241,7 @@ class DeviceLinkFlowTest {
             compose.onNodeWithTag(DEVICE_LINK_LABEL_TAG).performTextReplacement(blank)
             compose.onNodeWithText(placeholder, useUnmergedTree = true).assertIsDisplayed()
         }
+        compose.mainClock.advanceTimeBy(DEVICE_LINK_ARM_DELAY_MS + 100L)
         compose.onNodeWithTag(DEVICE_LINK_PRIMARY_TAG).performScrollTo().performClick()
 
         compose.runOnIdle { assertEquals(DeviceLinkChoices(label = placeholder), linked) }
@@ -261,7 +271,7 @@ class DeviceLinkFlowTest {
         request(DeviceLinkPromptStateFfi.Comparing(CODE), onLink = { links++ })
 
         compose.onNodeWithTag(DEVICE_LINK_LABEL_TAG).performScrollTo().performTextReplacement("a".repeat(65))
-        compose.onNodeWithTag(DEVICE_LINK_ADD_TO_CHATS_TAG).assertDoesNotExist()
+        compose.onNodeWithTag(DEVICE_LINK_ADD_TO_CHATS_TAG).assertExists()
 
         compose.onNodeWithTag(DEVICE_LINK_PRIMARY_TAG).performScrollTo().assertIsNotEnabled()
         compose.onNodeWithText(context.getString(R.string.link_request_label_too_long)).assertExists()

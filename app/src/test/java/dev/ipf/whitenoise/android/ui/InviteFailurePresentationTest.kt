@@ -17,13 +17,13 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.NoGroupMembersSelectedException
 import dev.ipf.whitenoise.android.state.StartProfileChatNoActiveAccountException
+import dev.ipf.whitenoise.android.state.groupCreateFailureCopyable
 import dev.ipf.whitenoise.android.state.groupCreateFailureDetail
 import dev.ipf.whitenoise.android.state.groupCreateSelectionFailureDetail
 import dev.ipf.whitenoise.android.state.groupMemberSelectionFailure
 import dev.ipf.whitenoise.android.state.inviteFailureDetail
 import dev.ipf.whitenoise.android.state.requireCreatedGroupId
 import dev.ipf.whitenoise.android.state.skippedGroupMembersDetail
-import dev.ipf.whitenoise.android.state.startProfileChatFailureCopyable
 import dev.ipf.whitenoise.android.state.startProfileChatFailureDetail
 import dev.ipf.whitenoise.android.state.startProfileChatFailureIsMissingSetup
 import dev.ipf.whitenoise.android.ui.chats.newchat.startChatErrorUiState
@@ -106,7 +106,7 @@ class InviteFailurePresentationTest {
             startProfileChatFailureDetail(failure) { " " },
         )
         assertFalse(startProfileChatFailureIsMissingSetup(failure))
-        assertFalse(startProfileChatFailureCopyable(failure))
+        assertFalse(groupCreateFailureCopyable(failure))
     }
 
     /** Blank names cannot make a partial commit appear to have added everyone. */
@@ -239,7 +239,7 @@ class InviteFailurePresentationTest {
                 MarmotKitException.MissingKeyPackage("deadbeef", MissingKeyPackageReasonFfi.NOT_FOUND),
             ),
         )
-        assertFalse(startProfileChatFailureCopyable(obsolete))
+        assertFalse(groupCreateFailureCopyable(obsolete))
     }
 
     /** An incomplete directory lookup is a retryable problem for that recipient, never proof of missing setup. */
@@ -260,7 +260,7 @@ class InviteFailurePresentationTest {
             groupCreateSelectionFailureDetail(incomplete, null),
         )
         assertFalse(startProfileChatFailureIsMissingSetup(incomplete))
-        assertFalse(startProfileChatFailureCopyable(incomplete))
+        assertFalse(groupCreateFailureCopyable(incomplete))
     }
 
     /** A confirmed missing KeyPackage reads as missing setup, not as a native error. */
@@ -275,14 +275,14 @@ class InviteFailurePresentationTest {
             ),
             startProfileChatFailureDetail(missing) { "Alice" },
         )
-        assertFalse(startProfileChatFailureCopyable(missing))
+        assertFalse(groupCreateFailureCopyable(missing))
 
         val missingBlankAccount = MarmotKitException.MissingKeyPackage("  ", MissingKeyPackageReasonFfi.NOT_FOUND)
         assertEquals(
             AppText.Resource(R.string.error_missing_key_package),
             startProfileChatFailureDetail(missingBlankAccount) { "ignored" },
         )
-        assertFalse(startProfileChatFailureCopyable(missingBlankAccount))
+        assertFalse(groupCreateFailureCopyable(missingBlankAccount))
     }
 
     @Test
@@ -294,7 +294,7 @@ class InviteFailurePresentationTest {
             AppText.Resource(R.string.error_invalid_identity_reference),
             startProfileChatFailureDetail(invalidIdentity) { "ignored" },
         )
-        assertFalse(startProfileChatFailureCopyable(invalidIdentity))
+        assertFalse(groupCreateFailureCopyable(invalidIdentity))
         assertEquals(
             AppText.Resource(R.string.error_invalid_identity_reference),
             groupCreateFailureDetail(invalidIdentity) { "ignored" },
@@ -310,7 +310,7 @@ class InviteFailurePresentationTest {
             AppText.Resource(R.string.error_invalid_key_package),
             groupCreateFailureDetail(invalidKeyPackage) { "ignored" },
         )
-        assertFalse(startProfileChatFailureCopyable(invalidKeyPackage))
+        assertFalse(groupCreateFailureCopyable(invalidKeyPackage))
     }
 
     @Test
@@ -347,7 +347,7 @@ class InviteFailurePresentationTest {
             AppText.Resource(R.string.toast_chat_still_loading),
             startProfileChatFailureDetail(pending) { "ignored" },
         )
-        assertFalse(startProfileChatFailureCopyable(pending))
+        assertFalse(groupCreateFailureCopyable(pending))
     }
 
     @Test
@@ -373,19 +373,19 @@ class InviteFailurePresentationTest {
             AppText.Resource(R.string.error_group_create_failed_retry),
             startProfileChatFailureDetail(publishFailure) { "ignored" },
         )
-        assertTrue(startProfileChatFailureCopyable(publishFailure))
+        assertTrue(groupCreateFailureCopyable(publishFailure))
         val runtimeFailure = MarmotKitException.Runtime("relay unreachable")
         assertEquals(
             AppText.Resource(R.string.error_group_create_failed_retry),
             startProfileChatFailureDetail(runtimeFailure) { "ignored" },
         )
-        assertFalse(startProfileChatFailureCopyable(runtimeFailure))
+        assertFalse(groupCreateFailureCopyable(runtimeFailure))
         val unexpectedFailure = RuntimeException("relay unreachable")
         assertEquals(
             AppText.Resource(R.string.error_group_create_failed_retry),
             startProfileChatFailureDetail(unexpectedFailure) { "ignored" },
         )
-        assertTrue(startProfileChatFailureCopyable(unexpectedFailure))
+        assertTrue(groupCreateFailureCopyable(unexpectedFailure))
     }
 
     @Test
@@ -396,6 +396,6 @@ class InviteFailurePresentationTest {
             AppText.Resource(R.string.toast_no_active_account),
             startProfileChatFailureDetail(noActiveAccount) { "ignored" },
         )
-        assertFalse(startProfileChatFailureCopyable(noActiveAccount))
+        assertFalse(groupCreateFailureCopyable(noActiveAccount))
     }
 }

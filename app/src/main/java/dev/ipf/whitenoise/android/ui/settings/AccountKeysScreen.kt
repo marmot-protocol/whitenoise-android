@@ -201,6 +201,11 @@ internal fun AccountKeysScreen(
             !appState.signOutInProgress &&
             !appState.wipeInProgress
 
+    // Copying or exporting the key, plain or encrypted, retires the chat list's reminder to save it (#4279).
+    fun markPrivateKeySaved() {
+        if (ownsAccount()) accountIdHex?.let(appState.privateKeyReminders::markKeySaved)
+    }
+
     fun launchExport(
         encrypted: Boolean,
         content: String,
@@ -257,6 +262,7 @@ internal fun AccountKeysScreen(
                         }
                         KeyExportDestination.Share -> {
                             ui.hideSensitive()
+                            // Launching the chooser does not confirm that the key was saved anywhere.
                             ui.shareErrorDialog = !sharePrivateKey(context, shareTitle, content)
                         }
                     }
@@ -327,6 +333,7 @@ internal fun AccountKeysScreen(
                             if (secret != null) {
                                 copySensitiveToClipboard(context, privateKeyLabel, secret)
                                 ui.copiedKey = CopiedProfileKey.Private
+                                markPrivateKeySaved()
                             }
                         },
                     )
@@ -348,6 +355,7 @@ internal fun AccountKeysScreen(
             if (backup != null && !backup.isExpired() && canDeliverSecret()) {
                 copySensitiveToClipboard(context, encryptedBackupLabel, backup.content)
                 ui.copiedKey = CopiedProfileKey.Encrypted
+                markPrivateKeySaved()
             } else {
                 ui.encryptedBackup = null
             }

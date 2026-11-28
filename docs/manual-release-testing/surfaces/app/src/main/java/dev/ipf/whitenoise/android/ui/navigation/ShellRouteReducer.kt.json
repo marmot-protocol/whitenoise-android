@@ -1,0 +1,17 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/ShellRouteReducer.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Notification-owned route survives its own account switch",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/ShellRouteReducer.kt",
+        "anchor": "private fun ownerReplacementKeepsRoute(",
+        "test_ids": [
+          "NTF-038"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

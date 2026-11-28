@@ -85,8 +85,8 @@
     <string name="explanation_organize_emoji_find">在你的中繼站（轉送訊息的伺服器）上搜尋與你輸入內容相符的表情符號組。如果你貼上了表情符號組連結，則會直接開啟該組。在你選擇安裝之前，不會安裝任何內容。</string>
     <string name="explanation_organize_emoji_set">開啟此表情符號組的預覽，讓你在安裝前先查看。名稱下方的文字顯示它包含多少個表情符號，或是否已安裝、是否有更新。</string>
     <string name="explanation_organize_emoji_builtin_set">關閉後，此表情符號組將不會出現在表情選擇器和建議中。別人傳送其中的表情符號時仍會顯示，你可以隨時重新開啟。</string>
-    <string name="explanation_organize_emoji_load_image">從託管此組的伺服器載入它的預覽圖片。這會與該圖片主機分享你的 IP 位址。若不載入，此組只會以文字顯示。</string>
     <string name="explanation_organize_emoji_install">安裝此組，讓你可以在訊息中使用其中的表情符號。安裝會下載圖片，這會與它們的圖片主機分享你的 IP 位址。安裝進行中你可以取消，之後也可以移除此組。</string>
+    <string name="explanation_organize_emoji_load_emoji">從各個圖片主機載入圖片，預覽這組表情符號。這些主機會收到你的 IP 位址。只有安裝這組表情符號後，圖片才會儲存。</string>
     <string name="explanation_organize_emoji_update">將你已安裝的副本替換為此組的較新版本。更新會重新下載圖片，這會與它們的圖片主機分享你的 IP 位址。</string>
     <string name="explanation_organize_emoji_check_update">再次查看此已安裝組是否有較新版本。如果找到，會出現更新按鈕。在你更新之前，已安裝的組不會改變。</string>
     <string name="explanation_organize_emoji_remove">將此組從你已安裝的表情符號組中移除，因此不再提供其中的表情符號供你使用。你之後可以再次尋找並安裝此組。</string>

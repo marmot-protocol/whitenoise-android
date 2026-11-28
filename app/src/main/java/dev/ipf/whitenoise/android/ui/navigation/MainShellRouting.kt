@@ -10,6 +10,7 @@ import androidx.compose.ui.unit.LayoutDirection.Rtl
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.chats.ChatListReturnHead
 import dev.ipf.whitenoise.android.ui.conversation.ConversationSurfaceState
 import dev.ipf.whitenoise.android.ui.conversation.NotificationLandingTarget
@@ -40,6 +41,17 @@ internal data class ConversationOpenContext(
     // the active-ref flip without recreation.
     val pinnedAccountRef: String? = null,
 )
+
+/** Rechecks live shell destinations before a staged first-run invite opens the chooser. */
+internal fun WhiteNoiseAppState.canShareFromChats(
+    sectionName: String,
+    selectedChat: ChatListItem?,
+    pendingOpen: PendingConversationOpen?,
+): Boolean =
+    sectionName == MainSection.Chats.name &&
+        selectedChat == null &&
+        pendingOpen == null &&
+        pendingProfileNpub == null
 
 /** A conversation open waiting for its prepared route, with the list head captured for the return snap. */
 internal data class PendingConversationOpen(

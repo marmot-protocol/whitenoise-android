@@ -311,7 +311,7 @@ class WelcomeSignInPresentationTest {
     }
 
     /** Resuming a retained Sign In draft after backing out of pairing can retire the original provider copy. */
-    @Test fun retainedProviderBunkerLinkCanBeRetiredAfterLeavingAndReopeningSignIn() {
+    @Test fun retainedProviderBunkerLinkCanBeRetiredAfterClosingPairingAndReturningToSignIn() {
         val clipboard = context.getSystemService(ClipboardManager::class.java)
         val link = "bunker://test?relay=wss://signer.example"
         var reads = 0
@@ -330,6 +330,7 @@ class WelcomeSignInPresentationTest {
             ReflectionHelpers.ClassParameter.from(Long::class.javaPrimitiveType, 1L),
         )
         val signInField = SignInFieldState()
+        val signingInState = mutableStateOf(false)
         val entry = mutableStateOf<RemoteSignerEntry?>(null)
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -343,6 +344,7 @@ class WelcomeSignInPresentationTest {
                         onImportIdentity = { error("A bunker link should open remote signer pairing") },
                         signInField = signInField,
                         onUseRemoteSigner = { entry.value = it },
+                        signingInState = signingInState,
                     )
                 }
             }
@@ -356,7 +358,7 @@ class WelcomeSignInPresentationTest {
             assertEquals(link, requireNotNull(entry.value).link)
             entry.value = null
         }
-        composeRule.onNodeWithTag("onboarding.welcome.sign_in").performScrollTo().performClick()
+        composeRule.onNodeWithTag("onboarding.sign_in.private_key").assertIsDisplayed()
         composeRule.onNodeWithTag("onboarding.sign_in.action").performClick()
         composeRule.runOnIdle {
             val request = requireNotNull(entry.value)

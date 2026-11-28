@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -26,8 +27,15 @@ internal class MainShellProcessState(
     val startupDiagnosticsPrompt = StartupDiagnosticsCloseOwner()
 
     val pendingCameraCaptureFiles = PendingCameraCaptureFiles()
-    val selectedChat = mutableStateOf<ChatListItem?>(null)
-    val selectedChatOpenContext = mutableStateOf(ConversationOpenContext())
+
+    /** The single route owner. Process-retained, so the open route survives Activity recreation and app lock. */
+    val shellNavigator = ShellNavigator()
+
+    /** The open conversation's row, read from [shellNavigator]. */
+    val selectedChat: State<ChatListItem?> = shellNavigator.selectedChat
+
+    /** The open conversation's open context, read from [shellNavigator]. */
+    val selectedChatOpenContext: State<ConversationOpenContext> = shellNavigator.selectedChatOpenContext
     val selectedChatJustCreated = mutableStateOf(false)
     val selectedChatOpenedAsDmHint = mutableStateOf(false)
     val conversationScrollSnapshots = mutableStateMapOf<String, ConversationScrollSnapshot>()
@@ -39,6 +47,10 @@ internal class MainShellProcessState(
     private var initialConnectionPresentationAvailable = true
     private val conversationControllers = linkedMapOf<ConversationControllerKey, ConversationController>()
     private var conversationMediaUploadEpoch = appState.mediaUploadSessionEpoch()
+
+    /** The account the retained route owner is bound to, which a conversation without a pinned account belongs to. */
+    val routeOwnerAccountRef: String?
+        get() = chatsEntry?.accountRef
 
     /**
      * Returns the retained controller for [accountRef] and [runtimeGeneration], or replaces it
@@ -53,13 +65,21 @@ internal class MainShellProcessState(
         if (current != null && current.accountRef == accountRef && current.runtimeGeneration == runtimeGeneration) {
             return current.controller
         }
-        val notificationRoute = retainedNotificationRouteForReplacement(current, accountRef, runtimeGeneration)
         clearRetainedRoute()
         clearConversationControllers()
-        notificationRoute?.let { retained ->
-            selectedChat.value = retained.chat
-            selectedChatOpenContext.value = retained.openContext
-        }
+        // Only an exact notification-owned route survives a same-runtime account replacement, see the reducer.
+        shellNavigator.dispatch(
+            if (accountRef == null) {
+                ShellNavEvent.OwnerLost(runtimeGeneration)
+            } else {
+                ShellNavEvent.OwnerReplaced(
+                    previousAccountRef = current?.accountRef,
+                    previousRuntimeGeneration = current?.runtimeGeneration,
+                    accountRef = accountRef,
+                    runtimeGeneration = runtimeGeneration,
+                )
+            },
+        )
         val controller =
             ChatsController(
                 appState = appState,
@@ -80,27 +100,6 @@ internal class MainShellProcessState(
         // The block list is account-scoped like the chats controller, so it follows the same replacement.
         appState.bindBlockListMirror(accountRef)
         return controller
-    }
-
-    /**
-     * Carries only an exact notification-owned route across its same-runtime
-     * account replacement; controllers, scroll state, and ordinary routes reset.
-     */
-    private fun retainedNotificationRouteForReplacement(
-        current: RetainedChatsController?,
-        accountRef: String?,
-        runtimeGeneration: Int,
-    ): RetainedNotificationRoute? {
-        val openContext = selectedChatOpenContext.value
-        val replacementKeepsRuntime =
-            accountRef != null &&
-                current?.accountRef != accountRef &&
-                current?.runtimeGeneration == runtimeGeneration
-        return selectedChat.value
-            ?.takeIf {
-                openContext.pinnedAccountRef == accountRef && openContext.notificationRouteTraceRequestId != null
-            }?.let { chat -> RetainedNotificationRoute(chat, openContext) }
-            ?.takeIf { replacementKeepsRuntime }
     }
 
     /** Grants the cold-process connection presentation exactly once. */
@@ -185,6 +184,7 @@ internal class MainShellProcessState(
         notificationFirstFrame.release()
         clearConversationControllers()
         clearRetainedRoute()
+        shellNavigator.dispatch(ShellNavEvent.TaskRemoved)
     }
 
     /** Releases the first-frame priority, every retained controller and the retained route of this process state. */
@@ -192,6 +192,7 @@ internal class MainShellProcessState(
         notificationFirstFrame.release()
         clearConversationControllers()
         clearRetainedRoute()
+        shellNavigator.dispatch(ShellNavEvent.ShellReleased)
         val controller = chatsEntry?.controller
         chatsEntry = null
         appState.runtimeMirrors.blocks.stop()
@@ -210,9 +211,8 @@ internal class MainShellProcessState(
         conversationControllers.clear()
     }
 
+    /** Clears the open-time flags and scroll hints that belong to a route the navigator is about to drop. */
     private fun clearRetainedRoute() {
-        selectedChat.value = null
-        selectedChatOpenContext.value = ConversationOpenContext()
         selectedChatJustCreated.value = false
         selectedChatOpenedAsDmHint.value = false
         conversationScrollSnapshots.clear()
@@ -222,11 +222,6 @@ internal class MainShellProcessState(
         val accountRef: String?,
         val runtimeGeneration: Int,
         val controller: ChatsController,
-    )
-
-    private data class RetainedNotificationRoute(
-        val chat: ChatListItem,
-        val openContext: ConversationOpenContext,
     )
 
     private data class ConversationControllerKey(

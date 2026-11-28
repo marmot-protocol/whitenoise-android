@@ -13,6 +13,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.BuildConfig
+import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.INITIAL_PRESENTATION_EVENT_CARD_WARM_BUDGET_MILLIS
 import dev.ipf.whitenoise.android.ui.common.APP_MOTION_OPEN_MILLIS
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
@@ -102,6 +103,22 @@ internal fun ConversationControllerReleasedPerformanceMarker(controllerReleased:
             .performanceTestTag(PerformanceTestTags.CONVERSATION_CONTROLLER_RELEASED),
     )
 }
+
+internal suspend fun ConversationController.awaitPreparedConversationOpen(): Boolean =
+    awaitPreparedConversationOpen(
+        awaitReady = {
+            snapshotFlow {
+                preparedConversationCanOpen(
+                    hasPublishedAuthoritativeTimeline = hasPublishedAuthoritativeTimeline,
+                    hasPreparedInitialPresentation = hasPreparedInitialPresentation,
+                    hasLoadError = error != null,
+                    terminalConversationUnavailable = terminalConversationUnavailable,
+                )
+            }.filter { it }
+                .first()
+        },
+        holdingForEventCards = { isHoldingInitialPageForEventCards },
+    )
 
 /**
  * Waits for a chat-list tap's conversation to be ready to show, and returns whether it became ready.

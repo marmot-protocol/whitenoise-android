@@ -9,4 +9,7 @@ appId: dev.ipf.whitenoise.android.maestrolab
           visible: Help Improve White Noise
         commands:
         - tapOn: Close
-    - assertVisible: Allow Maestro Test Lab to send you notifications\?
+    - assertVisible: Know when someone replies
+- assertVisible: Turn on notifications to see new messages and chat invitations without opening White Noise.
+- tapOn: Turn on notifications
+- assertVisible: Allow Maestro Test Lab to send you notifications\?

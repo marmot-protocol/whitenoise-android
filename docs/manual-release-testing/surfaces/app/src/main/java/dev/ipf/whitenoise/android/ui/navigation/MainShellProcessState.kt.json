@@ -10,14 +10,6 @@
         "test_ids": [
           "MSG-023"
         ]
-      },
-      {
-        "surface": "Notification-owned route survives its own account switch",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShellProcessState.kt",
-        "anchor": "private fun retainedNotificationRouteForReplacement(",
-        "test_ids": [
-          "NTF-038"
-        ]
       }
     ]
   },

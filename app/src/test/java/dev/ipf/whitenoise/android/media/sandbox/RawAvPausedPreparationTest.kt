@@ -58,6 +58,7 @@ class RawAvPausedPreparationTest {
                     resolver: ContentResolver,
                     uri: Uri,
                     edge: Int,
+                    playbackColors: Boolean,
                 ): MediaProbe {
                     calls.incrementAndGet()
                     entered.countDown()
@@ -83,7 +84,7 @@ class RawAvPausedPreparationTest {
             assertTrue(engine.snapshot().prepared)
             assertFalse(engine.snapshot().playWhenReady)
             assertEquals(RawAvPlaybackEngine.Status.Ready, engine.snapshot().status)
-            assertSame(bitmap, field(engine, "lastBitmap"))
+            assertSame(bitmap, (field(engine, "presenter") as RawVideoPresenter).retainedBitmap())
             assertFalse(bitmap.isRecycled)
             assertEquals(1, calls.get())
             assertNull(field(engine, "pendingSeek"))
@@ -104,6 +105,7 @@ class RawAvPausedPreparationTest {
                     resolver: ContentResolver,
                     uri: Uri,
                     edge: Int,
+                    playbackColors: Boolean,
                 ): MediaProbe {
                     entered.countDown()
                     check(release.await(3, TimeUnit.SECONDS))
@@ -126,7 +128,7 @@ class RawAvPausedPreparationTest {
             release.countDown()
             engine.prepare().get(2, TimeUnit.SECONDS)
             awaitProbeIdle(engine)
-            assertNull(field(engine, "lastBitmap"))
+            assertNull((field(engine, "presenter") as RawVideoPresenter).retainedBitmap())
             assertTrue(bitmap.isRecycled)
         } finally {
             release.countDown()
@@ -147,6 +149,7 @@ class RawAvPausedPreparationTest {
                     resolver: ContentResolver,
                     uri: Uri,
                     edge: Int,
+                    playbackColors: Boolean,
                 ) = MediaProbe(2, 2, 4000, initial)
 
                 override fun probeUriAt(
@@ -154,9 +157,11 @@ class RawAvPausedPreparationTest {
                     uri: Uri,
                     positionMs: Long,
                     edge: Int,
+                    playbackColors: Boolean,
                 ): MediaProbe {
                     calls.incrementAndGet()
                     assertEquals(1500L, positionMs)
+                    assertTrue(playbackColors)
                     entered.countDown()
                     check(release.await(3, TimeUnit.SECONDS))
                     return MediaProbe(2, 2, 4000, sought)
@@ -180,8 +185,7 @@ class RawAvPausedPreparationTest {
             assertEquals(revision, field(engine, "revision"))
             release.countDown()
             completion.get(2, TimeUnit.SECONDS)
-            assertSame(sought, field(engine, "lastBitmap"))
-            assertTrue(initial.isRecycled)
+            assertSame(sought, (field(engine, "presenter") as RawVideoPresenter).retainedBitmap())
             assertFalse(sought.isRecycled)
             assertEquals(1500L, engine.positionMs())
             assertEquals(1, calls.get())
@@ -200,6 +204,7 @@ class RawAvPausedPreparationTest {
                     resolver: ContentResolver,
                     uri: Uri,
                     edge: Int,
+                    playbackColors: Boolean,
                 ) = MediaProbe(2, 2, 4000, Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888))
 
                 override fun probeUriAt(
@@ -207,6 +212,7 @@ class RawAvPausedPreparationTest {
                     uri: Uri,
                     positionMs: Long,
                     edge: Int,
+                    playbackColors: Boolean,
                 ): MediaProbe = throw missing
             },
         )

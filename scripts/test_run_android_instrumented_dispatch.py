@@ -124,6 +124,7 @@ class InstrumentedDispatchTest(unittest.TestCase):
             "MediaAvNativeCorpusDeviceTest": (
                 "commonVideoFormatsReturnRedPixelsFromFreshRestrictedWorkers",
                 "commonAudioFormatsReturnFiniteWaveformsAndDurations",
+                "shortAudioReserveYieldsAndPreservesEveryVideoFrame",
                 "silentAudioReturnsNoWaveformFromFreshRestrictedWorker"),
         }
         focused = self.run_dispatch("workflow_dispatch", "false", "false", "false", "true")
@@ -198,10 +199,11 @@ class InstrumentedDispatchTest(unittest.TestCase):
             native = [line for line in cases if any("." + name + "#" in line for name in (
                 "NativeMediaSandboxDeviceTest", "IsolatedAttachmentPlayerDeviceTest", "MediaAvNativeCorpusDeviceTest",
                 "MediaAvPerformanceDeviceTest"))]
-            self.assertEqual(11, len(native))
+            self.assertEqual(12, len(native))
             for method in ("tinyRawSonicEosProducesNonzeroPcmAndDrainsTheUnityDeviceAtQuarterSpeed",
                            "quarterSpeedRawPcmRefillsAfterAnInteriorUnderrunWithoutResettingTheMediaClock",
                            "measureProductionCostsOnUnchangedCorpus",
+                           "shortAudioReserveYieldsAndPreservesEveryVideoFrame",
                            "silentAudioReturnsNoWaveformFromFreshRestrictedWorker"):
                 self.assertTrue(any(case.endswith("#" + method) for case in native))
             with tempfile.TemporaryDirectory() as temporary:

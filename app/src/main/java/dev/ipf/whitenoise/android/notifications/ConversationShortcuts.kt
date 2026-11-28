@@ -164,15 +164,21 @@ internal fun clearRevokedConversationShortcutsForAccount(
         val redacted =
             relabeled.isEmpty() ||
                 runCatching { ShortcutManagerCompat.updateShortcuts(context, relabeled) }.getOrDefault(false)
-        if (!channelsCleared || !redacted) return@synchronized
-        if (plan.disabledIds.isNotEmpty()) {
-            runCatching { ShortcutManagerCompat.disableShortcuts(context, plan.disabledIds, "") }
+        if (!channelsCleared) return@synchronized
+        // A pinned shortcut keeps its label on the launcher, so it is touched only once redacted. When redaction
+        // fails, the pinned copies stay for the launcher scan in retention to retry, and the rest still go now.
+        val unredactedPins = if (redacted) emptySet() else relabeled.map { it.id }.toSet()
+        val disabledIds = plan.disabledIds - unredactedPins
+        val dynamicIds = plan.dynamicIds - unredactedPins
+        val longLivedIds = plan.longLivedIds - unredactedPins
+        if (disabledIds.isNotEmpty()) {
+            runCatching { ShortcutManagerCompat.disableShortcuts(context, disabledIds, "") }
         }
-        if (plan.dynamicIds.isNotEmpty()) {
-            runCatching { ShortcutManagerCompat.removeDynamicShortcuts(context, plan.dynamicIds) }
+        if (dynamicIds.isNotEmpty()) {
+            runCatching { ShortcutManagerCompat.removeDynamicShortcuts(context, dynamicIds) }
         }
-        if (plan.longLivedIds.isNotEmpty()) {
-            runCatching { ShortcutManagerCompat.removeLongLivedShortcuts(context, plan.longLivedIds) }
+        if (longLivedIds.isNotEmpty()) {
+            runCatching { ShortcutManagerCompat.removeLongLivedShortcuts(context, longLivedIds) }
         }
     }
 }

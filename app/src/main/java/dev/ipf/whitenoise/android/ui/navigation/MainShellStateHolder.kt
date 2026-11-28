@@ -34,7 +34,12 @@ internal class MainShellStateHolder(
     private val processState: MainShellProcessState = MainShellProcessState(appState),
 ) : ViewModel() {
     private val composerExpansionStateSubscription: AutoCloseable
-    val sectionState = MainShellSectionState(savedStateHandle)
+
+    /** The process-retained single route owner. */
+    val shellNavigator = processState.shellNavigator
+
+    /** This Activity's saved copy of the route's section, written from [shellNavigator]. */
+    val sectionState = MainShellSectionState(savedStateHandle, shellNavigator)
 
     init {
         appState.composerExpansionStateRetention.restoreIfEmpty(
@@ -97,6 +102,10 @@ internal class MainShellStateHolder(
     val selectedChatOpenedAsDmHint = processState.selectedChatOpenedAsDmHint
     val conversationScrollSnapshots = processState.conversationScrollSnapshots
     val notificationFirstFrame = processState.notificationFirstFrame
+
+    /** The account the route owner is bound to, which an unpinned conversation belongs to. */
+    val routeOwnerAccountRef: String?
+        get() = processState.routeOwnerAccountRef
 
     private var savedAccountRef: String? = savedStateHandle[SAVED_ACCOUNT_REF_KEY]
     private var savedGroupIdHex: String? = savedStateHandle[SAVED_GROUP_ID_KEY]
@@ -195,8 +204,12 @@ internal class MainShellStateHolder(
         accountRef: String?,
         runtimeGeneration: Int,
     ): ChatsController {
+        val revision = shellNavigator.revision
+        // The owner rebinds first: its boundary event clears the stack before this holder restores its section.
+        val controller = processState.chatsController(accountRef, runtimeGeneration)
         sectionState.bind(accountRef, runtimeGeneration)
-        return processState.chatsController(accountRef, runtimeGeneration)
+        if (shellNavigator.revision != revision) auditShellRoute(shellNavigator.lastEventName)
+        return controller
     }
 
     /** Resolve a process-restored route only after the active account's local projection is authoritative. */
@@ -215,14 +228,19 @@ internal class MainShellStateHolder(
         if (savedAccountRef == null || savedAccountRef != activeAccountRef) {
             clearSavedConversationRoute()
         } else {
-            selectedChat.value =
+            val restored =
                 (controller.items + controller.archivedItems)
                     .firstOrNull { it.group.groupIdHex.equals(groupIdHex, ignoreCase = true) }
-            selectedChatOpenContext.value = ConversationOpenContext()
             selectedChatJustCreated.value = false
             selectedChatOpenedAsDmHint.value = false
             savedRouteResolutionPending = false
-            if (selectedChat.value == null) clearSavedConversationRoute()
+            if (restored == null) {
+                clearSavedConversationRoute()
+            } else {
+                dispatchShellNav(
+                    ShellNavEvent.RestoreSavedConversation(restoredConversationRoute(restored, activeAccountRef)),
+                )
+            }
         }
     }
 
@@ -291,6 +309,7 @@ internal class MainShellStateHolder(
             phase == AppPhase.Onboarding || phase is AppPhase.Failed -> {
                 sectionState.clear()
                 processState.release()
+                auditShellRoute(shellNavigator.lastEventName)
             }
         }
         return firstUsefulFrameReady(
@@ -379,6 +398,8 @@ internal class MainShellStateHolder(
         // The Application-owned process state transfers to a fresh Activity.
         // Account/runtime replacement and process death remain its cleanup boundaries.
         composerExpansionStateSubscription.close()
+        // The process-retained navigator must not keep writing into a finished Activity's saved state.
+        sectionState.detach()
         super.onCleared()
     }
 
@@ -387,6 +408,7 @@ internal class MainShellStateHolder(
         composerExpansionStateSubscription.close()
         sectionState.clear()
         processState.release()
+        auditShellRoute(shellNavigator.lastEventName)
     }
 
     private fun clearSavedConversationRoute() {

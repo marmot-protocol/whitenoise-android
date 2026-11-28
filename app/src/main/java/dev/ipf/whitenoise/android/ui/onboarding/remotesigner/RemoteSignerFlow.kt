@@ -1,8 +1,5 @@
 package dev.ipf.whitenoise.android.ui.onboarding.remotesigner
 
-import android.content.ActivityNotFoundException
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -86,17 +83,7 @@ internal fun RemoteSignerFlow(
     RemoteSignerScreen(
         pairing = pairing,
         onClose = onClose,
-        onOpenApproval = { url ->
-            // Only an https page the user just saw by host name is opened, in their own browser.
-            if (remoteSignerApprovalHost(url) != null) {
-                try {
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE)
-                    context.startActivity(intent)
-                } catch (_: ActivityNotFoundException) {
-                    // No browser: the prompt stays and the signer's request times out on its own.
-                }
-            }
-        },
+        onOpenApproval = context::openRemoteSignerApproval,
     )
 }
 

@@ -2,24 +2,14 @@
 
 package dev.ipf.whitenoise.android.ui.devices
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import dev.ipf.marmotkit.NewDeviceLinkStateFfi
@@ -31,7 +21,6 @@ import dev.ipf.whitenoise.android.state.DeviceLinkOffers
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.start
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
-import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 
 internal const val DEVICE_LINK_OFFER_TAG = "device_link.offer"
 internal const val DEVICE_LINK_OFFER_LINK_TAG = "device_link.offer.link"
@@ -161,37 +150,21 @@ internal fun DeviceLinkReminder(appState: WhiteNoiseAppState) {
 }
 
 /** The reminder's text above its two actions, which wrap below the text at any width or font size. */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun DeviceLinkReminderBanner(
     onLink: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Surface(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp)
-                .testTag(DEVICE_LINK_REMINDER_TAG),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        shape = MaterialTheme.shapes.medium,
-        border = amoledOutlineBorder(),
+    DeviceLinkNoticeBanner(
+        text = stringResource(R.string.link_offer_reminder),
+        modifier = modifier.testTag(DEVICE_LINK_REMINDER_TAG),
     ) {
-        Column(Modifier.fillMaxWidth().padding(start = 16.dp, top = 10.dp, end = 4.dp, bottom = 4.dp)) {
-            Text(stringResource(R.string.link_offer_reminder), style = MaterialTheme.typography.bodyMedium)
-            FlowRow(
-                modifier = Modifier.align(Alignment.End),
-                horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.End),
-            ) {
-                TextButton(onClick = onDismiss, modifier = Modifier.testTag(DEVICE_LINK_REMINDER_DISMISS_TAG)) {
-                    Text(stringResource(R.string.dismiss))
-                }
-                TextButton(onClick = onLink, modifier = Modifier.testTag(DEVICE_LINK_REMINDER_LINK_TAG)) {
-                    Text(stringResource(R.string.link_device_this_title))
-                }
-            }
+        TextButton(onClick = onDismiss, modifier = Modifier.testTag(DEVICE_LINK_REMINDER_DISMISS_TAG)) {
+            Text(stringResource(R.string.dismiss))
+        }
+        TextButton(onClick = onLink, modifier = Modifier.testTag(DEVICE_LINK_REMINDER_LINK_TAG)) {
+            Text(stringResource(R.string.link_device_this_title))
         }
     }
 }

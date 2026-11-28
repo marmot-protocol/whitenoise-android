@@ -107,7 +107,7 @@
       },
       {
         "surface": "Chat-list open of a conversation whose first page waits for its event cards",
-        "anchor": "holdingForEventCards = { controller.isHoldingInitialPageForEventCards }",
+        "anchor": "controller.awaitPreparedConversationOpen()",
         "test_ids": [
           "STB-002"
         ],

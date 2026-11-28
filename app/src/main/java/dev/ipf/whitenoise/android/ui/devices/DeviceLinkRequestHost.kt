@@ -7,6 +7,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -17,8 +18,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
@@ -33,6 +32,7 @@ import dev.ipf.whitenoise.android.state.DeviceRepairConfirmationRequired
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.decline
 import dev.ipf.whitenoise.android.state.link
+import dev.ipf.whitenoise.android.state.onEvent
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import kotlinx.coroutines.delay
@@ -55,15 +55,16 @@ internal fun deviceLinkWatchedAccounts(accounts: List<AccountSummaryFfi>): List<
 }
 
 /**
- * Presents link requests from any signed-in profile above the app shell. Requests are read while the app is in the
- * foreground: each return to the foreground re-reads MDK before anything is presented, so a request that expired in
- * the background shows as ended rather than reappearing, and nothing runs or notifies while the app is away.
- * [blocked] holds new presentations back, and takes down one already showing, while the app is locked or another
- * protected flow is on screen.
+ * Watches link requests from every signed-in profile and presents the one the user opened from the chat list's
+ * notice ([DeviceLinkRequestNotice]); no request is presented on its own. Requests are read while the app is in the
+ * foreground: each return to the foreground re-reads MDK, so a request that expired in the background shows as ended
+ * rather than reappearing, and nothing runs or notifies while the app is away. [blocked] keeps the notice from
+ * opening anything, and takes down a request already showing, while the app is locked or another protected flow is on
+ * screen.
  *
- * A request on the active profile opens its comparison. A request on another profile is only announced: Review
+ * An opened request on the active profile shows its comparison. One on another profile is only announced: Review
  * activates that profile and re-reads its prompt before the comparison is shown, and nothing is answered for a
- * profile that is not active.
+ * profile that is not active. A repeated request's warning can open Devices over the app.
  */
 @Composable
 internal fun DeviceLinkRequestHost(
@@ -73,20 +74,27 @@ internal fun DeviceLinkRequestHost(
     val runtimeGeneration = appState.runtimeGeneration
     val accounts = deviceLinkWatchedAccounts(appState.accounts)
     val currentAccounts = rememberUpdatedState(accounts)
-    val currentBlocked = rememberUpdatedState(blocked)
     val watcher = appState.deviceLinkRequests
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(watcher, lifecycle, accounts) {
         appState.followEventsWhileStarted(lifecycle) { nextEvent ->
-            watcher.refresh(currentAccounts.value, currentBlocked.value)
+            watcher.refresh(currentAccounts.value)
             while (nextEvent != null) {
-                watcher.onEvent(nextEvent() ?: break, currentAccounts.value, currentBlocked.value)
+                watcher.onEvent(nextEvent() ?: break, currentAccounts.value)
             }
         }
     }
-    LaunchedEffect(watcher, blocked, appState.activeAccountRef) { watcher.reoffer(blocked) }
+    SideEffect { watcher.blocked = blocked }
+    LaunchedEffect(watcher, appState.activeAccountRef) { watcher.reoffer() }
+    var devicesOpen by remember(appState.activeAccountRef, runtimeGeneration) { mutableStateOf(false) }
+    val reporting = remember(watcher) { mutableStateOf(false) }
+    if (devicesOpen && !blocked) DeviceLinkDevicesWindow(appState, onClose = { devicesOpen = false })
     // A request already on screen is taken down while the app is locked, so nothing can be answered until unlock.
     val request = watcher.queue.presented ?: return
+    val showDevices = {
+        watcher.close()
+        devicesOpen = true
+    }
     DeviceLinkRequestPresentation(
         watcher = watcher,
         request = request,
@@ -96,13 +104,23 @@ internal fun DeviceLinkRequestHost(
         onReview = {
             appState.launchMutation {
                 if (appState.setActiveAccount(request.accountRef)) {
-                    watcher.refresh(currentAccounts.value, currentBlocked.value)
+                    watcher.refresh(currentAccounts.value)
                 }
             }
         },
     ) {
         DeviceLinkApprovalGate(runtimeGeneration, request, blocked) { draft ->
-            ActiveProfileLinkRequest(appState, watcher, request, draft)
+            ActiveProfileLinkRequest(
+                appState = appState,
+                watcher = watcher,
+                request = request,
+                draft = draft,
+                reporting = { reporting.value },
+                onReport = {
+                    launchLinkReport(appState, watcher, request, runtimeGeneration, reporting)
+                },
+                onReviewDevices = showDevices,
+            )
         }
     }
 }
@@ -134,7 +152,6 @@ internal fun DeviceLinkRequestPresentation(
     activeRequest: @Composable () -> Unit,
 ) {
     var review by remember(watcher) { mutableStateOf<DeviceLinkReview?>(null) }
-    val currentBlocked by rememberUpdatedState(blocked)
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     if (request.accountRef == activeAccountRef) {
         val pending = review?.takeIf { it.accountRef == request.accountRef }?.awaits(watcher.successfulReads) == true
@@ -145,11 +162,11 @@ internal fun DeviceLinkRequestPresentation(
                 lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                     while (true) {
                         delay(DEVICE_LINK_REVIEW_RETRY_MS)
-                        watcher.reread(request.accountRef, currentBlocked)
+                        watcher.reread(request.accountRef)
                     }
                 }
             }
-            if (!blocked) DeviceLinkReviewPendingDialog(onNotNow = { watcher.hidePresented(blocked) })
+            if (!blocked) DeviceLinkReviewPendingDialog(onNotNow = watcher::close)
         }
     } else if (!blocked && request.open) {
         DeviceLinkOtherProfileDialog(
@@ -158,7 +175,7 @@ internal fun DeviceLinkRequestPresentation(
                 review = DeviceLinkReview(request.accountRef, watcher.successfulReads[request.accountRef] ?: 0L)
                 onReview()
             },
-            onNotNow = { watcher.hidePresented(blocked) },
+            onNotNow = watcher::close,
         )
     }
 }
@@ -178,22 +195,27 @@ internal fun DeviceLinkApprovalGate(
 }
 
 /** The name the app shows for the profile [accountRef], from what is already cached. */
-private fun WhiteNoiseAppState.profileName(accountRef: String): String {
+internal fun WhiteNoiseAppState.profileName(accountRef: String): String {
     val accountId = accounts.firstOrNull { it.label == accountRef }?.accountIdHex
     return accountId?.let(::accountDisplayNameCached) ?: accountRef
 }
 
 /**
- * The active profile's request over the whole window. Link device and Not now go to MDK through a controller bound
- * to this profile and runtime; closing the window only hides the request. A failed command is shown once and leaves
- * the request, and the choices entered, in place.
+ * The active profile's request over the whole window. Link device and Don't link go to MDK through a controller bound
+ * to this profile and runtime; closing the window only returns the request to the chat list's notice. A failed
+ * command is shown once and leaves the request, and the choices entered, in place. Touches that began before the
+ * window appeared are ignored, and a repeated request's Review devices runs [onReviewDevices].
  */
+@Suppress("LongParameterList")
 @Composable
 private fun ActiveProfileLinkRequest(
     appState: WhiteNoiseAppState,
     watcher: DeviceLinkRequestWatcher,
     request: DeviceLinkRequest,
     draft: DeviceLinkApprovalDraft,
+    reporting: () -> Boolean,
+    onReport: () -> Unit,
+    onReviewDevices: () -> Unit,
 ) {
     val prompt = watcher.presentedPrompt ?: return
     val runtimeGeneration = appState.runtimeGeneration
@@ -212,29 +234,44 @@ private fun ActiveProfileLinkRequest(
     var beforeCommand by remember(controller) { mutableStateOf<DeviceLinkSnapshotFfi?>(null) }
     LaunchedEffect(controller.link) {
         val result = controller.link ?: return@LaunchedEffect
-        watcher.accept(request.accountRef, result, blocked = false, beforeCommand = beforeCommand)
+        watcher.accept(request.accountRef, result, beforeCommand = beforeCommand)
         // This effect runs a frame after the command, so MDK's own event may already have published a newer state.
-        watcher.reread(request.accountRef, blocked = false)
+        watcher.reread(request.accountRef)
     }
     val failureMessage = rememberLinkFailureMessage(controller)
-    Dialog(
-        onDismissRequest = { watcher.hidePresented(blocked = false) },
-        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
-    ) {
+
+    fun canRespond(): Boolean =
+        !reporting() &&
+            !watcher.blocked &&
+            watcher.queue.presented?.id == request.id &&
+            appState.activeAccountRef == request.accountRef &&
+            appState.runtimeGeneration == runtimeGeneration
+    val reportCurrent: () -> Unit = {
+        if (canRespond() && controller.running == null) onReport()
+    }
+    DeviceLinkConsentDialog(appState, watcher, request, prompt, ::canRespond, reportCurrent) { canApprove ->
         DeviceLinkRequestContent(
             state = prompt.state,
             running = controller.running,
             onLink = { choices ->
-                beforeCommand = watcher.snapshots[request.accountRef]
-                scope.launch { controller.link(request.promptId, choices) }
+                scope.launch {
+                    if (!canApprove()) return@launch
+                    beforeCommand = watcher.snapshots[request.accountRef]
+                    controller.link(request.promptId, choices)
+                }
             },
             onDecline = {
                 beforeCommand = watcher.snapshots[request.accountRef]
-                scope.launch { controller.decline(request.promptId) }
+                scope.launch {
+                    if (canRespond()) controller.decline(request.promptId)
+                }
             },
-            onClose = { watcher.hidePresented(blocked = false) },
+            onClose = watcher::close,
             failureMessage = failureMessage,
             draft = draft,
+            repeated = request.repeated,
+            onReviewDevices = onReviewDevices,
+            onReport = reportCurrent,
         )
     }
 }

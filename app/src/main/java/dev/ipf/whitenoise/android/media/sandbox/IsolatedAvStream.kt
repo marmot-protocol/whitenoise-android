@@ -48,6 +48,8 @@ internal sealed interface AvStreamFrame {
     data object VideoEnd : AvStreamFrame
 
     data object AudioEnd : AvStreamFrame
+
+    data object AudioDeferred : AvStreamFrame
 }
 
 /**
@@ -355,7 +357,7 @@ internal class IsolatedAvStream private constructor(
             try {
                 context.bindIsolatedService(
                     Intent(context, MediaAvPlaybackService::class.java),
-                    Context.BIND_AUTO_CREATE,
+                    lane.bindFlags(wantVideo),
                     workerInstanceName(if (lane == AvStreamLane.Playback) "av_playback" else "av_analysis", instance),
                     { command -> callbackHandler.post(command) },
                     connection,
@@ -372,41 +374,24 @@ internal class IsolatedAvStream private constructor(
 
     /** Validates raw output metadata before copying owned pixel/PCM bytes from shared memory. */
     @Suppress("CyclomaticComplexMethod") // Validate and own one exact typed shared-memory output in this call.
-    fun read(preferred: Int = AvStreamProtocol.ANY_TRACK): AvStreamFrame =
+    fun read(
+        preferred: Int = AvStreamProtocol.ANY_TRACK,
+        bitmaps: RawVideoBitmaps = RawVideoBitmaps.Fresh,
+    ): AvStreamFrame =
         call {
-            require(preferred in AvStreamProtocol.ANY_TRACK..AvStreamProtocol.AUDIO_TRACK)
-            require(preferred != AvStreamProtocol.VIDEO_TRACK || wantVideo)
-            require(preferred != AvStreamProtocol.AUDIO_TRACK || wantAudio)
+            AvStreamProtocol.requireReadTrack(preferred, wantVideo, wantAudio)
             val values = transact(AvStreamProtocol.READ, 7) { it.writeInt(preferred) }
             val output = AvStreamOutput.from(values, edge, wantVideo, wantAudio)
-            require(preferred != AvStreamProtocol.VIDEO_TRACK || output.kind in setOf(1, 3))
-            require(preferred != AvStreamProtocol.AUDIO_TRACK || output.kind in setOf(2, 4))
-            require(preferred != AvStreamProtocol.ANY_TRACK || output.kind in 0..2)
+            AvStreamProtocol.requireReadKind(preferred, output.kind)
             when (output.kind) {
                 0 -> AvStreamFrame.End
                 3 -> AvStreamFrame.VideoEnd
                 4 -> AvStreamFrame.AudioEnd
-                1 -> {
-                    val memory = checkNotNull(video).value
-                    val source = memory.mapReadOnly()
-                    try {
-                        source.limit(output.byteCount)
-                        val bitmap = Bitmap.createBitmap(output.width, output.height, Bitmap.Config.ARGB_8888)
-                        var retained = false
-                        try {
-                            check(bitmap.byteCount == output.byteCount)
-                            bitmap.copyPixelsFromBuffer(source)
-                            if (lifetime.closed || !admissions.isCurrent(lane, ownerEpoch, this)) {
-                                throw IOException("Media session retired during output copy")
-                            }
-                            AvStreamFrame.Video(bitmap, output.timestampUs).also { retained = true }
-                        } finally {
-                            if (!retained) bitmap.recycle()
-                        }
-                    } finally {
-                        SharedMemory.unmap(source)
+                5 -> AvStreamFrame.AudioDeferred
+                1 ->
+                    copyRawVideoFrame(checkNotNull(video).value, output, bitmaps) {
+                        !lifetime.closed && admissions.isCurrent(lane, ownerEpoch, this)
                     }
-                }
                 else -> {
                     val source = checkNotNull(audio).value.mapReadOnly()
                     try {

@@ -1,16 +1,13 @@
 package dev.ipf.whitenoise.android.core
 
 import dev.ipf.marmotkit.AppMessageRecordFfi
-import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.GroupSystemEventFfi
 import dev.ipf.marmotkit.GroupSystemEventProvenanceFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
-import dev.ipf.marmotkit.MessageTagFfi
-import dev.ipf.marmotkit.TimelineMessageRecordFfi
-import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import dev.ipf.whitenoise.android.state.timelineRecord as fixtureTimelineRecord
 
 class GroupSystemEventsTest {
     // Wire-shaped payload as a peer client emits it for an avatar change,
@@ -684,39 +681,12 @@ class GroupSystemEventsTest {
         direction: String = "system",
         sourceMessageIdHex: String? = null,
         groupSystem: GroupSystemEventFfi? = null,
-    ) = TimelineMessageRecordFfi(
-        clientToken = null,
-        messageIdHex = "message",
+    ) = fixtureTimelineRecord("message", 1uL, plaintext).copy(
         sourceMessageIdHex = sourceMessageIdHex,
         direction = direction,
         groupIdHex = "group",
         sender = actorHex,
-        plaintext = plaintext,
-        contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList(), blankLinesBefore = ByteArray(0)),
         kind = 1210uL,
-        tags = emptyList<MessageTagFfi>(),
-        timelineAt = 1uL,
-        receivedAt = 1uL,
-        replyToMessageIdHex = null,
-        replyPreview = null,
-        mediaJson = null,
-        media = emptyList(),
-        thread = null,
-        poll = null,
         groupSystem = groupSystem,
-        hasReports = false,
-        edit = null,
-        reactions = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),
-        deleted = false,
-        deletionSource = DeletionSourceFfi.UNKNOWN,
-        deletedByMessageIdHex = null,
-        invalidationStatus = null,
-        sourceEpoch = null,
-        retentionSeconds = null,
-        retentionExpiresAt = null,
-        sticker = null,
-        importedFrom = null,
-        recipientConfirmed = false,
-        historyImportProvenance = null,
     )
 }

@@ -1059,6 +1059,8 @@ private fun projectedMediaMessage(
     recordedAt: ULong,
     reference: MediaAttachmentReferenceFfi,
 ) = TimelineMessageRecordFfi(
+    agentItem = null,
+    agentItemFirstEventMissing = false,
     clientToken = null,
     messageIdHex = CONFIRMED_MESSAGE_ID,
     sourceMessageIdHex = "d4".repeat(32),

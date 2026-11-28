@@ -135,6 +135,8 @@ class TimelineProjectorTest {
                 plaintext = "Current message",
                 replyPreview =
                     TimelineReplyPreviewFfi(
+                        retentionSeconds = null,
+                        retentionExpiresAt = null,
                         messageIdHex = "parent",
                         sender = "alice",
                         plaintext = "Parent message",
@@ -540,6 +542,8 @@ class TimelineProjectorTest {
         mediaJson: String? = null,
         media: List<MediaAttachmentReferenceFfi> = emptyList(),
     ) = TimelineReplyPreviewFfi(
+        retentionSeconds = null,
+        retentionExpiresAt = null,
         messageIdHex = "parent",
         sender = sender,
         plaintext = plaintext,
@@ -590,6 +594,8 @@ class TimelineProjectorTest {
         replyToMessageIdHex: String? = replyPreview?.messageIdHex,
         media: List<MediaAttachmentOutcomeFfi> = emptyList(),
     ) = TimelineMessageRecordFfi(
+        agentItem = null,
+        agentItemFirstEventMissing = false,
         clientToken = null,
         messageIdHex = id,
         sourceMessageIdHex = null,

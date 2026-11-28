@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.onboarding.remotesigner
 
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
+import androidx.compose.ui.text.TextRange
 import dev.ipf.marmotkit.Nip46ErrorFfi
 import dev.ipf.marmotkit.Nip46StateFfi
 import dev.ipf.marmotkit.Nip46StatusFfi
@@ -95,6 +96,7 @@ class RemoteSignerPairingTest {
             assertTrue(host.spentLinks.isEmpty())
         }
 
+    /** Editing or validating a new link removes an error that belonged to the old text. */
     @Test
     fun malformedLinksStayInlineAndNeverCreateASession() =
         runTest {
@@ -105,14 +107,25 @@ class RemoteSignerPairingTest {
             flow.link.setTextAndPlaceCursorAtEnd("nsec1notalink")
             flow.submitLink()
             assertEquals(R.string.remote_signer_error_not_bunker_link, flow.linkErrorRes)
+            flow.link.edit { selection = TextRange.Zero }
+            assertEquals(R.string.remote_signer_error_not_bunker_link, flow.linkErrorRes)
             assertTrue(host.configs.isEmpty())
 
             flow.link.setTextAndPlaceCursorAtEnd("bunker://not-a-link")
+            assertNull(flow.linkErrorRes)
             flow.submitLink()
             runCurrent()
             assertEquals(R.string.remote_signer_error_invalid_link, flow.linkErrorRes)
             assertEquals(RemoteSignerStep.EnterLink, flow.step)
             assertTrue(host.finished.isEmpty())
+
+            flow.link.setTextAndPlaceCursorAtEnd(BUNKER)
+            assertNull(flow.linkErrorRes)
+            flow.submitLink()
+            runCurrent()
+            assertTrue(flow.step is RemoteSignerStep.Review)
+            assertTrue(flow.back())
+            assertNull(flow.linkErrorRes)
         }
 
     @Test
@@ -198,6 +211,7 @@ class RemoteSignerPairingTest {
             assertTrue("a mismatched signer never reaches the account", host.finished.isEmpty())
             flow.retry()
             assertEquals("a wrong account starts over instead of retrying", RemoteSignerStep.EnterLink, flow.step)
+            assertTrue("start over clears the previous bunker link", flow.link.text.isEmpty())
             assertTrue(session.cancelled)
         }
 

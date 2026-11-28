@@ -84,6 +84,46 @@ class MediaAvNativeCorpusDeviceTest {
         }
     }
 
+    /** A short audio track can fill lookahead while its remaining video still needs to play. */
+    @Test
+    fun shortAudioReserveYieldsAndPreservesEveryVideoFrame() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        withFixture("short-audio-h264.mp4") { source ->
+            val stream = IsolatedAvStream.openUri(context, android.net.Uri.fromFile(source), edge = 64)
+            stream.use {
+                assertVideoTimestamp(stream, 0L)
+                assertTrue(stream.read(AvStreamProtocol.AUDIO_RESERVE_TRACK) is AvStreamFrame.Audio)
+                assertEquals(AvStreamFrame.AudioDeferred, readToAudioBoundary(stream))
+                var lastTimestampUs = 0L
+                repeat(599) {
+                    val frame = stream.read(AvStreamProtocol.VIDEO_TRACK) as AvStreamFrame.Video
+                    frame.bitmap.recycle()
+                    assertTrue(frame.timestampUs > lastTimestampUs)
+                    lastTimestampUs = frame.timestampUs
+                }
+                assertTrue(lastTimestampUs >= 9_900_000L)
+                assertEquals(AvStreamFrame.VideoEnd, stream.read(AvStreamProtocol.VIDEO_TRACK))
+                assertEquals(AvStreamFrame.AudioEnd, readToAudioBoundary(stream))
+
+                stream.seek(0L)
+                assertVideoTimestamp(stream, 0L)
+                assertEquals(AvStreamFrame.AudioDeferred, readToAudioBoundary(stream))
+                stream.seek(5_000_000L)
+                assertVideoTimestamp(stream, 5_000_000L)
+                assertVideoTimestamp(stream, 5_016_667L)
+            }
+            assertTrue(stream.awaitRetired())
+        }
+    }
+
+    private fun readToAudioBoundary(stream: IsolatedAvStream): AvStreamFrame {
+        repeat(20) {
+            val frame = stream.read(AvStreamProtocol.AUDIO_RESERVE_TRACK)
+            if (frame !is AvStreamFrame.Audio) return frame
+        }
+        error("Unexpected PCM for the 200 ms fixture")
+    }
+
     /** Preferred reads keep the frame covering an interior seek or the final display interval. */
     @Test
     fun preferredReadPreservesCoveringFrameAfterSeek() {

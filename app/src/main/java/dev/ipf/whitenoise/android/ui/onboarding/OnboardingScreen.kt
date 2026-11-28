@@ -51,6 +51,7 @@ internal fun OnboardingScreen(
     val identity = keyField.text.toString()
     var inFlightAction by remember { mutableStateOf(OnboardingAction.Idle) }
     var remoteSigner by remember { mutableStateOf<RemoteSignerEntry?>(null) }
+    val signingInState = remember { mutableStateOf(false) }
     var importErrorRes by remember { mutableStateOf<Int?>(null) }
     var recoveryConsentVisible by remember { mutableStateOf(false) }
     // The key an acknowledged recovery already ran for, cleared as soon as the
@@ -170,6 +171,7 @@ internal fun OnboardingScreen(
     OnboardingContent(
         identity = identity,
         signInField = signInField,
+        signingInState = signingInState,
         creatingIdentity = false,
         signingInBusy = inFlightAction == OnboardingAction.Importing,
         importErrorRes = importErrorRes,

@@ -2,12 +2,16 @@ package dev.ipf.whitenoise.android.ui.common
 
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.exclude
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.onConsumedWindowInsetsChanged
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -121,7 +125,13 @@ fun ScaffoldTopBarWithNoticeSlot(
         modifier = Modifier.zIndex(1f).onConsumedWindowInsetsChanged { consumed = it },
         content = {
             Box { topBar() }
-            Box { if (topNoticeSlot) TopNoticeSlot() }
+            Column {
+                if (topNoticeSlot) TopNoticeSlot()
+                LocalDialogInputSnackbar.current?.let { snackbar ->
+                    val safeHorizontal = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)
+                    WhiteNoiseSnackbarHost(snackbar, modifier = Modifier.windowInsetsPadding(safeHorizontal))
+                }
+            }
         },
     ) { measurables, constraints ->
         val bar = measurables[0].measure(constraints)

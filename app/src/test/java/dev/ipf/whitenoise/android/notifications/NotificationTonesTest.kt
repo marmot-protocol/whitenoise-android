@@ -126,7 +126,6 @@ class NotificationTonesTest {
         listOf(
             NotificationChannelSpec.REACTIONS,
             NotificationChannelSpec.INVITES,
-            NotificationChannelSpec.AGENT_ACTIVITY,
         ).forEach {
             assertNotEquals(NotificationTone.DING.uri(context), manager.getNotificationChannel(it.id).sound)
         }

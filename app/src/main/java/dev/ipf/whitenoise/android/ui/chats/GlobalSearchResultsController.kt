@@ -497,8 +497,7 @@ private val GLOBAL_SEARCH_INERT_TRIGGERS =
         TimelineUpdateTriggerFfi.REACTION_REMOVED,
         TimelineUpdateTriggerFfi.RECEIPT_CHANGED,
         TimelineUpdateTriggerFfi.REPLY_PREVIEW_CHANGED,
-        TimelineUpdateTriggerFfi.AGENT_ACTIVITY,
-        TimelineUpdateTriggerFfi.AGENT_OPERATION,
+        TimelineUpdateTriggerFfi.AGENT_ITEM,
     )
 
 /** Triggers through which a message not yet listed can become a match. */

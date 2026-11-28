@@ -20,6 +20,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -49,7 +50,7 @@ import dev.ipf.whitenoise.android.ui.settings.rememberSettingsNativeSurface
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 
-/** Selects Welcome or Sign In while the existing owner retains creation, import, signer and recovery state. */
+/** Selects Welcome or Sign In using [signingInState], which a host can retain while showing another flow. */
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable
 internal fun OnboardingContent(
@@ -77,8 +78,9 @@ internal fun OnboardingContent(
     onRecoverSavedAccount: (String) -> Unit = {},
     signInField: SignInFieldState? = null,
     onUseRemoteSigner: ((RemoteSignerEntry) -> Unit)? = null,
+    signingInState: MutableState<Boolean> = remember { mutableStateOf(signingInBusy || loggingInWithAmber) },
 ) {
-    var signingIn by remember { mutableStateOf(signingInBusy || loggingInWithAmber) }
+    var signingIn by signingInState
     val busy = creatingIdentity || signingInBusy || loggingInWithAmber || reactivatingAccountLabel != null
     if (signingIn) {
         SignInContent(

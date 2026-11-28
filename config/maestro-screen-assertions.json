@@ -2200,11 +2200,25 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestHost.kt",
-      "symbol": "ActiveProfileLinkRequest",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestNotice.kt",
+      "symbol": "DeviceLinkDevicesWindow",
       "bindings": [],
-      "remaining": "This request appears only when a second installation of the same account asks to link, which the single-emulator runner cannot provide. Its states, choices, duplicate-tap and close-without-answer behavior are covered by JVM tests and manual SET-061; add a direct assertion when the runner can seed a second device.",
-      "second_device": ["SET-061"]
+      "remaining": "Opening Devices from a link request requires a second installation. SET-075 covers the repeated warning and return to Chats. SET-079 covers the consent report handoff.",
+      "second_device": ["SET-075", "SET-079"]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/CompromiseAlert.kt",
+      "symbol": "CompromiseAlert",
+      "bindings": [],
+      "remaining": "Showing the compromise alert requires a native warning. SET-078 covers the alert, follow-up actions and dismissal.",
+      "second_device": ["SET-078"]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkConsent.kt",
+      "symbol": "DeviceLinkConsentDialog",
+      "bindings": [],
+      "remaining": "The dialog requires a link from another installation. SET-061 covers link choices and dismissal; SET-079 covers consent, phone unlock and report feedback.",
+      "second_device": ["SET-061", "SET-079"]
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestHost.kt",
@@ -4741,13 +4755,13 @@
           },
           "scope": "Settings route and home child opened from avatar, System Back restores Chats.",
           "opened_by": {
-            "text": "Settings"
+            "id": "chats.switchProfile"
           }
         }
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreenHost.kt",
       "symbol": "SettingsScreen",
       "bindings": [
         {
@@ -4757,7 +4771,7 @@
           },
           "scope": "Settings route and home child opened from avatar, System Back restores Chats.",
           "opened_by": {
-            "text": "Settings"
+            "id": "chats.switchProfile"
           }
         }
       ]
@@ -5116,6 +5130,25 @@
             "text": "Offline speech recognition"
           },
           "visible_on_entry": true
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/NotificationAskDialog.kt",
+      "symbol": "NotificationAskDialog",
+      "bindings": [
+        {
+          "case": "consent-default-close",
+          "selector": {
+            "text": "Know when someone replies"
+          },
+          "scope": "Actual notification explanation after the usage choice closes on a returning install; Turn on notifications opens Android's prompt, which is denied.",
+          "entry_assertion": {
+            "text": "Know when someone replies"
+          },
+          "opened_by": {
+            "text": "Close"
+          }
         }
       ]
     },
@@ -7129,7 +7162,7 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewDialog.kt",
       "symbol": "SignInReviewDialog",
       "bindings": [],
       "remaining": "This surface opens only for an account with a second installation or linked device, which the single-emulator runner cannot provide. Its states and actions are covered by JVM tests and the linked-devices manual scenarios; add a direct assertion when the runner can seed a second device.",

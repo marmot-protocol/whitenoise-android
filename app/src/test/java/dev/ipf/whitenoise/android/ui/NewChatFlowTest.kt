@@ -261,9 +261,9 @@ class NewChatFlowTest {
             assertEquals("created-group", failure.error.retryGroupIdHex)
         }
 
-    /** Starting a chat with someone who has no KeyPackage explains it and offers the optional share link. */
+    /** Starting a chat with someone who has no KeyPackage presents an invitation naming them. */
     @Test
-    fun sharedStartChatAttemptExplainsMissingKeyPackageWithOptionalShare() =
+    fun sharedStartChatAttemptPresentsMissingKeyPackageAsInvitation() =
         runTest {
             val result =
                 attemptStartProfileChat(
@@ -279,14 +279,11 @@ class NewChatFlowTest {
 
             val failure = result as StartChatAttemptResult.Failed
             assertTrue(failure.error.invitation)
-            assertEquals(AppText.Resource(R.string.toast_couldnt_start_chat), failure.error.title)
             assertEquals(
-                AppText.Resource(
-                    R.string.error_missing_key_package_for,
-                    listOf("White Noise support"),
-                ),
-                failure.error.detail,
+                AppText.Resource(R.string.start_chat_not_on_white_noise_for, listOf("White Noise support")),
+                failure.error.title,
             )
+            assertEquals(AppText.Resource(R.string.start_chat_not_on_white_noise_detail), failure.error.detail)
         }
 
     @Test

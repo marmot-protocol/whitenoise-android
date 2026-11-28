@@ -24,6 +24,7 @@ internal fun automaticAvDecodeRequest(
         putInt("edge", request.edge)
         putBoolean("oriented", request.option)
         putLong("positionUs", request.positionUs)
+        putBoolean("playbackColors", request.playbackColors)
         putLong("offset", request.offset)
         putLong("length", request.length ?: input.statSize)
         request.region?.let {

@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.profile
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -13,8 +14,7 @@ import dev.ipf.whitenoise.android.ui.onboarding.WelcomeScreen
 import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.RemoteSignerEntry
 
 /**
- * Prototype Add Profile entry and secure Sign In use the already reviewed shared presentation.
- * The caller opens the shared process-owned Sign Up form; import/Amber retain their existing entry callbacks.
+ * Hosts the Add Profile entry and secure Sign In. The caller retains [signingInState] while showing pairing.
  */
 @Suppress("FunctionNaming", "LongMethod", "LongParameterList")
 @Composable
@@ -32,6 +32,12 @@ internal fun AddAccountSheetContent(
     amberSignInStage: Int? = null,
     onBack: () -> Unit = {},
     onUseRemoteSigner: ((RemoteSignerEntry) -> Unit)? = null,
+    signingInState: MutableState<Boolean> =
+        remember {
+            val action = inFlightAction
+            val signingIn = action == OnboardingAction.Importing || action == OnboardingAction.AmberLogin
+            mutableStateOf(signingIn)
+        },
 ) {
     val busy = inFlightAction != OnboardingAction.Idle
     val field = signInField ?: remember { SignInFieldState(identity) }
@@ -41,9 +47,7 @@ internal fun AddAccountSheetContent(
             if (key.text.toString() != identity) field.replaceText(identity)
         }
     }
-    var signingIn by remember {
-        mutableStateOf(inFlightAction == OnboardingAction.Importing || inFlightAction == OnboardingAction.AmberLogin)
-    }
+    var signingIn by signingInState
     if (signingIn) {
         SignInContent(
             identity = key.text.toString(),

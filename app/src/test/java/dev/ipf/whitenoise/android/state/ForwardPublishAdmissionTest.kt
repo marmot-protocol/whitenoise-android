@@ -37,7 +37,7 @@ class ForwardPublishAdmissionTest {
             admissions += 1
             if (statuses[token] == null) {
                 messages += token
-                statuses[token] = LocalSendStatusFfi.Queued
+                statuses[token] = LocalSendStatusFfi.Queued("11".repeat(32))
             }
             return LocalSendAcceptanceFfi(clientToken = token, messageIdHex = "message-for-$token")
         }
@@ -68,7 +68,7 @@ class ForwardPublishAdmissionTest {
             val ledger = FakeTokenLedger()
             launch {
                 delay(HANDOFF_MILLIS)
-                ledger.statuses[TOKEN] = LocalSendStatusFfi.EngineOwned
+                ledger.statuses[TOKEN] = LocalSendStatusFfi.EngineOwned("11".repeat(32))
             }
 
             publish(ledger)
@@ -115,7 +115,7 @@ class ForwardPublishAdmissionTest {
             val stalled = runCatching { publish(ledger, stallAdmission = true) }.exceptionOrNull()
             assertTrue("expected a publish timeout, got $stalled", stalled is ForwardPublishTimeoutException)
 
-            ledger.statuses[TOKEN] = LocalSendStatusFfi.EngineOwned
+            ledger.statuses[TOKEN] = LocalSendStatusFfi.EngineOwned("11".repeat(32))
             ledger.messages += TOKEN
             publish(ledger)
 
@@ -136,15 +136,15 @@ class ForwardPublishAdmissionTest {
                         SendMaintenanceDispositionFfi.READY,
                     ),
                 )
-            listOf(LocalSendStatusFfi.EngineOwned, completed).forEach { status ->
+            listOf(LocalSendStatusFfi.EngineOwned("11".repeat(32)), completed).forEach { status ->
                 val ledger = FakeTokenLedger().apply { statuses[TOKEN] = status }
                 publish(ledger)
                 assertEquals("status $status must not be admitted again", 0, ledger.admissions)
             }
-            val queued = FakeTokenLedger().apply { statuses[TOKEN] = LocalSendStatusFfi.Queued }
+            val queued = FakeTokenLedger().apply { statuses[TOKEN] = LocalSendStatusFfi.Queued("11".repeat(32)) }
             launch {
                 delay(HANDOFF_MILLIS)
-                queued.statuses[TOKEN] = LocalSendStatusFfi.EngineOwned
+                queued.statuses[TOKEN] = LocalSendStatusFfi.EngineOwned("11".repeat(32))
             }
             publish(queued)
             assertEquals(0, queued.admissions)
@@ -182,7 +182,7 @@ class ForwardPublishAdmissionTest {
             val ledger = FakeTokenLedger()
             launch {
                 delay(HANDOFF_MILLIS)
-                ledger.statuses[TOKEN] = LocalSendStatusFfi.EngineOwned
+                ledger.statuses[TOKEN] = LocalSendStatusFfi.EngineOwned("11".repeat(32))
             }
 
             admitForwardPublish(
