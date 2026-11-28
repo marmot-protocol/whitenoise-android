@@ -44,6 +44,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
+import dev.ipf.whitenoise.android.share.outboundShareHostStarted
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -125,7 +126,9 @@ internal fun rememberSharedPhotoShare(
                     }.onSuccess {
                         state.selection.clear()
                     }.onFailure { error ->
-                        if (!ownsShare()) return@onFailure
+                        // In the background a failure is not reported and the selection is kept, as for a share
+                        // cancelled there, so the person finds their selection intact on return.
+                        if (!ownsShare() || !outboundShareHostStarted(context)) return@onFailure
                         // Unavailable photos leave the selection, so the next Share sends the rest.
                         if (error is SharedPhotosUnavailableException) state.selection.deselect(error.photos)
                         onFailure(state.selection, error)

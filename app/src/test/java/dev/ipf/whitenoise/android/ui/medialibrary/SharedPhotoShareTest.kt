@@ -179,6 +179,35 @@ class SharedPhotoShareTest {
             assertNoShare()
         }
 
+    /** A streamed photo that fails while it is copied is named as unavailable, as a failed read is. */
+    @Test
+    fun aStreamFailingMidCopyNamesItsPhoto() =
+        runTest {
+            clearSharedFiles()
+            registerShareTarget()
+
+            val failure =
+                runCatching {
+                    shareSelectedPhotos(context, "account", listOf(beach, harbour), "Share", { gallery }) { photo ->
+                        if (photo != harbour) return@shareSelectedPhotos AttachmentPlaintext.Bytes(bytesOf(photo))
+                        object : AttachmentPlaintext {
+                            override val size = 4L
+
+                            /** Fails as a dropped download stream does. */
+                            override fun copyTo(output: OutputStream) = throw IOException("stream dropped")
+
+                            /** Holds nothing to release. */
+                            override fun close() = Unit
+                        }
+                    }
+                }.exceptionOrNull()
+
+            assertTrue("$failure", failure is SharedPhotosUnavailableException)
+            assertEquals(listOf(harbour), (failure as SharedPhotosUnavailableException).photos)
+            assertTrue(failure.unreadable)
+            assertNoShare()
+        }
+
     /** A photo removed while it is read fails its read; the share reports it unavailable so it can be deselected. */
     @Test
     fun aReadFailureForARemovedPhotoReportsItUnavailable() =

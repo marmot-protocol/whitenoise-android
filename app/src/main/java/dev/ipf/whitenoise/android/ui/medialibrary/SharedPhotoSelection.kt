@@ -12,7 +12,9 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.withContext
+import java.io.FilterOutputStream
 import java.io.IOException
+import java.io.OutputStream
 
 /** A gallery slot: the message and authored attachment index a tile was selected from. */
 private fun SharedMediaTile.slot() = messageIdHex to attachmentIndex
@@ -186,19 +188,72 @@ private fun requireSharedPhotosAvailable(unavailable: List<SharedMediaTile>?) {
     if (unavailable.isNotEmpty()) throw SharedPhotosUnavailableException(unavailable)
 }
 
-/** Reads [photo] through [source], tagging a failure with the photo so the share can name and deselect it. */
+/**
+ * Reads [photo] through [source], tagging a failure with the photo so the share can name and deselect it. A streamed
+ * source is wrapped so a failure while it is copied is tagged too; in-memory bytes and a private file lease are local
+ * and keep their own type, so a lease can still be moved into place.
+ */
 @Suppress("TooGenericExceptionCaught") // Any provider or download failure of this one photo is attributed to it.
 private suspend fun readPhoto(
     photo: SharedMediaTile,
     source: suspend (SharedMediaTile) -> AttachmentPlaintext,
-): AttachmentPlaintext =
-    try {
-        source(photo)
-    } catch (cancel: CancellationException) {
-        throw cancel
-    } catch (failure: Exception) {
-        throw SharedPhotoReadException(photo, failure)
+): AttachmentPlaintext {
+    val plaintext =
+        try {
+            source(photo)
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (failure: Exception) {
+            throw SharedPhotoReadException(photo, failure)
+        }
+    val local = plaintext is AttachmentPlaintext.Bytes || plaintext is AttachmentPlaintext.Lease
+    return if (local) plaintext else AttributedPhotoPlaintext(photo, plaintext)
+}
+
+/** A streamed photo whose read failures, but not failures writing the staged copy, are attributed to [photo]. */
+private class AttributedPhotoPlaintext(
+    private val photo: SharedMediaTile,
+    private val delegate: AttachmentPlaintext,
+) : AttachmentPlaintext by delegate {
+    /** Copies the photo, tagging a failure that did not come from [output] with the photo. */
+    override fun copyTo(output: OutputStream) {
+        val target = WriteFailureTrackingStream(output)
+        try {
+            delegate.copyTo(target)
+        } catch (failure: IOException) {
+            if (target.failed) throw failure
+            throw SharedPhotoReadException(photo, failure)
+        }
     }
+}
+
+/** Passes writes to [delegate] and remembers whether one of them failed. */
+private class WriteFailureTrackingStream(
+    private val delegate: OutputStream,
+) : FilterOutputStream(delegate) {
+    var failed = false
+        private set
+
+    /** Writes one byte, recording a failure. */
+    override fun write(b: Int) = tracked { delegate.write(b) }
+
+    /** Writes [len] bytes of [b] from [off], recording a failure. */
+    override fun write(
+        b: ByteArray,
+        off: Int,
+        len: Int,
+    ) = tracked { delegate.write(b, off, len) }
+
+    /** Runs [write], marking this stream failed when it throws. */
+    private inline fun tracked(write: () -> Unit) {
+        try {
+            write()
+        } catch (failure: IOException) {
+            failed = true
+            throw failure
+        }
+    }
+}
 
 /**
  * [failure], unless photos found [unavailable] after it explain it better, or it is one photo's failed read, which

@@ -206,7 +206,7 @@ private fun AttachmentCollectionHeader(
 }
 
 /**
- * One line for a blocked send: how many items still need attention out of the whole set, the one Retry that
+ * One line for a blocked send: how many items were not sent out of the whole set, the one Retry that
  * sends them on, and Details for the explanation, the other choices and every item.
  */
 @Composable
@@ -216,7 +216,8 @@ private fun AttachmentCollectionBlockedLine(
     onRetry: () -> Unit,
     onToggle: () -> Unit,
 ) {
-    val unsent = operation.total - operation.settled
+    // Skipped and cancelled items were not sent either, so only published items are left out.
+    val unsent = operation.total - operation.published
     Row(
         modifier = Modifier.fillMaxWidth().testTag("conversation.attachment.collection.blocked"),
         verticalAlignment = Alignment.CenterVertically,

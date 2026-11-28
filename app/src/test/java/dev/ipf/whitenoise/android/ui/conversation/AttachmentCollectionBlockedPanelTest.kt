@@ -17,6 +17,7 @@ import dev.ipf.whitenoise.android.state.CollectionItemKind
 import dev.ipf.whitenoise.android.state.CollectionItemState
 import dev.ipf.whitenoise.android.state.PlannedCollectionItem
 import dev.ipf.whitenoise.android.state.planAttachmentChunks
+import dev.ipf.whitenoise.android.state.skipItems
 import dev.ipf.whitenoise.android.state.withChunkState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -59,6 +60,22 @@ class AttachmentCollectionBlockedPanelTest {
         assertEquals(listOf(operation.chunks.single().id), retried)
     }
 
+    /** A skipped item counts as not sent, so one sent, one skipped and one failed reads "2 of 3 not sent". */
+    @Test
+    fun skippedItemsCountAsNotSent() {
+        val planned = List(3) { PlannedCollectionItem("file-$it", CollectionItemKind.DOCUMENT, 1_000L) }
+        val operation = operation("three-files", planned)
+        val (sent, skipped, failed) = operation.chunks
+        render(
+            operation
+                .withChunkState(sent.id, CollectionChunkState.ACCEPTED, CollectionItemState.PUBLISHED, 0L)
+                .skipItems(skipped.itemIds.toSet(), 0L)
+                .withChunkState(failed.id, CollectionChunkState.FAILED, CollectionItemState.FAILED, 0L),
+        )
+
+        composeRule.onNodeWithText("2 of 3 not sent").assertIsDisplayed()
+    }
+
     /** Details reveals the explanation, Skip, Cancel and each item, and hides them again. */
     @Test
     fun detailsRevealsTheSecondaryChoicesAndItems() {
@@ -85,16 +102,7 @@ class AttachmentCollectionBlockedPanelTest {
     /** Two photos planned into one message whose send failed before anything was accepted. */
     private fun failedTwoPhotoSend(): AttachmentCollectionOperation {
         val planned = List(2) { PlannedCollectionItem("photo-$it", CollectionItemKind.MEDIA, 1_000L) }
-        val operation =
-            AttachmentCollectionOperation(
-                id = "two-photos",
-                accountRef = "account",
-                groupIdHex = "group",
-                items = planned.map { CollectionItem(it.id, "content://shot/${it.id}", it.kind) },
-                chunks = planAttachmentChunks("two-photos", planned),
-                createdAtMs = 0L,
-                updatedAtMs = 0L,
-            )
+        val operation = operation("two-photos", planned)
         return operation.withChunkState(
             operation.chunks.single().id,
             CollectionChunkState.FAILED,
@@ -102,6 +110,20 @@ class AttachmentCollectionBlockedPanelTest {
             0L,
         )
     }
+
+    /** A fresh operation [id] planned from [planned] items. */
+    private fun operation(
+        id: String,
+        planned: List<PlannedCollectionItem>,
+    ) = AttachmentCollectionOperation(
+        id = id,
+        accountRef = "account",
+        groupIdHex = "group",
+        items = planned.map { CollectionItem(it.id, "content://shot/${it.id}", it.kind) },
+        chunks = planAttachmentChunks(id, planned),
+        createdAtMs = 0L,
+        updatedAtMs = 0L,
+    )
 
     /** The English text of [id]. */
     private fun text(id: Int): String = context.getString(id)

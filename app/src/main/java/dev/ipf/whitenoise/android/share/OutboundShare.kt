@@ -120,15 +120,16 @@ internal fun launchOutboundShare(
  * staged and keeps its selection. A context with no hosting activity is not checked.
  */
 internal fun requireOutboundShareHostStarted(context: Context) {
-    if (context
-            .lifecycleOwner()
-            ?.lifecycle
-            ?.currentState
-            ?.isAtLeast(Lifecycle.State.STARTED) == false
-    ) {
-        throw CancellationException("outbound share host is no longer started")
-    }
+    if (!outboundShareHostStarted(context)) throw CancellationException("outbound share host is no longer started")
 }
+
+/** Whether the activity behind [context] is at least started; a context with no hosting activity counts as started. */
+internal fun outboundShareHostStarted(context: Context): Boolean =
+    context
+        .lifecycleOwner()
+        ?.lifecycle
+        ?.currentState
+        ?.isAtLeast(Lifecycle.State.STARTED) != false
 
 internal fun inviteShareIntent(message: String): Intent = outboundShareIntent(message, emptyList())
 

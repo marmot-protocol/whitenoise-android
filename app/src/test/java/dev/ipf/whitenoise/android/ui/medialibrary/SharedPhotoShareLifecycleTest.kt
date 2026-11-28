@@ -163,6 +163,20 @@ class SharedPhotoShareLifecycleTest {
         assertTrue(failures.isEmpty())
     }
 
+    /** A photo that fails while the app is in the background is not reported and keeps the whole selection. */
+    @Test
+    fun aFailureWhileTheAppIsAwayKeepsTheSelection() {
+        harbourUnreadable = true
+        composeRule.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
+        release.complete(Unit)
+
+        composeRule.waitUntil(TIMEOUT_MS) { !share.sharing }
+        assertNull(shadowOf(RuntimeEnvironment.getApplication()).nextStartedActivity)
+        assertTrue(sharedFiles().isEmpty())
+        assertEquals(listOf(beach, harbour), share.selection.photos)
+        assertTrue(failures.isEmpty())
+    }
+
     /** A photo whose file cannot be read is named and deselected, so the next Share sends the others. */
     @Test
     fun anUnreadablePhotoIsDeselectedAndTheNextShareSendsTheRest() {
