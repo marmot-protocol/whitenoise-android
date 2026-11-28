@@ -112,8 +112,8 @@ internal fun WhiteNoiseAppState.setDefaultDisappearingMessagesSeconds(
  *
  * MarmotKit sets both participants as founding admins and includes the timer in the initial Welcome.
  * If the conversation already exists, MarmotKit returns its ID with its existing timer and roles.
- * The direct operation reports a recipient on an outdated client or with unfinished relay lists as a
- * generic runtime failure, so those cases show the retry copy until MarmotKit types them.
+ * A nonzero timer needs the recipient's key to support retention; otherwise nothing is created and
+ * MarmotKit throws `IncompatibleKeyPackage`, which the caller presents as update guidance.
  * This lower-level variant leaves failure presentation to the caller so the New Message flow can keep
  * an inline retry state instead of collapsing everything into a transient toast.
  */

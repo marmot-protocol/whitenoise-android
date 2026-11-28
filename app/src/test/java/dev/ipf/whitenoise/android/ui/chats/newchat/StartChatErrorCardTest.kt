@@ -57,6 +57,22 @@ class StartChatErrorCardTest {
         assertFalse(unknown.invitation)
     }
 
+    /** A DM whose founding timer the recipient's key cannot carry asks them to update, named when known. */
+    @Test
+    fun incompatiblePackageAsksTheRecipientToUpdate() {
+        val error = MarmotKitException.IncompatibleKeyPackage()
+
+        val known = startChatErrorUiState("npub1alice", "alice", error, "Alice") { "ignored" }
+        assertEquals(AppText.Resource(R.string.error_incompatible_key_package_for, listOf("Alice")), known.detail)
+        assertEquals(AppText.Resource(R.string.toast_couldnt_start_chat), known.title)
+        assertFalse(known.invitation)
+        assertFalse(known.copyable)
+
+        val unknown = startChatErrorUiState("npub1alice", "alice", error, " ") { "ignored" }
+        assertEquals(AppText.Resource(R.string.error_incompatible_key_package), unknown.detail)
+        assertFalse(unknown.invitation)
+    }
+
     /** A recipient with no KeyPackage at all is someone to invite: named when known, never a failure title. */
     @Test
     fun missingKeyIsPresentedAsAnInvitationNamedWhenKnown() {

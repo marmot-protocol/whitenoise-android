@@ -74,6 +74,14 @@ internal fun inviteFailureDetail(
             recipientName?.trim()?.takeIf { it.isNotEmpty() }?.let {
                 AppText.Resource(R.string.error_invalid_key_package_for, listOf(it))
             } ?: AppText.Resource(R.string.error_invalid_key_package)
+        // A nonzero founding timer needs retention support in the recipient's key, so they need to update.
+        is MarmotKitException.IncompatibleKeyPackage ->
+            recipientFailureDetail(
+                recipientName.orEmpty(),
+                { it },
+                R.string.error_incompatible_key_package,
+                R.string.error_incompatible_key_package_for,
+            )
         is MarmotKitException.InvalidIdentity -> AppText.Resource(R.string.error_invalid_identity_reference)
         is MarmotKitException.GroupHydrationPending -> AppText.Resource(R.string.toast_chat_still_loading)
         // A full disk refuses the change before anything is written; freeing space makes Retry worthwhile.
