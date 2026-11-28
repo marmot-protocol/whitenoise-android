@@ -444,20 +444,6 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
-      "calls": {
-        "AnimatedDropdownMenu": 1
-      },
-      "family": "conversation/GroupSystemRow.kt",
-      "policy": "ordinary",
-      "test_ids": [
-        "SCR-001",
-        "SCR-002",
-        "SCR-003",
-        "SCR-004"
-      ]
-    },
-    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
       "calls": {
         "fadingVerticalScroll": 1
@@ -477,20 +463,6 @@
         "WhiteNoiseLazyColumn": 1
       },
       "family": "conversation/PollVotesSheet.kt",
-      "policy": "ordinary",
-      "test_ids": [
-        "SCR-001",
-        "SCR-002",
-        "SCR-003",
-        "SCR-004"
-      ]
-    },
-    {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportRatePicker.kt",
-      "calls": {
-        "AnimatedDropdownMenu": 1
-      },
-      "family": "conversation/TtsTransportRatePicker.kt",
       "policy": "ordinary",
       "test_ids": [
         "SCR-001",
@@ -622,20 +594,6 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPreviewSendBar.kt",
-      "calls": {
-        "AnimatedDropdownMenu": 1
-      },
-      "family": "conversation/media",
-      "policy": "ordinary",
-      "test_ids": [
-        "SCR-001",
-        "SCR-002",
-        "SCR-003",
-        "SCR-004"
-      ]
-    },
-    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
       "calls": {
         "fadingVerticalScroll": 3
@@ -666,8 +624,7 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/editor/PhotoEditorScreen.kt",
       "calls": {
-        "fadingVerticalScroll": 2,
-        "DropdownMenu": 1
+        "fadingVerticalScroll": 2
       },
       "family": "conversation/media",
       "policy": "ordinary",
@@ -1063,8 +1020,7 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/MediaLibrary.kt",
       "calls": {
-        "WhiteNoiseLazyColumn": 1,
-        "AnimatedDropdownMenu": 1
+        "WhiteNoiseLazyColumn": 1
       },
       "family": "medialibrary",
       "policy": "ordinary",
@@ -1160,20 +1116,6 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AvatarViewer.kt",
-      "calls": {
-        "AnimatedDropdownMenu": 1
-      },
-      "family": "profile",
-      "policy": "ordinary",
-      "test_ids": [
-        "SCR-001",
-        "SCR-002",
-        "SCR-003",
-        "SCR-004"
-      ]
-    },
-    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ContactPrivateDetailsFrame.kt",
       "calls": {
         "fadingVerticalScroll": 1
@@ -1191,8 +1133,7 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsInCommonContent.kt",
       "calls": {
-        "WhiteNoiseLazyColumn": 1,
-        "AnimatedDropdownMenu": 1
+        "WhiteNoiseLazyColumn": 1
       },
       "family": "profile",
       "policy": "ordinary",
@@ -1979,37 +1920,9 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderChoice.kt",
-      "calls": {
-        "AnimatedDropdownMenu": 1
-      },
-      "family": "settings",
-      "policy": "ordinary",
-      "test_ids": [
-        "SCR-001",
-        "SCR-002",
-        "SCR-003",
-        "SCR-004"
-      ]
-    },
-    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
       "calls": {
         "fadingVerticalScroll": 1
-      },
-      "family": "settings",
-      "policy": "ordinary",
-      "test_ids": [
-        "SCR-001",
-        "SCR-002",
-        "SCR-003",
-        "SCR-004"
-      ]
-    },
-    {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderRulePanel.kt",
-      "calls": {
-        "AnimatedDropdownMenu": 1
       },
       "family": "settings",
       "policy": "ordinary",
@@ -2352,6 +2265,34 @@
         "fadingVerticalScroll": 1
       },
       "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseChoicePage.kt",
+      "calls": {
+        "WhiteNoiseLazyColumn": 1
+      },
+      "family": "common",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DefaultDisappearingTimerDialog.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "group",
       "policy": "ordinary",
       "test_ids": [
         "SCR-001",
