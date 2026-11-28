@@ -349,7 +349,12 @@ class ReplyNavigationTest {
             messageIdHex = messageId,
             sender = "bob",
             plaintext = "parent",
-            contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList(), blankLinesBefore = ByteArray(0)),
+            contentTokens =
+                MarkdownDocumentFfi(
+                    truncated = false,
+                    blocks = emptyList(),
+                    blankLinesBefore = ByteArray(0),
+                ),
             kind = 9uL,
             mediaJson = null,
             media = emptyList(),
