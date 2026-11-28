@@ -20,6 +20,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.cancel
 import dev.ipf.whitenoise.android.state.confirmMatch
 import dev.ipf.whitenoise.android.state.dismissMoveSibling
+import dev.ipf.whitenoise.android.state.signInAlertsApply
 import dev.ipf.whitenoise.android.state.signInsMarkedMine
 import dev.ipf.whitenoise.android.state.start
 import dev.ipf.whitenoise.android.state.withChatProgress
@@ -68,6 +69,7 @@ private fun LinkedDevicesPages(
     onBack: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
+    val account = appState.accounts.firstOrNull { it.label == controller.accountRef }
     val key = controller.accountRef to appState.runtimeGeneration
     var linking by rememberSaveable(key) { mutableStateOf(false) }
     var deviceSlot by rememberSaveable(key) { mutableStateOf<String?>(null) }
@@ -91,7 +93,7 @@ private fun LinkedDevicesPages(
             LinkedDevicesContent(
                 state = visibleRoster,
                 onBack = onBack,
-                linking = linkedDevicesLinking(appState, controller, management),
+                linking = linkedDevicesLinking(controller, management, account?.let(::signInAlertsApply) == true),
                 actions =
                     linkedDevicesActions(scope, controller, management) { page ->
                         linking = page.linking
@@ -112,6 +114,7 @@ private fun LinkedDevicesPages(
     LinkedDevicesDialogs(
         management = management,
         mine = appState.signInsMarkedMine(controller.accountRef),
+        readOnlyReview = account?.externalSigning == true,
         reviewingSlot = reviewingSlot,
         repairing = repairing,
         onRepaired = { scope.launch { controller.refreshLink() } },
@@ -139,7 +142,7 @@ private fun linkedDevicesFirstRead(
         graceOver = true
     }
     val rosterRead = controller.roster.roster != null || controller.roster.readFailed
-    val linkRead = controller.link != null || controller.linkReadFailed
+    val linkRead = !controller.canLink || controller.link != null || controller.linkReadFailed
     val read = rosterRead && linkRead && management.signIns.list.loaded
     return read || graceOver
 }
@@ -153,6 +156,7 @@ private fun linkedDevicesFirstRead(
 private fun LinkedDevicesDialogs(
     management: DeviceManagement,
     mine: Set<String>,
+    readOnlyReview: Boolean,
     reviewingSlot: String?,
     repairing: Boolean,
     onRepaired: () -> Unit,
@@ -171,6 +175,7 @@ private fun LinkedDevicesDialogs(
             },
             onClose = onClose,
             mine = reviewing.slotIdHex in mine,
+            readOnly = readOnlyReview,
             onMine = {
                 onClose()
                 scope.launch { management.signIns.markMine(reviewing) }
@@ -190,11 +195,11 @@ private fun LinkedDevicesDialogs(
 
 /** What the roster shows about linking for the active account. */
 private fun linkedDevicesLinking(
-    appState: WhiteNoiseAppState,
     controller: DeviceLinkController,
     management: DeviceManagement,
+    canReviewSignIns: Boolean,
 ): LinkedDevicesLinking {
-    val externalSigner = appState.activeAccount?.localSigning != true
+    val externalSigner = !controller.canLink
     return LinkedDevicesLinking(
         availability = if (externalSigner) DeviceLinkAvailability.ExternalSigner else DeviceLinkAvailability.Available,
         newDevice = controller.link?.newDevice,
@@ -205,6 +210,7 @@ private fun linkedDevicesLinking(
                 .orEmpty()
                 .any { it.state is DeviceLinkPromptStateFfi.Linking },
         busy = controller.running != null || management.devices.running != null,
+        externalSignerCanReview = externalSigner && canReviewSignIns,
     )
 }
 

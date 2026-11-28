@@ -299,7 +299,8 @@ class DeviceLinkScreenshotTest {
     /** The roster of an account that signs through an external signer app. */
     @Test
     fun rosterExternalSignerDark() {
-        val linking = LinkedDevicesLinking(availability = DeviceLinkAvailability.ExternalSigner)
+        val linking =
+            LinkedDevicesLinking(availability = DeviceLinkAvailability.ExternalSigner, externalSignerCanReview = true)
         show(Look(dark = true)) { LinkedDevicesContent(onlyThisDevice(), {}, linking) }
         compose.onRoot().captureRoboImage("src/test/snapshots/linked_devices_external_signer_dark.png")
     }

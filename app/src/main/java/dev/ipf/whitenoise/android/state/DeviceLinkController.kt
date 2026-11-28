@@ -107,6 +107,7 @@ internal data class LinkedDeviceRosterState(
 internal class DeviceLinkController(
     val accountRef: String,
     private val native: DeviceLinkNative,
+    val canLink: Boolean = true,
     private val owns: () -> Boolean = { true },
 ) {
     var roster by mutableStateOf(LinkedDeviceRosterState())
@@ -173,7 +174,7 @@ internal class DeviceLinkController(
     @Suppress("TooGenericExceptionCaught") // Every non-cancellation native failure keeps the prior snapshot.
     suspend fun refreshLink() {
         linkReads.withLock {
-            if (!current) return
+            if (!canLink || !current) return
             val snapshot =
                 try {
                     native.deviceLinkSnapshot(accountRef)
@@ -204,7 +205,7 @@ internal class DeviceLinkController(
         kind: DeviceLinkCommand,
         run: suspend DeviceLinkNative.(accountRef: String) -> DeviceLinkSnapshotFfi,
     ) {
-        if (!current || !commands.tryLock()) return
+        if (!canLink || !current || !commands.tryLock()) return
         try {
             running = kind
             linkReads.withLock {

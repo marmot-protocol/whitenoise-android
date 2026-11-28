@@ -176,7 +176,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
         "anchor": "fun LinkedDevicesContent(",
         "test_ids": [
-          "SET-060"
+          "SET-060",
+          "SET-080"
         ]
       },
       {

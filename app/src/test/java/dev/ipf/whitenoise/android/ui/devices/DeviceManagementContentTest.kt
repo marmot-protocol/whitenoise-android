@@ -416,6 +416,18 @@ class DeviceManagementContentTest {
         compose.runOnIdle { assertEquals(listOf(SignInResponseFfi.DISMISS), answers) }
     }
 
+    @Test
+    fun anExternalSignerCanRejectAnUnknownSignIn() {
+        val answers = review(signIn("a"), readOnly = true)
+
+        compose.onNodeWithTag(SIGN_IN_NOT_NOW_TAG).assertDoesNotExist()
+        compose.onNodeWithTag(SIGN_IN_MINE_TAG).assertDoesNotExist()
+        compose.onNodeWithTag(SIGN_IN_DISMISS_TAG).assertDoesNotExist()
+        compose.onNodeWithTag(SIGN_IN_REJECT_TAG).performClick()
+
+        compose.runOnIdle { assertEquals(listOf(SignInResponseFfi.REJECT), answers) }
+    }
+
     /** Closing the review sends no answer. */
     @Test
     fun closingTheReviewAnswersNothing() {
@@ -464,6 +476,7 @@ class DeviceManagementContentTest {
         signIn: UnrecognizedSignInFfi,
         mine: Boolean = false,
         onMine: () -> Unit = {},
+        readOnly: Boolean = false,
     ): List<SignInResponseFfi> {
         val answers = mutableListOf<SignInResponseFfi>()
         compose.setContent {
@@ -474,6 +487,7 @@ class DeviceManagementContentTest {
                     onClose = {},
                     mine = mine,
                     onMine = onMine,
+                    readOnly = readOnly,
                 )
             }
         }
