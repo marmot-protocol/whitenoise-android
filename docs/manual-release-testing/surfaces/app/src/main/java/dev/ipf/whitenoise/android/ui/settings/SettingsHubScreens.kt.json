@@ -252,7 +252,7 @@
         "anchor": "fun AccountScreen(",
         "test_ids": [
           "SET-046",
-          "SET-086"
+          "SET-083"
         ]
       },
       {
@@ -309,7 +309,7 @@
         "anchor": "fun LinkedDevicesRoute(",
         "test_ids": [
           "SET-060",
-          "SET-086"
+          "SET-083"
         ]
       }
     ],
