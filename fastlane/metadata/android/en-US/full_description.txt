@@ -1,6 +1,8 @@
+Message friends, family and groups without giving anyone your phone number. Pick a name and you’re in: no phone number, no email, no account on anyone’s server.
+
 White Noise is a private messenger built on the open Marmot Protocol and Nostr.
 
-Direct messages and group conversations are protected with Messaging Layer Security (MLS), including forward secrecy and post-compromise security. Your private key stays on your device, and White Noise does not require a phone number or email address.
+Direct messages and group conversations are protected with Messaging Layer Security (MLS), including forward secrecy and post-compromise security. Your private key stays on your device.
 
 White Noise is non-custodial and works with independent Nostr relays and Blossom media servers. Encrypted conversation media is encrypted before it is uploaded.
 
