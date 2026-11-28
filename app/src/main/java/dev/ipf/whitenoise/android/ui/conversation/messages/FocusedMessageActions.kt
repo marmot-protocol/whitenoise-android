@@ -194,10 +194,9 @@ private const val FOCUSED_BACKDROP_ALPHA = 0.88f
 private const val FOCUSED_MORE_DISC_ALPHA = 0.08f
 private val FocusedStackMaximumWidth = 560.dp
 private val FocusedOverlayShadowSafeInset = 8.dp
-private val FocusedStackChrome = FocusedOverlayShadowSafeInset * 2 + 8.dp * 2
 private val FocusedReactionRailInset = 4.dp
 
-// Two rows of 48dp targets: the rail height the overlay reserves before the preview takes its share.
+// Two rows of 48dp targets: the rail height the overlay's 200dp preview budget was sized around.
 private val FocusedReactionRailBudget = 108.dp
 
 // A frame shorter than this, such as one the keyboard has shortened, keeps the 100% rail.
@@ -284,10 +283,10 @@ internal fun FocusedMessageActions(
             // The theme scales its typography by the app's text-size setting; sp also carries the system scale.
             val textScale = MaterialTheme.typography.bodyLarge.fontSize.value / Typography.bodyLarge.fontSize.value
             val emojiSize = with(LocalDensity.current) { (FocusedReactionEmojiSize.value * textScale).sp.toDp() }
-            // The stack's padding and gaps, the two-row rail and two action rows come before the preview (#4100).
-            // A larger text size grows the rail (#3279), but only into height a frame taller than
+            // The rail, inter-item gaps and a tappable scroll viewport need roughly 200dp with two 48dp reaction
+            // rows. A larger text size grows the rail (#3279), but only into height a frame taller than
             // FocusedReactionGrowthFrameHeight can spare, and that growth comes out of the preview instead of the
-            // action menu, which keeps two rows of its own text size.
+            // action viewport. On an ordinary full-height frame, the preview keeps its original footprint.
             val railWidth = minOf(maxWidth, FocusedStackMaximumWidth) - FocusedStackHorizontalPadding * 2
             val actionPanelMaximumWidth = maxWidth - FocusedStackHorizontalPadding * 2
             val railAllowance =
@@ -303,9 +302,7 @@ internal fun FocusedMessageActions(
                 } else {
                     0.dp
                 }
-            val menuReserve =
-                FocusedStackChrome + FocusedReactionRailBudget + rememberFocusedActionMenuReserve(terminalActions)
-            val previewHeightLimit = (maxHeight - menuReserve - railGrowth.coerceAtLeast(0.dp)).coerceAtLeast(48.dp)
+            val previewHeightLimit = (maxHeight - 200.dp - railGrowth.coerceAtLeast(0.dp)).coerceAtLeast(48.dp)
             var stackHeightPx by remember { mutableIntStateOf(0) }
             var previewCenterInStackPx by remember { mutableStateOf<Int?>(null) }
             val travel =

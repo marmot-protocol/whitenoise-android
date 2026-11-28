@@ -61,8 +61,8 @@ private suspend fun WhiteNoiseAppState.clearUnlinkedAccountNotifications(
     listed: Boolean,
 ) {
     val copies = accountSession.copyLifetimes
-    if (!unlinkedNotificationsClearable(listed, accounts.firstOrNull { it.label == accountRef }?.unlinked)) return
-    if (!copies.isCurrent(accountRef, copy)) return
+    val unlinked = accounts.firstOrNull { it.label == accountRef }?.unlinked
+    if (!unlinkedNotificationsClearable(listed, unlinked) || !copies.isCurrent(accountRef, copy)) return
     // Recording the departing channel owners lets startup retention finish if the process dies part way.
     val knownGroupIds = runCatchingCancellable { captureAccountKnownGroupIds(accountRef) }.getOrNull().orEmpty()
     if (!copies.isCurrent(accountRef, copy)) return

@@ -71,9 +71,9 @@ class FocusedMessageImeOverlayTest {
             previewHeight = 400,
         )
 
-    /** A preview taller than the frame can spare still leaves two whole action rows inside the menu (#4100). */
+    /** A preview taller than the frame can spare still leaves the whole menu outline and a row inside it (#4100). */
     @Test
-    fun previewTallerThanTheFrameLeavesTwoActionRows() =
+    fun previewTallerThanTheFrameKeepsTheMenuWhole() =
         assertActionsScrollWithoutMovingPreview(
             fontScale = 1f,
             layoutDirection = LayoutDirection.Ltr,
@@ -405,7 +405,7 @@ class FocusedMessageImeOverlayTest {
         val previewBefore = composeRule.onNodeWithTag("message-actions-preview").fetchSemanticsNode().boundsInRoot
         assertPreviewWithinFrame(previewBefore, "the message must start inside the short frame")
         composeRule.onNodeWithTag(FOCUSED_ACTION_MENU_SCROLL_TEST_TAG).assertIsDisplayed()
-        assertRowsScrollInsideTheMenuSurface(minimumRows = if (previewHeight > 60) 2 else 0)
+        assertRowsScrollInsideTheMenuSurface(minimumRows = if (previewHeight > 60) 1 else 0)
         if (previewHeight > 60) {
             val actionViewport =
                 composeRule.onNodeWithTag(FOCUSED_ACTION_MENU_SCROLL_TEST_TAG).fetchSemanticsNode().boundsInRoot
@@ -444,7 +444,7 @@ class FocusedMessageImeOverlayTest {
             panelBounds.bottom + shadowAllowance <= frame.bottom + 0.5f,
         )
         val rowHeight = with(composeRule.density) { 48.dp.toPx() }
-        assertTrue("the menu must keep $minimumRows whole rows", panelBounds.height >= rowHeight * minimumRows)
+        assertTrue("the menu must keep $minimumRows whole row(s)", panelBounds.height >= rowHeight * minimumRows)
     }
 
     /** Checks all preview edges remain inside the overlay frame within rounding tolerance. */

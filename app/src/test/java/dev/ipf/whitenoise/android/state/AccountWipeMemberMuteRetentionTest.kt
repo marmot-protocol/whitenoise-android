@@ -479,7 +479,7 @@ class AccountWipeMemberMuteRetentionTest {
             assertTrue("the other account's shortcut must stay", kept in left)
         }
 
-    /** An account listed as linked again by the time the handler reads it was signed in again, so its shortcuts stay. */
+    /** An account listed as linked again when the handler reads it was signed in again; its shortcuts stay. */
     @Test
     fun unlinkKeepsTheShortcutsOfAnAccountSignedInAgain() =
         runBlocking {

@@ -51,10 +51,6 @@ private val FocusedActionCellMinimumHeight = 48.dp
 private val FocusedActionCellSupportingHeight = 64.dp
 private val FocusedActionCellVerticalPadding = 8.dp
 
-// Room for the group's own vertical content padding around the rows.
-private val FocusedActionMenuChrome = 16.dp
-private const val FOCUSED_ACTION_MENU_RESERVED_ROWS = 2
-
 /**
  * Material's grouped menu: leading icon, label, an optional reason line, error colours for destructive rows.
  *
@@ -219,16 +215,6 @@ private fun rememberActionCellHeight(actions: List<FocusedMessageAction>): Dp {
                 },
         )
     }
-}
-
-/**
- * The height the menu keeps before a lifted message takes its share of a short frame: two rows of
- * [actions] at the current text size, so the menu always shows where its rows continue and where it ends.
- */
-@Composable
-internal fun rememberFocusedActionMenuReserve(actions: List<FocusedMessageAction>): Dp {
-    val rows = actions.size.coerceIn(1, FOCUSED_ACTION_MENU_RESERVED_ROWS)
-    return rememberActionCellHeight(actions) * rows + FocusedActionMenuChrome
 }
 
 /** One labelled action in the grid: icon, label, and the reason it is unavailable when there is one. */
