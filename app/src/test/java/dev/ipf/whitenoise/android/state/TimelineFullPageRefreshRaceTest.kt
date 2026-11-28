@@ -244,6 +244,8 @@ class TimelineFullPageRefreshRaceTest {
         timelineAt: ULong,
     ): TimelineMessageRecordFfi =
         TimelineMessageRecordFfi(
+            agentItem = null,
+            agentItemFirstEventMissing = false,
             clientToken = null,
             messageIdHex = messageId,
             sourceMessageIdHex = messageId,

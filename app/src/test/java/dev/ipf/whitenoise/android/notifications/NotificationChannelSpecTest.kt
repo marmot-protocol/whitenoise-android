@@ -127,28 +127,15 @@ class NotificationChannelSpecTest {
         )
     }
 
+    /** A mention still uses the configured mention channel when the traffic class is standard. */
     @Test
-    fun agentActivityRoutesToTheLowImportanceAgentChannel() {
-        val spec =
-            NotificationChannelSpec.forUpdate(
-                update(
-                    trigger = NotificationTriggerFfi.NEW_MESSAGE,
-                    trafficClass = NotificationTrafficClassFfi.AGENT_ACTIVITY,
-                ),
-            )
-
-        assertEquals(NotificationChannelSpec.AGENT_ACTIVITY, spec)
-        assertEquals(ChannelImportance.LOW, spec.importance)
-    }
-
-    @Test
-    fun mentionTakesPrecedenceOverAgentActivity() {
+    fun mentionTakesPrecedenceOverStandardGroupRouting() {
         val spec =
             NotificationChannelSpec.forUpdate(
                 update(
                     trigger = NotificationTriggerFfi.NEW_MESSAGE,
                     isMention = true,
-                    trafficClass = NotificationTrafficClassFfi.AGENT_ACTIVITY,
+                    trafficClass = NotificationTrafficClassFfi.STANDARD,
                 ),
             )
 

@@ -667,6 +667,8 @@ class OptimisticMessageReconciliationTest {
         tags: List<MessageTagFfi> = emptyList(),
     ): TimelineMessageRecordFfi =
         TimelineMessageRecordFfi(
+            agentItem = null,
+            agentItemFirstEventMissing = false,
             clientToken = null,
             messageIdHex = messageIdHex,
             sourceMessageIdHex = sourceMessageIdHex,

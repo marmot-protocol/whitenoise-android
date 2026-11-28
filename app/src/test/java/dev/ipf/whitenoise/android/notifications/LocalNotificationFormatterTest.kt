@@ -196,23 +196,6 @@ class LocalNotificationFormatterTest {
     }
 
     @Test
-    fun agentActivityGetsItsOwnNotificationIdentityDistinctFromFinalReplies() {
-        val finalReply = content(update(trigger = NotificationTriggerFfi.NEW_MESSAGE, groupIdHex = "group-a"))
-        val activity =
-            content(
-                update(
-                    trigger = NotificationTriggerFfi.NEW_MESSAGE,
-                    groupIdHex = "group-a",
-                    trafficClass = NotificationTrafficClassFfi.AGENT_ACTIVITY,
-                ),
-            )
-
-        assertEquals(LocalNotificationFormatter.MESSAGE_NOTIFICATION_ID, finalReply?.notificationId)
-        assertEquals(LocalNotificationFormatter.AGENT_ACTIVITY_NOTIFICATION_ID, activity?.notificationId)
-        assertNotEquals(finalReply?.notificationTag, activity?.notificationTag)
-    }
-
-    @Test
     fun mentionDismissalKeyMatchesThePostedMentionIdentity() {
         val mention =
             content(

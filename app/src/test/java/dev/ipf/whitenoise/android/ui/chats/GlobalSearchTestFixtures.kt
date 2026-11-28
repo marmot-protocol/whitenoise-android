@@ -195,6 +195,8 @@ internal object GlobalSearchTestFixtures {
         expiresAt: ULong? = null,
         invalidation: String? = null,
     ) = TimelineMessageRecordFfi(
+        agentItem = null,
+        agentItemFirstEventMissing = false,
         clientToken = null,
         hasReports = false,
         poll = null,

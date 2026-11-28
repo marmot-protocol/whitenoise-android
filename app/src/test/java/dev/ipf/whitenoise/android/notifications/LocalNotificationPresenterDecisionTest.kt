@@ -44,21 +44,6 @@ class LocalNotificationPresenterDecisionTest {
     }
 
     @Test
-    fun agentActivityUsesPlainStyleAndNoReplyActions() {
-        val decision =
-            decision(
-                update(
-                    trigger = NotificationTriggerFfi.NEW_MESSAGE,
-                    trafficClass = NotificationTrafficClassFfi.AGENT_ACTIVITY,
-                ),
-            )
-
-        assertSame(NotificationStyleChoice.Plain, decision?.style)
-        assertEquals(emptyList<NotificationActionKind>(), decision?.actions)
-        assertEquals(0, decision?.historyCap)
-    }
-
-    @Test
     fun newMessageUsesMessagingStyleAndReplyAndMarkReadActions() {
         val decision = decision(update(trigger = NotificationTriggerFfi.NEW_MESSAGE, reactionEmoji = null))
 

@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.notifications
 
-import dev.ipf.marmotkit.NotificationTrafficClassFfi
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 
@@ -152,7 +151,6 @@ enum class NotificationChannelSpec(
                         // Mentions take precedence over the DM/group split: a
                         // mention is the highest-signal message, on its own channel.
                         update.isMention -> MENTIONS
-                        update.trafficClass == NotificationTrafficClassFfi.AGENT_ACTIVITY -> AGENT_ACTIVITY
                         update.isDm -> DIRECT_MESSAGES
                         else -> GROUP_MESSAGES
                     }

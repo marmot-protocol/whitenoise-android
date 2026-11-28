@@ -35,7 +35,7 @@ class DurableLocalSendsTest {
                 nativeBoundary { method, _ ->
                     calls += method
                     check(method == "localSendStatus")
-                    if (admitted) LocalSendStatusFfi.Queued else null
+                    if (admitted) LocalSendStatusFfi.Queued("11".repeat(32)) else null
                 }
             // A JVM proxy wraps checked native exceptions; this override preserves the binding's real failure.
             val engine =
@@ -101,7 +101,8 @@ class DurableLocalSendsTest {
     @Test
     fun recoveredOwnershipDoesNotReadmit() =
         runTest {
-            for (status in listOf(LocalSendStatusFfi.Queued, LocalSendStatusFfi.EngineOwned)) {
+            val messageId = "11".repeat(32)
+            for (status in listOf(LocalSendStatusFfi.Queued(messageId), LocalSendStatusFfi.EngineOwned(messageId))) {
                 val engine =
                     nativeBoundary { method, _ ->
                         check(method == "localSendStatus")
@@ -112,20 +113,24 @@ class DurableLocalSendsTest {
             }
         }
 
-    /** A rejected token is terminal instead of silently sending the same payload under another identity. */
+    /** A rejected or membership-fenced token cannot silently send the payload under a new identity. */
     @Test
     fun rejectedTokenRequiresDeliberateNewSubmission() =
         runTest {
-            val engine =
-                nativeBoundary { method, _ ->
-                    check(method == "localSendStatus")
-                    LocalSendStatusFfi.Rejected
-                }
-            val failure =
-                runCatching {
-                    engine.sendComposerTextWithToken("account", "group", null, "hello", "rejected")
-                }.exceptionOrNull()
-            assertTrue(failure is IllegalStateException)
+            for (status in listOf(LocalSendStatusFfi.Rejected, LocalSendStatusFfi.RefusedNewMembers)) {
+                val calls = mutableListOf<String>()
+                val engine =
+                    nativeBoundary { method, _ ->
+                        calls += method
+                        status
+                    }
+                val failure =
+                    runCatching {
+                        engine.sendComposerTextWithToken("account", "group", null, "hello", "rejected")
+                    }.exceptionOrNull()
+                assertTrue(failure is IllegalStateException)
+                assertEquals(listOf("localSendStatus"), calls)
+            }
         }
 
     /** A failed status probe is diagnostic context, not a replacement for the admission failure. */
@@ -166,7 +171,7 @@ class DurableLocalSendsTest {
                 nativeBoundary { method, _ ->
                     check(method == "localSendStatus")
                     statusReads += 1
-                    LocalSendStatusFfi.EngineOwned
+                    LocalSendStatusFfi.EngineOwned("11".repeat(32))
                 }
 
             val result =

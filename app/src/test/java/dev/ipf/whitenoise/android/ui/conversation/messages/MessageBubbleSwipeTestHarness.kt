@@ -142,6 +142,8 @@ internal fun swipeTestProjectedRecord(
             thumbhash = null,
         )
     return TimelineMessageRecordFfi(
+        agentItem = null,
+        agentItemFirstEventMissing = false,
         clientToken = null,
         messageIdHex = SWIPE_TEST_MESSAGE_ID,
         sourceMessageIdHex = SWIPE_TEST_MESSAGE_ID,
