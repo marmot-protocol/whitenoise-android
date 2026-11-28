@@ -114,7 +114,10 @@ internal class FakeRemoteSignerHost(
     }
 
     /** Records exactly which links the native handshake spent. */
-    override fun onBunkerLinkSpent(link: String) {
+    override fun onBunkerLinkSpent(
+        link: String,
+        paste: BunkerClipboardPaste?,
+    ) {
         spentLinks += link
     }
 

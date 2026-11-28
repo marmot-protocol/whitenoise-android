@@ -155,7 +155,7 @@ internal fun AddIdentitySheet(
                 appState,
                 onClose = { remoteSigner = null },
                 onFinished = session::dismiss,
-                initialLink = entry.link,
+                entry = entry,
             )
             return@MeasuredPlaybackDialog
         }
@@ -182,8 +182,8 @@ internal fun AddIdentitySheet(
             privateKeyState = session.key,
             amberSignInStage = appState.amberSignInStage,
             onBack = this.dismiss,
-            onUseRemoteSigner = { link ->
-                if (session.action == OnboardingAction.Idle) remoteSigner = RemoteSignerEntry(link)
+            onUseRemoteSigner = { entry ->
+                if (session.action == OnboardingAction.Idle) remoteSigner = entry
             },
         )
         removalRef?.let { label ->

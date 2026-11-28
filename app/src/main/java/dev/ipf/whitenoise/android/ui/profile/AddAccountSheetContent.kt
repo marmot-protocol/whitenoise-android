@@ -11,6 +11,7 @@ import androidx.compose.runtime.setValue
 import dev.ipf.whitenoise.android.ui.onboarding.OnboardingAction
 import dev.ipf.whitenoise.android.ui.onboarding.SignInContent
 import dev.ipf.whitenoise.android.ui.onboarding.WelcomeScreen
+import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.RemoteSignerEntry
 
 /**
  * Prototype Add Profile entry and secure Sign In use the already reviewed shared presentation.
@@ -31,7 +32,7 @@ internal fun AddAccountSheetContent(
     privateKeyState: TextFieldState? = null,
     amberSignInStage: Int? = null,
     onBack: () -> Unit = {},
-    onUseRemoteSigner: ((String?) -> Unit)? = null,
+    onUseRemoteSigner: ((RemoteSignerEntry) -> Unit)? = null,
 ) {
     val busy = inFlightAction != OnboardingAction.Idle
     val key = privateKeyState ?: remember { TextFieldState(identity) }

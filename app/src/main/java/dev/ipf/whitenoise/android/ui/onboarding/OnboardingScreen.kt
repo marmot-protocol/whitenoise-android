@@ -153,7 +153,7 @@ internal fun OnboardingScreen(
                 privateKeyState.setTextAndPlaceCursorAtEnd("")
                 remoteSigner = null
             },
-            initialLink = entry.link,
+            entry = entry,
         )
         return
     }
@@ -210,8 +210,8 @@ internal fun OnboardingScreen(
         amberSignInStage = appState.amberSignInStage,
         amberSignerAvailable = amberSignerAvailable,
         onLoginWithAmber = { startSignInAction(OnboardingAction.AmberLogin) },
-        onUseRemoteSigner = { link ->
-            if (inFlightAction == OnboardingAction.Idle) remoteSigner = RemoteSignerEntry(link)
+        onUseRemoteSigner = { entry ->
+            if (inFlightAction == OnboardingAction.Idle) remoteSigner = entry
         },
         savedAccounts = savedAccounts,
         reactivatingAccountLabel = appState.retainedAccountReactivationRef,

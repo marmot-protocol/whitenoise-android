@@ -47,7 +47,7 @@ class SensitiveClipboardCoverageTest {
     fun pairingRetiresTheBunkerLinkBeforeTheAccountHandoff() {
         val path = "src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerPairing.kt"
         val pairing = appModuleSource(path).functionBody("pair")
-        val cleanup = pairing.indexOf("submittedLink?.let(host::onBunkerLinkSpent)")
+        val cleanup = pairing.indexOf("host.onBunkerLinkSpent(")
         assertTrue(cleanup > pairing.indexOf("active.connect()"))
         assertTrue(cleanup > pairing.indexOf("if (token != attempt) return"))
         assertTrue(cleanup in 0 until pairing.indexOf("handOffToAccount("))

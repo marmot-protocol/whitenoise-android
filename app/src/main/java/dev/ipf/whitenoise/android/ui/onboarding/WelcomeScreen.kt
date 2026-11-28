@@ -44,6 +44,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
 import dev.ipf.whitenoise.android.ui.common.nativePageBody
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
+import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.RemoteSignerEntry
 import dev.ipf.whitenoise.android.ui.settings.SettingsNativeViewport
 import dev.ipf.whitenoise.android.ui.settings.rememberSettingsNativeSurface
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
@@ -76,7 +77,7 @@ fun OnboardingContent(
     onContinueWithSavedAccount: (String) -> Unit = {},
     onRecoverSavedAccount: (String) -> Unit = {},
     privateKeyState: TextFieldState? = null,
-    onUseRemoteSigner: ((String?) -> Unit)? = null,
+    onUseRemoteSigner: ((RemoteSignerEntry) -> Unit)? = null,
 ) {
     var signingIn by remember { mutableStateOf(signingInBusy || loggingInWithAmber) }
     val busy = creatingIdentity || signingInBusy || loggingInWithAmber || reactivatingAccountLabel != null

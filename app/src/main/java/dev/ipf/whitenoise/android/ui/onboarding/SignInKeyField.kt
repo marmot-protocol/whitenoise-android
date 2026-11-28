@@ -43,6 +43,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSecureTextField
 import dev.ipf.whitenoise.android.ui.common.plainText
 import dev.ipf.whitenoise.android.ui.common.rememberClipboardCanOfferPaste
 import dev.ipf.whitenoise.android.ui.common.withPrimaryClipForPaste
+import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.BunkerClipboardPaste
 import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.isBunkerLink
 import dev.ipf.whitenoise.android.ui.qr.QrScannerSheet
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
@@ -61,6 +62,7 @@ internal fun SignInKeyField(
     onIdentityChange: (String) -> Unit,
     onErrorChange: (Int?) -> Unit,
     onSubmit: () -> Unit,
+    onBunkerClipboardPaste: (BunkerClipboardPaste?) -> Unit = {},
     scannerContent: @Composable (() -> Unit, (String) -> Unit) -> Unit = { dismiss, scan ->
         QrScannerSheet(
             onDismiss = dismiss,
@@ -86,10 +88,14 @@ internal fun SignInKeyField(
     val clipboard = remember(context) { ContextCompat.getSystemService(context, ClipboardManager::class.java) }
     val canPaste = rememberClipboardCanOfferPaste(clipboard)
 
-    /** Replaces the key text and reports the change while the field is active. */
-    fun replaceKey(value: String) {
+    /** Replaces the active field and reports whether the new value came from a provider paste. */
+    fun replaceKey(
+        value: String,
+        paste: BunkerClipboardPaste? = null,
+    ) {
         if (currentBusy || !active) return
         key.setTextAndPlaceCursorAtEnd(value)
+        onBunkerClipboardPaste(paste)
         onIdentityChange(value)
     }
     Row(
@@ -116,7 +122,9 @@ internal fun SignInKeyField(
                         SystemPasteIconButton(
                             onPaste = {
                                 clipboard.withPrimaryClipForPaste { clip ->
-                                    IdentityEntryInput.pasteValue(clip.plainText(context))?.let(::replaceKey)
+                                    IdentityEntryInput.pasteValue(clip.plainText(context))?.let { value ->
+                                        replaceKey(value, BunkerClipboardPaste.capture(clip, value))
+                                    }
                                 }
                             },
                             modifier = Modifier.padding(horizontal = 4.dp),

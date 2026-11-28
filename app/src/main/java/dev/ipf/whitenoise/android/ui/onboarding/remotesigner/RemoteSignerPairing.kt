@@ -34,7 +34,10 @@ internal interface RemoteSignerPairingHost {
     suspend fun newSession(configJson: String): Nip46SessionFfiInterface
 
     /** Removes a spent bunker link from the clipboard before the account handoff can close the flow. */
-    fun onBunkerLinkSpent(link: String)
+    fun onBunkerLinkSpent(
+        link: String,
+        paste: BunkerClipboardPaste?,
+    )
 
     /** Signs in with, or reattaches, the verified Ready [session] for account [userHex]. */
     suspend fun finish(
@@ -104,6 +107,9 @@ internal class RemoteSignerPairing(
     /** The pasted or scanned bunker link; a masked field, never saved state. */
     val link = TextFieldState()
 
+    /** Evidence from the explicit provider paste that supplied the current link. */
+    var clipboardPaste: BunkerClipboardPaste? = null
+
     private var session: Nip46SessionFfiInterface? = null
     private var job: Job? = null
     private var attempt = 0L
@@ -122,9 +128,11 @@ internal class RemoteSignerPairing(
     fun choose(
         chosen: RemoteSignerMethod,
         prefill: String? = null,
+        paste: BunkerClipboardPaste? = null,
     ) {
         if (busy) return
         method = chosen
+        clipboardPaste = paste
         linkErrorRes = null
         if (chosen == RemoteSignerMethod.ConnectionCode) {
             val config = JSONObject().put("relays", JSONArray(offerRelays)).put("name", REMOTE_SIGNER_CLIENT_NAME)
@@ -190,12 +198,14 @@ internal class RemoteSignerPairing(
             if (current == RemoteSignerStep.EnterLink) link.clearText() else discard()
             val linkPath = method == RemoteSignerMethod.BunkerLink && current != RemoteSignerStep.EnterLink
             step = if (linkPath) RemoteSignerStep.EnterLink else RemoteSignerStep.Choose
+            if (step == RemoteSignerStep.Choose) clipboardPaste = null
         }
         return handled
     }
 
     /** Ends the flow; an account handoff already in progress finishes on its own. */
     fun dispose() {
+        clipboardPaste = null
         link.clearText()
         lastOpen = null
         if (!busy) discard()
@@ -284,7 +294,8 @@ internal class RemoteSignerPairing(
                 }
             }
         if (token != attempt) return
-        submittedLink?.let(host::onBunkerLinkSpent)
+        submittedLink?.let { host.onBunkerLinkSpent(it, clipboardPaste) }
+        clipboardPaste = null
         val wrongAccount = expectedAccountHex != null && !userHex.equals(expectedAccountHex, ignoreCase = true)
         if (wrongAccount) {
             step = RemoteSignerStep.Failed(RemoteSignerFailure.WrongAccount)

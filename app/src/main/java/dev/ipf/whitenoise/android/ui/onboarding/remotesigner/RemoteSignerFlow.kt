@@ -1,8 +1,6 @@
 package dev.ipf.whitenoise.android.ui.onboarding.remotesigner
 
 import android.content.ActivityNotFoundException
-import android.content.ClipboardManager
-import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.runtime.Composable
@@ -18,8 +16,6 @@ import dev.ipf.marmotkit.Nip46SessionFfiInterface
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.loginWithRemoteSigner
 import dev.ipf.whitenoise.android.state.repairRemoteSigner
-import dev.ipf.whitenoise.android.ui.common.clearSensitiveClipboard
-import dev.ipf.whitenoise.android.ui.common.plainText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -34,7 +30,10 @@ private class AppRemoteSignerHost(
     private var runtime: MarmotInterface? = null
 
     /** Clears a spent link using the app context while the account still owns its original UI. */
-    override fun onBunkerLinkSpent(link: String) = clearClipboardIfHolding(appState.appContext, link)
+    override fun onBunkerLinkSpent(
+        link: String,
+        paste: BunkerClipboardPaste?,
+    ) = clearClipboardIfHolding(appState.appContext, link, paste)
 
     override suspend fun newSession(configJson: String): Nip46SessionFfiInterface {
         val current = appState.marmot()
@@ -57,7 +56,7 @@ private class AppRemoteSignerHost(
 }
 
 /**
- * Hosts one remote-signer pairing. [initialLink] starts on the bunker-link step with that link filled in;
+ * Hosts one remote-signer pairing. An [entry] with a link starts on the bunker-link step with that link filled in;
  * [repairAccountHex] re-pairs that existing account instead of signing in. [onFinished] runs once the account owns
  * the session, [onClose] when the user leaves first.
  */
@@ -67,7 +66,7 @@ internal fun RemoteSignerFlow(
     appState: WhiteNoiseAppState,
     onClose: () -> Unit,
     onFinished: () -> Unit = onClose,
-    initialLink: String? = null,
+    entry: RemoteSignerEntry? = null,
     repairAccountHex: String? = null,
 ) {
     val context = LocalContext.current
@@ -78,7 +77,9 @@ internal fun RemoteSignerFlow(
         }
     val finished by rememberUpdatedState(onFinished)
     DisposableEffect(pairing) { onDispose { pairing.dispose() } }
-    LaunchedEffect(pairing) { if (initialLink != null) pairing.choose(RemoteSignerMethod.BunkerLink, initialLink) }
+    LaunchedEffect(pairing) {
+        entry?.link?.let { pairing.choose(RemoteSignerMethod.BunkerLink, it, entry.clipboardPaste) }
+    }
     LaunchedEffect(pairing.step) {
         if (pairing.step == RemoteSignerStep.Done) finished()
     }
@@ -99,19 +100,8 @@ internal fun RemoteSignerFlow(
     )
 }
 
-/** A request to open the pairing flow; [link] is a bunker link already entered in the key field. */
+/** Opens pairing with an optional link and the evidence from pasting that link in the key field. */
 internal class RemoteSignerEntry(
-    val link: String?,
+    val link: String? = null,
+    val clipboardPaste: BunkerClipboardPaste? = null,
 )
-
-/** Clears the spent link only while the clipboard still holds it, without interrupting sign-in. */
-internal fun clearClipboardIfHolding(
-    context: Context,
-    used: String,
-) {
-    val clipboard = context.getSystemService(ClipboardManager::class.java) ?: return
-    runCatching {
-        val text = clipboard.primaryClip?.takeIf { it.itemCount == 1 }?.plainText(context)
-        if (text?.trim() == used) clearSensitiveClipboard(context)
-    }
-}
