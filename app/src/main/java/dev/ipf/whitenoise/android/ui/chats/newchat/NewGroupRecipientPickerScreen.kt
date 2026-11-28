@@ -24,7 +24,7 @@ import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.ArrowForward
 import dev.ipf.whitenoise.android.ui.qr.QrScanOutcome
 import dev.ipf.whitenoise.android.ui.qr.QrScanResult
 import dev.ipf.whitenoise.android.ui.qr.QrScanUseCase
-import dev.ipf.whitenoise.android.ui.qr.QrScannerSheet
+import dev.ipf.whitenoise.android.ui.qr.QrScannerDialog
 
 /** New-group-only picker; Add Members retains its separate selection and auto-resolution contract. */
 @Composable
@@ -35,7 +35,7 @@ internal fun NewGroupRecipientPickerScreen(
     onBack: () -> Unit,
     onConfirm: () -> Unit,
     scannerContent: @Composable (onDismiss: () -> Unit, onScan: (String) -> Unit) -> Unit = { dismiss, scan ->
-        QrScannerSheet(onDismiss = dismiss, onScan = scan)
+        QrScannerDialog(onDismiss = dismiss, onScan = scan)
     },
 ) {
     if (appState.signOutInProgress || appState.wipeInProgress) return

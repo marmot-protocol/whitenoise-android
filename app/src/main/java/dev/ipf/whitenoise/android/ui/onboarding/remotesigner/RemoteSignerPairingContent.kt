@@ -49,7 +49,7 @@ import dev.ipf.whitenoise.android.ui.common.plainText
 import dev.ipf.whitenoise.android.ui.common.rememberClipboardCanOfferPaste
 import dev.ipf.whitenoise.android.ui.common.withPrimaryClipForPaste
 import dev.ipf.whitenoise.android.ui.qr.QrCodeImage
-import dev.ipf.whitenoise.android.ui.qr.QrScannerSheet
+import dev.ipf.whitenoise.android.ui.qr.QrScannerDialog
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 /** The two pairing directions as quiet rows; the choice itself starts nothing on the network. */
@@ -170,7 +170,7 @@ internal fun RemoteSignerLinkField(pairing: RemoteSignerPairing) {
         }
     }
     if (scanning) {
-        QrScannerSheet(
+        QrScannerDialog(
             onDismiss = { scanning = false },
             onScan = { raw ->
                 scanning = false

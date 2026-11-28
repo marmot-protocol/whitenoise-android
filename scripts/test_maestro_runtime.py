@@ -1241,7 +1241,7 @@ class RuntimeEvidenceTest(unittest.TestCase):
         catalog = {screen['symbol']: screen for screen in inventory()['screen_catalog']}
         for name in ('ChatContextMenu', 'GlobalSearchFilterMenu', 'ComposerAttachmentMenu',
                      'MessageActionMenu', 'KeyboardSafePopup', 'MessageDeleteConfirmationDialog',
-                     'AddAccountSheetContent', 'ForwardMessagePickerContent', 'QrScannerSheetContent',
+                     'AddAccountSheetContent', 'ForwardMessagePickerContent', 'QrScannerDialogContent',
                      'ShareChatPickerFullScreenContent', 'SmartFolderRulePanel', 'KeyPackagesScreenForAccount'):
             with self.subTest(surface=name):
                 self.assertIn(name, catalog)

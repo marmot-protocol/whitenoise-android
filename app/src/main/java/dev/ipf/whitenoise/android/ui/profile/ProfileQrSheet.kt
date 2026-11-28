@@ -56,7 +56,7 @@ import dev.ipf.whitenoise.android.ui.qr.QrCodeImage
 import dev.ipf.whitenoise.android.ui.qr.QrScanOutcome
 import dev.ipf.whitenoise.android.ui.qr.QrScanResult
 import dev.ipf.whitenoise.android.ui.qr.QrScanUseCase
-import dev.ipf.whitenoise.android.ui.qr.QrScannerSheet
+import dev.ipf.whitenoise.android.ui.qr.QrScannerDialog
 import dev.ipf.whitenoise.android.ui.settings.CopyablePublicKey
 
 internal fun profileQrContentForNpub(npub: String): String? = ProfileLink.parse(npub)?.qrUri
@@ -258,7 +258,7 @@ internal fun ProfileQrSheet(
     }
 
     if (showScan && showScanner) {
-        QrScannerSheet(
+        QrScannerDialog(
             onDismiss = { showScanner = false },
             onScan = { raw ->
                 showScanner = false

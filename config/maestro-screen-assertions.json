@@ -3143,14 +3143,14 @@
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
-      "symbol": "QrScannerSheetContent",
+      "symbol": "QrScannerDialogContent",
       "bindings": [
         {
           "case": "qr-permission-deny-close",
           "selector": {
             "text": "^Camera access needed$"
           },
-          "scope": "scanner QrScannerSheetContent renders denied-permission recovery state and closes; no QR decode or camera capture claim."
+          "scope": "scanner QrScannerDialogContent renders denied-permission recovery state and closes; no QR decode or camera capture claim."
         }
       ]
     },
@@ -3184,14 +3184,14 @@
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerSheet.kt",
-      "symbol": "QrScannerSheet",
+      "symbol": "QrScannerDialog",
       "bindings": [
         {
           "case": "qr-permission-deny-close",
           "selector": {
             "text": "^Camera access needed$"
           },
-          "scope": "scanner QrScannerSheet renders denied-permission recovery state and closes; no QR decode or camera capture claim.",
+          "scope": "scanner QrScannerDialog renders denied-permission recovery state and closes; no QR decode or camera capture claim.",
           "entry_assertion": {
             "text": "^Scan QR Code$"
           },
@@ -4794,6 +4794,25 @@
             "id": "share_connect.qr_surface"
           },
           "scope": "share/connect QR destination using generated identity and Back."
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderPeopleConditionPage.kt",
+      "symbol": "SmartFolderPeopleConditionPage",
+      "bindings": [
+        {
+          "case": "smart-folders-participants-picker-back",
+          "selector": {
+            "id": "folder.peoplePage"
+          },
+          "scope": "People filter page lists people inline with search and disabled Save, and Back closes it without changing the folder.",
+          "entry_assertion": {
+            "id": "folder.peoplePage"
+          },
+          "opened_by": {
+            "id": "folder.addField.PARTICIPANTS"
+          }
         }
       ]
     },

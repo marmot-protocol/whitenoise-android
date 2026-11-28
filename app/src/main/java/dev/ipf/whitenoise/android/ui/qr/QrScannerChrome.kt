@@ -11,14 +11,17 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -59,11 +62,21 @@ import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 
 private val SCANNER_PERMISSION_BACKGROUND = Color(0xFF202020)
 
-internal const val QR_SCANNER_SHEET_CONTENT_TAG = "qr_scanner_sheet_content"
+/** The toolbar plus the scrim fade below it, measured from the top of the safe area. */
+private val ScannerHeaderHeight = 96.dp
 
-/** Render real scanner state; the preview slot is supplied by the production CameraX owner. */
+/** The header bar clears the status bar and side cutouts, while its scrim still runs behind them. */
+private val ScannerHeaderInsets
+    @Composable get() = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)
+
+internal const val QR_SCANNER_CONTENT_TAG = "qr_scanner_content"
+
+/**
+ * Render real scanner state; the preview slot is supplied by the production CameraX owner. The preview runs edge to
+ * edge, while the target, permission card and header clear the system bars and cutouts.
+ */
 @Composable
-internal fun QrScannerSheetContent(
+internal fun QrScannerDialogContent(
     permissionGranted: Boolean,
     scannerError: String?,
     onDismiss: () -> Unit,
@@ -85,45 +98,22 @@ internal fun QrScannerSheetContent(
             .fillMaxWidth()
             .fillMaxSize()
             .exposePerformanceTestTags()
-            .testTag(QR_SCANNER_SHEET_CONTENT_TAG)
+            .testTag(QR_SCANNER_CONTENT_TAG)
             .background(if (permissionGranted) Color.Black else SCANNER_PERMISSION_BACKGROUND),
     ) {
-        when {
-            scannerError != null ->
-                ScannerErrorDialog(
-                    detail = scannerError,
-                    onDismiss = onDismiss,
-                    onRetry = onRetry,
-                )
-            permissionGranted -> {
-                cameraPreview()
-                BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    val targetSize = minOf(maxWidth - 64.dp, maxHeight - 192.dp, 280.dp).coerceAtLeast(0.dp)
-                    if (targetSize >= 64.dp) {
-                        RoundedQrTarget(Modifier.size(targetSize).testTag("qr_scanner.target"))
-                    }
-                }
-            }
-            else ->
-                ScannerPermissionArea { availableHeight ->
-                    if (permissionPending) {
-                        CircularProgressIndicator(
-                            color = Color.White,
-                            modifier = Modifier.testTag("qr_scanner.permission_pending"),
-                        )
-                    } else {
-                        ScannerRecoveryCard(
-                            title = stringResource(R.string.qr_camera_access_needed),
-                            detail = stringResource(permissionDetailRes),
-                            action =
-                                stringResource(
-                                    if (openSettings) R.string.open_settings else R.string.allow_camera,
-                                ),
-                            onAction = if (openSettings) onOpenSettings else onRequestPermission,
-                            verticalMargin = if (availableHeight < 192.dp) 0.dp else WhiteNoiseSpacing.Section,
-                        )
-                    }
-                }
+        if (permissionGranted && scannerError == null) cameraPreview()
+        Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
+            ScannerStateLayer(
+                permissionGranted = permissionGranted,
+                scannerError = scannerError,
+                onDismiss = onDismiss,
+                onRequestPermission = onRequestPermission,
+                permissionPending = permissionPending,
+                openSettings = openSettings,
+                onOpenSettings = onOpenSettings,
+                permissionDetailRes = permissionDetailRes,
+                onRetry = onRetry,
+            )
         }
         ScannerHeader(
             onDismiss = onDismiss,
@@ -137,16 +127,68 @@ internal fun QrScannerSheetContent(
     }
 }
 
-/** Preserve phone centering while giving short windows all the space below the actual 112dp header. */
+/** The layer inside the safe area: the error dialog, the scan target over the preview, or permission recovery. */
+@Suppress("LongParameterList")
+@Composable
+private fun ScannerStateLayer(
+    permissionGranted: Boolean,
+    scannerError: String?,
+    onDismiss: () -> Unit,
+    onRequestPermission: () -> Unit,
+    permissionPending: Boolean,
+    openSettings: Boolean,
+    onOpenSettings: () -> Unit,
+    @StringRes permissionDetailRes: Int,
+    onRetry: () -> Unit,
+) {
+    when {
+        scannerError != null ->
+            ScannerErrorDialog(
+                detail = scannerError,
+                onDismiss = onDismiss,
+                onRetry = onRetry,
+            )
+        permissionGranted -> {
+            BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                val targetSize = minOf(maxWidth - 64.dp, maxHeight - 192.dp, 280.dp).coerceAtLeast(0.dp)
+                if (targetSize >= 64.dp) {
+                    RoundedQrTarget(Modifier.size(targetSize).testTag("qr_scanner.target"))
+                }
+            }
+        }
+        else ->
+            ScannerPermissionArea { availableHeight ->
+                if (permissionPending) {
+                    CircularProgressIndicator(
+                        color = Color.White,
+                        modifier = Modifier.testTag("qr_scanner.permission_pending"),
+                    )
+                } else {
+                    ScannerRecoveryCard(
+                        title = stringResource(R.string.qr_camera_access_needed),
+                        detail = stringResource(permissionDetailRes),
+                        action =
+                            stringResource(
+                                if (openSettings) R.string.open_settings else R.string.allow_camera,
+                            ),
+                        onAction = if (openSettings) onOpenSettings else onRequestPermission,
+                        verticalMargin = if (availableHeight < 192.dp) 0.dp else WhiteNoiseSpacing.Section,
+                    )
+                }
+            }
+    }
+}
+
+/** Preserve phone centering while giving short windows all the space below the actual header. */
 @Composable
 private fun ScannerPermissionArea(content: @Composable (Dp) -> Unit) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        val availableHeight = (maxHeight - 112.dp).coerceAtLeast(0.dp)
+        val availableHeight = (maxHeight - ScannerHeaderHeight).coerceAtLeast(0.dp)
         Layout(
             modifier = Modifier.fillMaxSize(),
             content = { content(availableHeight) },
         ) { measurables, constraints ->
-            val header = 112.dp.roundToPx().coerceAtMost(constraints.maxHeight)
+            val header = ScannerHeaderHeight.roundToPx().coerceAtMost(constraints.maxHeight)
             val child =
                 measurables.single().measure(
                     constraints.copy(minWidth = 0, minHeight = 0, maxHeight = constraints.maxHeight - header),
@@ -222,7 +264,10 @@ private fun ScannerRecoveryCard(
     }
 }
 
-/** Prototype centered scanner toolbar; torch appears only for the currently bound flash-capable camera. */
+/**
+ * Prototype centered scanner toolbar of a full-screen task: Close leads, the torch appears only for the currently
+ * bound flash-capable camera. Its scrim runs behind the status bar while the bar itself clears the system bars.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("LongMethod") // Declarative scanner drawing/layout.
 @Composable
@@ -239,7 +284,6 @@ private fun ScannerHeader(
         modifier =
             modifier
                 .fillMaxWidth()
-                .height(112.dp)
                 .background(
                     Brush.verticalGradient(
                         colors =
@@ -249,18 +293,11 @@ private fun ScannerHeader(
                                 Color.Transparent,
                             ),
                     ),
-                ),
+                ).windowInsetsPadding(ScannerHeaderInsets)
+                .height(ScannerHeaderHeight),
     ) {
-        BottomSheetDefaults.DragHandle(
-            modifier = Modifier.align(Alignment.TopCenter),
-            color = Color.White.copy(alpha = 0.72f),
-        )
-
         CenterAlignedTopAppBar(
-            modifier =
-                Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 16.dp),
+            modifier = Modifier.align(Alignment.TopCenter),
             title = {
                 Text(
                     text = stringResource(titleRes),

@@ -49,7 +49,7 @@ import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
 import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
 import dev.ipf.whitenoise.android.ui.profile.profileQrContentForNpub
 import dev.ipf.whitenoise.android.ui.qr.QrScanOutcome
-import dev.ipf.whitenoise.android.ui.qr.QrScannerSheet
+import dev.ipf.whitenoise.android.ui.qr.QrScannerDialog
 import dev.ipf.whitenoise.android.ui.settings.AiAgentsScreen
 import dev.ipf.whitenoise.android.ui.settings.SettingsRouteMotion
 import dev.ipf.whitenoise.android.ui.settings.ShareConnectScreen
@@ -283,7 +283,7 @@ internal fun NewMessageScreen(
     onNewGroup: () -> Unit,
     onOpenConversation: (ChatListItem, Boolean) -> Unit,
     scannerContent: @Composable (() -> Unit, (String) -> Unit) -> Unit = { dismiss, scan ->
-        QrScannerSheet(onDismiss = dismiss, onScan = scan)
+        QrScannerDialog(onDismiss = dismiss, onScan = scan)
     },
 ) {
     if (appState.signOutInProgress || appState.wipeInProgress) return

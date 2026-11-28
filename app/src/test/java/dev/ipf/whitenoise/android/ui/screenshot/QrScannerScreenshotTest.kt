@@ -14,8 +14,8 @@ import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.APP_MOTION_OPEN_MILLIS
-import dev.ipf.whitenoise.android.ui.qr.QR_SCANNER_SHEET_CONTENT_TAG
-import dev.ipf.whitenoise.android.ui.qr.QrScannerSheetContent
+import dev.ipf.whitenoise.android.ui.qr.QR_SCANNER_CONTENT_TAG
+import dev.ipf.whitenoise.android.ui.qr.QrScannerDialogContent
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -28,20 +28,20 @@ import org.robolectric.annotation.GraphicsMode
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "en-rUS-w360dp-h640dp-mdpi")
-class QrScannerSheetScreenshotTest {
+class QrScannerScreenshotTest {
     @get:Rule val composeRule = createComposeRule()
 
-    /** Retain the existing idle baseline name while updating the full scanner composition. */
-    @Test fun qrScannerSheetIdleDark() =
+    /** The idle full-screen scanner: edge-to-edge preview, Close-led header and target, with no sheet handle. */
+    @Test fun qrScannerIdleDark() =
         capture(
-            "qr_scanner_sheet_idle_dark",
+            "qr_scanner_idle_dark",
             granted = true,
         )
 
-    /** Retain the existing denied baseline with the prototype centered permission card. */
-    @Test fun qrScannerSheetPermissionDeniedDark() =
+    /** Denied permission shows the prototype centered permission card below the full-screen header. */
+    @Test fun qrScannerPermissionDeniedDark() =
         capture(
-            "qr_scanner_sheet_permission_denied_dark",
+            "qr_scanner_permission_denied_dark",
         )
 
     /** Permission text and action follow the ordinary light theme. */
@@ -97,7 +97,7 @@ class QrScannerSheetScreenshotTest {
             rtlLarge = true,
         )
 
-    /** A short landscape sheet scales its target without negative or off-screen constraints. */
+    /** A short landscape scanner scales its target without negative or off-screen constraints. */
     @Test
     @Config(qualifiers = "en-rUS-w640dp-h360dp-land-mdpi")
     fun landscapeTarget() =
@@ -145,7 +145,7 @@ class QrScannerSheetScreenshotTest {
                 LocalLayoutDirection provides if (rtlLarge) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
                 WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = if (rtlLarge || largeText) 2f else 1f) {
-                    QrScannerSheetContent(
+                    QrScannerDialogContent(
                         permissionGranted = granted,
                         scannerError = error,
                         onDismiss = {},
@@ -169,7 +169,7 @@ class QrScannerSheetScreenshotTest {
             composeRule.waitForIdle()
             composeRule.mainClock.autoAdvance = false
         }
-        val tag = if (error != null) "qr_scanner.error_dialog" else QR_SCANNER_SHEET_CONTENT_TAG
+        val tag = if (error != null) "qr_scanner.error_dialog" else QR_SCANNER_CONTENT_TAG
         composeRule.onNodeWithTag(tag).captureRoboImage("src/test/snapshots/$name.png")
     }
 }

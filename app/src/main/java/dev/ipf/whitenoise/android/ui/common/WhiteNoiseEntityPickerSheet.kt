@@ -120,7 +120,7 @@ fun WhiteNoiseEntityPickerSheet(
                     item { WhiteNoiseEmptyState(stringResource(R.string.no_matches)) }
                 }
                 itemsIndexed(visible, key = { _, item -> item.id }) { index, item ->
-                    PickerRow(
+                    WhiteNoisePickerRow(
                         item = item,
                         index = index,
                         count = visible.size,
@@ -148,10 +148,13 @@ fun WhiteNoiseEntityPickerSheet(
     }
 }
 
-/** One full-width row with an avatar, title and, for multi-select, a checkbox. */
+/**
+ * One full-width row with an avatar, title and, for multi-select, a checkbox. Shared by this sheet and by pages that
+ * list people inline, such as the smart-folder people filter, so both rows read and toggle alike.
+ */
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable
-private fun PickerRow(
+internal fun WhiteNoisePickerRow(
     item: WhiteNoisePickerItem,
     index: Int,
     count: Int,

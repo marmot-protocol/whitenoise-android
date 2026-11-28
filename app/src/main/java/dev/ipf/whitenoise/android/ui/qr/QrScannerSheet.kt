@@ -18,12 +18,7 @@ import androidx.camera.core.Preview
 import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.SheetValue
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -34,13 +29,10 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -48,19 +40,23 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.lifecycleOwner
-import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
+import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
-/** Near-full prototype scanner chrome around the production CameraX/ZXing owner. */
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * The QR scanner as a full-screen task with Close (docs/ui-patterns.md, bottom sheets): the camera takes over the
+ * display and needs its own controls, so it is a full-screen dialog rather than a sheet. Close, Android Back and an
+ * accepted scan all retire camera ingress and the torch before the exit motion starts, then return to the flow that
+ * opened the scanner. Permission, lifecycle and torch owners stay in this composable, outside the dialog window, so
+ * they keep observing the screen that launched the scan.
+ */
 @Suppress("FunctionNaming", "LongMethod") // One CameraX/lifecycle owner with declarative Compose content.
 @Composable
-internal fun QrScannerSheet(
+internal fun QrScannerDialog(
     onDismiss: () -> Unit,
     onScan: (String) -> Unit,
     @StringRes permissionDetailRes: Int = R.string.camera_access_required,
@@ -77,21 +73,12 @@ internal fun QrScannerSheet(
     val torch = remember(context) { QrScannerTorch(ContextCompat.getMainExecutor(context)) }
     val currentScan by rememberUpdatedState(onScan)
     var active by remember { mutableStateOf(true) }
-    val sheet =
-        rememberModalBottomSheetState(skipPartiallyExpanded = true, confirmValueChange = {
-            active ||
-                it == SheetValue.Hidden
-        })
-    val terminal = rememberSheetTerminalMotion(sheet)
 
-    fun finish(action: () -> Unit) {
-        if (!active) return
-        // Revoke camera ingress and torch before the decorative exit begins.
+    // Revoke camera ingress and torch before the decorative exit begins.
+    fun retire() {
         active = false
         torch.bind(null)
-        terminal.close(action)
     }
-    val close = { finish(onDismiss) }
     val cameraUnavailable = stringResource(R.string.camera_unavailable)
     val launcher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -106,36 +93,33 @@ internal fun QrScannerSheet(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
-    DisposableEffect(Unit) {
-        onDispose {
-            active = false
-            torch.bind(null)
-        }
-    }
+    DisposableEffect(Unit) { onDispose(::retire) }
     LaunchedEffect(active, permissionGranted, permissionFinished) {
         if (active && !permissionGranted && !permissionFinished) launcher.launch(Manifest.permission.CAMERA)
     }
-    val height =
-        with(LocalDensity.current) {
-            LocalWindowInfo.current.containerSize.height
-                .toDp() * 0.94f
-        }
-    // The one full-height camera sheet: black, edge to edge, and no handle over the preview.
-    WhiteNoiseModalBottomSheet(
-        onDismissRequest = close,
-        sheetState = sheet,
-        interactionEnabled = active,
-        containerColor = Color.Black,
-        contentColor = Color.White,
-        contentWindowInsets = { WindowInsets(0, 0, 0, 0) },
-        dragHandle = null,
+    // The camera owns the whole display: black, edge to edge, with the chrome clearing the system bars itself.
+    MeasuredPlaybackDialog(
+        origin = null,
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+        onDismissStart = ::retire,
+        dismissEnabled = { active },
     ) {
-        QrScannerSheetContent(
+        val surface = this
+
+        // Runs [action] once the exit motion ends; the first terminal request wins and later ones are ignored.
+        fun finish(action: () -> Unit) {
+            if (!active) return
+            retire()
+            surface.close(action)
+        }
+        val close = { finish(onDismiss) }
+        QrScannerDialogContent(
             permissionGranted = permissionGranted,
             scannerError = scannerError,
             onDismiss = close,
             onRequestPermission = { permissionFinished = false },
-            modifier = Modifier.height(height.coerceAtLeast(0.dp)),
+            modifier = Modifier.fillMaxSize(),
             permissionPending = !permissionFinished,
             openSettings =
                 permissionFinished &&
@@ -183,7 +167,7 @@ private tailrec fun Context.scannerActivity(): Activity? =
         else -> null
     }
 
-/** Keep the existing analysis executor and explicit provider/scanner teardown with the sheet lifecycle. */
+/** Keep the existing analysis executor and explicit provider/scanner teardown with the scanner lifecycle. */
 @Composable
 private fun CameraQrScanner(
     onScan: (String) -> Unit,
@@ -206,13 +190,13 @@ private fun CameraQrScanner(
     }
 
     // Track the CameraX provider and analysis use case so we can release them when
-    // the QR sheet is dismissed. CameraX binds use cases to the host activity's
+    // the QR scanner is dismissed. CameraX binds use cases to the host activity's
     // lifecycle, so without an explicit unbind the camera keeps streaming
     // (and the OS in-use indicator stays lit) until the activity stops. The
     // Clearing analysis closes the frame stream before the executor is shut down.
     //
     // `disposedRef` is a separate teardown signal so a late
-    // ProcessCameraProvider.getInstance() callback (fired after the sheet
+    // ProcessCameraProvider.getInstance() callback (fired after the scanner
     // dismissed) can bail and clean up instead of binding into refs we just
     // nulled out. Using `null` to mean both "not yet set" and "torn down"
     // would let `compareAndSet(null, …)` succeed after onDispose, leaking the
@@ -282,7 +266,7 @@ private fun bindQrScannerCamera(
                     if (!disposedRef.get()) onError(cameraUnavailable)
                     return@addListener
                 }
-            // If the sheet dismissed before this listener fired, the caller's
+            // If the scanner dismissed before this listener fired, the caller's
             // onDispose already ran and nulled the refs. Without disposedRef,
             // compareAndSet(null, provider) would succeed here and bind a
             // camera that nothing will ever unbind. Bail and clean up locally.
@@ -316,7 +300,7 @@ private fun bindQrScannerCamera(
                 // Failed before lifecycle binding could take over — the
                 // composable's onDispose has nothing to unbind, so release
                 // provider + analysis here instead of leaking them until the
-                // sheet dismisses.
+                // scanner dismisses.
                 runCatching { analysisRef.getAndSet(null)?.clearAnalyzer() }
                 runCatching { providerRef.getAndSet(null)?.unbindAll() }
                 onError(cameraUnavailable)

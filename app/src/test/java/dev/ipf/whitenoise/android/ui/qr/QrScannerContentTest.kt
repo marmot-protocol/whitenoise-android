@@ -122,7 +122,7 @@ class QrScannerContentTest {
     ) {
         composeRule.setContent {
             WhiteNoiseTheme(fontScale = fontScale) {
-                QrScannerSheetContent(
+                QrScannerDialogContent(
                     modifier = heightDp?.let { Modifier.height(it.dp) } ?: Modifier,
                     permissionGranted = granted,
                     scannerError = null,
