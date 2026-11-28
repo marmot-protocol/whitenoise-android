@@ -81,6 +81,15 @@ class StagingTagTest(unittest.TestCase):
             staging.publish_staging_tag("123")
         self.assertEqual(self.writes, [])
 
+    def test_rejects_a_source_outside_develop_history(self):
+        """A successful run cannot tag a commit outside the trusted branch history."""
+        ancestry_check = ("git", "merge-base", "--is-ancestor", SOURCE, "HEAD")
+        with patch.object(staging, "command", side_effect=subprocess.CalledProcessError(1, ancestry_check)):
+            with self.assertRaises(subprocess.CalledProcessError) as failure:
+                staging.publish_staging_tag("123")
+        self.assertEqual(failure.exception.cmd, ancestry_check)
+        self.assertEqual(self.writes, [])
+
     def test_rerun_keeps_the_existing_tag_and_rejects_collisions(self):
         """Retries reuse the original annotation and never move a published ref."""
         self.refs = f"{TAG_OBJECT}\t{REF}\n{SOURCE}\t{REF}^{{}}\n".encode()
