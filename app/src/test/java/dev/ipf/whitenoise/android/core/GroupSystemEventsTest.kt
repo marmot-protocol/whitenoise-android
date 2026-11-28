@@ -4,10 +4,10 @@ import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.GroupSystemEventFfi
 import dev.ipf.marmotkit.GroupSystemEventProvenanceFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
-import dev.ipf.whitenoise.android.state.timelineRecord as fixtureTimelineRecord
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import dev.ipf.whitenoise.android.state.timelineRecord as fixtureTimelineRecord
 
 class GroupSystemEventsTest {
     // Wire-shaped payload as a peer client emits it for an avatar change,
