@@ -14,13 +14,14 @@
         ]
       },
       {
-        "surface": "QrScannerSheet",
+        "surface": "QrScannerDialog",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerSheet.kt",
-        "anchor": "fun QrScannerSheet(",
+        "anchor": "fun QrScannerDialog(",
         "test_ids": [
           "ACC-003",
           "ONB-005",
-          "ONB-006"
+          "ONB-006",
+          "ACC-026"
         ]
       }
     ],

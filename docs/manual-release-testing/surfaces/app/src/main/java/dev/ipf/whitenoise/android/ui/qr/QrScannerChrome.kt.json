@@ -4,13 +4,14 @@
   "categories": {
     "composable_surfaces": [
       {
-        "surface": "QrScannerSheetContent",
+        "surface": "QrScannerDialogContent",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
-        "anchor": "fun QrScannerSheetContent(",
+        "anchor": "fun QrScannerDialogContent(",
         "test_ids": [
           "ACC-003",
           "ONB-005",
-          "ONB-006"
+          "ONB-006",
+          "ACC-026"
         ]
       },
       {
@@ -59,6 +60,17 @@
         "anchor": "fun ScannerRecoveryCard(",
         "test_ids": [
           "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      },
+      {
+        "surface": "ScannerStateLayer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
+        "anchor": "private fun ScannerStateLayer(",
+        "test_ids": [
+          "ACC-003",
+          "ACC-026",
           "ONB-005",
           "ONB-006"
         ]

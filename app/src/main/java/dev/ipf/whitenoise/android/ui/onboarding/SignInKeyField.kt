@@ -45,7 +45,7 @@ import dev.ipf.whitenoise.android.ui.common.rememberClipboardCanOfferPaste
 import dev.ipf.whitenoise.android.ui.common.withPrimaryClipForPaste
 import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.BunkerClipboardPaste
 import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.isBunkerLink
-import dev.ipf.whitenoise.android.ui.qr.QrScannerSheet
+import dev.ipf.whitenoise.android.ui.qr.QrScannerDialog
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 /**
@@ -64,7 +64,7 @@ internal fun SignInKeyField(
     onSubmit: () -> Unit,
     onBunkerClipboardPaste: (BunkerClipboardPaste?) -> Unit = {},
     scannerContent: @Composable (() -> Unit, (String) -> Unit) -> Unit = { dismiss, scan ->
-        QrScannerSheet(
+        QrScannerDialog(
             onDismiss = dismiss,
             onScan = scan,
             permissionDetailRes = R.string.qr_private_key_permission_detail,

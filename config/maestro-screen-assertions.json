@@ -3135,14 +3135,14 @@
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
-      "symbol": "QrScannerSheetContent",
+      "symbol": "QrScannerDialogContent",
       "bindings": [
         {
           "case": "qr-permission-deny-close",
           "selector": {
             "text": "^Camera access needed$"
           },
-          "scope": "scanner QrScannerSheetContent renders denied-permission recovery state and closes; no QR decode or camera capture claim."
+          "scope": "scanner QrScannerDialogContent renders denied-permission recovery state and closes; no QR decode or camera capture claim."
         }
       ]
     },
@@ -3176,14 +3176,14 @@
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerSheet.kt",
-      "symbol": "QrScannerSheet",
+      "symbol": "QrScannerDialog",
       "bindings": [
         {
           "case": "qr-permission-deny-close",
           "selector": {
             "text": "^Camera access needed$"
           },
-          "scope": "scanner QrScannerSheet renders denied-permission recovery state and closes; no QR decode or camera capture claim.",
+          "scope": "scanner QrScannerDialog renders denied-permission recovery state and closes; no QR decode or camera capture claim.",
           "entry_assertion": {
             "text": "^Scan QR Code$"
           },
