@@ -2891,4 +2891,7 @@
     <string name="private_key_reminder_body">Bu telefonu kaybederseniz kimliğinizi ve kişilerinizi korumanın tek yolu anahtarınızı kullanmaktır.</string>
     <string name="private_key_reminder_save">Anahtarı kaydet</string>
     <string name="private_key_reminder_not_now">Şimdi değil</string>
+    <string name="first_run_chats_title">İlk sohbetinizi başlatın</string>
+    <string name="first_run_chats_detail">Konuştuğunuz birini davet edin. Beklerken White Noise ekibine dilediğinizi sorun.</string>
+    <string name="first_run_new_chat">Yeni sohbet</string>
 </resources>

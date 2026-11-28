@@ -285,7 +285,7 @@ class ChatListUnreadPullSurfaceTest {
                             },
                             onUnreadOnlyChange = { toggles++ },
                         ) {
-                            EmptyChats(onCreate = {}, onFirstRunHelp = {}, scrollState = scroll)
+                            FirstRunEmptyChats(onCreate = {}, onHelp = {}, onInvite = {}, scrollState = scroll)
                         }
                     }
                 }

@@ -1829,11 +1829,14 @@ internal fun MainShell(
                                 onGroupCreateSubmitted = onGroupCreateSubmitted,
                                 onGroupCreateCompletedOpen = openGroupFromGroupCreateCompletion,
                                 onGroupCreateFlowSuperseded = supersedePendingGroupCreateOpen,
-                                conversationReturnHead =
-                                    publishedConversationReturnHead(chatListReturnHeadSnap),
+                                conversationReturnHead = publishedConversationReturnHead(chatListReturnHeadSnap),
                                 onConversationReturnHeadHandled = {
-                                    chatListReturnHeadSnap =
-                                        onConversationReturnHeadHandled(chatListReturnHeadSnap)
+                                    chatListReturnHeadSnap = onConversationReturnHeadHandled(chatListReturnHeadSnap)
+                                },
+                                chatsActive = {
+                                    appState.canShareFromChats(sectionName, selectedChat, pendingConversationOpen) &&
+                                        quickAccountSwitchTransition == null &&
+                                        currentShareRequestId == null
                                 },
                                 onFirstRunHelp = { support ->
                                     sectionName = MainSection.Settings.name

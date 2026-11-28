@@ -2845,4 +2845,7 @@
     <string name="private_key_reminder_body">如果您丢失了这部手机，只有使用私钥才能保留您的身份和联系人。</string>
     <string name="private_key_reminder_save">保存密钥</string>
     <string name="private_key_reminder_not_now">暂不</string>
+    <string name="first_run_chats_title">开始你的第一段对话</string>
+    <string name="first_run_chats_detail">邀请一位平常聊天的人。在等待期间，可以向 White Noise 团队提问。</string>
+    <string name="first_run_new_chat">新聊天</string>
 </resources>
