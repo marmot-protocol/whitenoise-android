@@ -43,9 +43,17 @@ data class TtsEngineHandle(
     val trust: EngineTrust,
     val voiceResolution: TtsVoiceResolution = TtsVoiceResolution.Empty,
     val connectedPackageVerified: Boolean = false,
+    private val openVoiceCatalogue: (() -> ConnectedTtsVoiceCatalogue)? = null,
 ) {
-    /** Shuts down the framework engine when this resolved handle is replaced. */
+    private val catalogue = lazy { openVoiceCatalogue?.invoke() }
+
+    /** A second connection to this engine for per-sentence voice checks, opened on first use. */
+    val voiceCatalogue: TtsVoiceCatalogue?
+        get() = catalogue.value
+
+    /** Shuts down the framework engine, and any catalogue connection it opened, when this handle is replaced. */
     fun release() {
+        if (catalogue.isInitialized()) catalogue.value?.release()
         textToSpeech.shutdown()
     }
 }
@@ -312,6 +320,9 @@ class TtsEngineResolver(
                     trust = trust,
                     voiceResolution = voiceResolution,
                     connectedPackageVerified = verifiedPackage != null,
+                    openVoiceCatalogue = {
+                        ConnectedTtsVoiceCatalogue(appContext.applicationContext, ttsFactory, activePackage)
+                    },
                 ),
         )
     }
