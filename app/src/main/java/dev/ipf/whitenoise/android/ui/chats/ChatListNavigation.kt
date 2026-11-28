@@ -36,8 +36,7 @@ internal class ChatListNavigation(
     private val appState: WhiteNoiseAppState,
     private val onOpenGroup: (ChatListItem, String?, Boolean, visibleActiveListHead: ChatListReturnHead?) -> Unit,
 ) {
-    private fun visibleReturnHead(): ChatListReturnHead? =
-        chatListVisibleReturnHead(visibleItems, showArchived, advancedFolder)
+    private fun visibleReturnHead() = chatListVisibleReturnHead(visibleItems, showArchived, advancedFolder)
 
     /** Opens a chat from the visible list, remembering the list head for the return scroll. */
     fun openGroupFromVisibleList(
@@ -99,8 +98,7 @@ internal class ChatListNewChatFlowHead(
 ) {
     private var newChatFlowOriginHead by newChatFlowOriginHeadState
 
-    private fun visibleReturnHead(): ChatListReturnHead? =
-        chatListVisibleReturnHead(visibleItems, showArchived, advancedFolder)
+    private fun visibleReturnHead() = chatListVisibleReturnHead(visibleItems, showArchived, advancedFolder)
 
     /** Holds the visible head as New Message opens, while the list is still on screen. */
     fun captureNewChatFlowOriginHead() {
