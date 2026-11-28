@@ -1,0 +1,27 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListNavigation.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Chat list opens and return-head capture",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListNavigation.kt",
+        "anchor": "fun openGroupFromVisibleList(",
+        "test_ids": [
+          "CHL-002"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "Removed search target notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListNavigation.kt",
+        "anchor": "R.string.toast_original_message_unavailable",
+        "test_ids": [
+          "FIND-013"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

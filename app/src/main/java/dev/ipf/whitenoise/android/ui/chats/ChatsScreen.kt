@@ -215,10 +215,8 @@ internal fun ChatsScreen(
     val accountSheets = remember(appState.runtimeGeneration) { ChatListAccountSheets() }
     // The list head when New Message opened, the row its keyed scroll anchor holds while the
     // flow replaces it. Not saved: after process death the open falls back to the current head.
-    var newChatFlowOriginHead by
-        remember(appState.activeAccountRef, appState.runtimeGeneration) {
-            mutableStateOf<ChatListReturnHead?>(null)
-        }
+    val newChatFlowOriginHeadState =
+        rememberNewChatFlowOriginHead(appState.activeAccountRef, appState.runtimeGeneration)
     var actionSheetChatId by
         remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf<String?>(null) }
     val actionMenuOwner =
@@ -1106,20 +1104,19 @@ internal fun ChatsScreen(
                 )
             }
 
-    /** The visible filtered head the return scroll compares against, or null for archived and advanced views. */
-    fun visibleReturnHead(): ChatListReturnHead? {
-        val ordinaryView = !showArchived && !advancedFolder
-        return if (ordinaryView) chatListReturnHead(visibleItems) else null
-    }
-
-    /** Opens a chat from the visible list, remembering the list head for the return scroll. */
-    fun openGroupFromVisibleList(
-        item: ChatListItem,
-        focusMessageId: String?,
-        justCreated: Boolean,
-    ) {
-        onOpenGroup(item, focusMessageId, justCreated, visibleReturnHead())
-    }
+    val chatNavigation =
+        ChatListNavigation(
+            newChatFlowOriginHeadState = newChatFlowOriginHeadState,
+            visibleItems = visibleItems,
+            showArchived = showArchived,
+            advancedFolder = advancedFolder,
+            sourceList = sourceList,
+            appState = appState,
+            searchRecents = searchRecents,
+            globalSearchState = globalSearchState,
+            onOpenGroup = onOpenGroup,
+            onPresentProfile = onPresentProfile,
+        )
 
     // Taken while the list is still on screen, since it may already include the new chat
     // by the time the flow completes (#3529).
@@ -1127,40 +1124,10 @@ internal fun ChatsScreen(
         mutableStateOf<NewMessageFlowLaunch?>(null)
     }
     val openNewMessageFlow = {
-        newChatFlowOriginHead = visibleReturnHead()
+        chatNavigation.captureNewChatFlowOriginHead()
         showNewChatFlow = true
     }
 
-    /** The head a chat created through New Message returns against, preferring the one held when it opened. */
-    fun newChatFlowReturnHead(): ChatListReturnHead? = newChatFlowOriginHead ?: visibleReturnHead()
-
-    /** Opens the chat a search result came from, among [chats], focused on that result's message. */
-    fun openSearchMessage(
-        groupIdHex: String,
-        messageIdHex: String,
-        chats: List<ChatListItem> = sourceList,
-    ) {
-        val canonical = canonicalChatListGroupId(groupIdHex)
-        val item =
-            chats.firstOrNull { canonicalChatListGroupId(it.group.groupIdHex) == canonical }
-                ?: run {
-                    appState.present(R.string.toast_original_message_unavailable)
-                    return
-                }
-        openGroupFromVisibleList(item, messageIdHex, false)
-    }
-
-    /** Remembers a chat or profile opened from global search for the blank search page (#4004). */
-    fun recordSearchOpen(entry: GlobalSearchRecent) {
-        searchRecents?.record(globalSearchState.accountScopeToken, entry)
-    }
-
-    /** Presents a profile from the visible list, remembering the list head for the return scroll. */
-    fun presentProfileFromVisibleList(npub: String) {
-        val visibleHead =
-            if (showArchived || advancedFolder) null else chatListReturnHead(visibleItems)
-        onPresentProfile(npub, visibleHead)
-    }
     LaunchedEffect(visibleChatIds, selectionMode, completeSelection) {
         if (!selectionMode) return@LaunchedEffect
         if (selectedChatIds.isEmpty()) completeSelection = null
@@ -1628,14 +1595,14 @@ internal fun ChatsScreen(
                     onOpenConversation = { item, justCreated ->
                         showNewChatFlow = false
                         newChatFlowLaunch = null
-                        onOpenGroup(item, null, justCreated, newChatFlowReturnHead())
+                        onOpenGroup(item, null, justCreated, chatNavigation.newChatFlowReturnHead())
                     },
                     onClose = dismiss,
                     onGroupCreateSubmitted = onGroupCreateSubmitted,
                     onGroupCreateCompletedOpen = { item, requestToken ->
                         showNewChatFlow = false
                         newChatFlowLaunch = null
-                        onGroupCreateCompletedOpen(item, requestToken, newChatFlowReturnHead())
+                        onGroupCreateCompletedOpen(item, requestToken, chatNavigation.newChatFlowReturnHead())
                     },
                 )
             }
@@ -1710,7 +1677,7 @@ internal fun ChatsScreen(
     }
     val openMessageResult by rememberUpdatedState<(GlobalSearchResult) -> Unit> { result ->
         searchViewport?.selection?.selected = GlobalSearchSelectedResult(result.groupIdHex, result.messageIdHex)
-        openSearchMessage(result.groupIdHex, result.messageIdHex, messageResultChats)
+        chatNavigation.openSearchMessage(result.groupIdHex, result.messageIdHex, messageResultChats)
     }
     val messageResultsActions =
         remember(messageResults, scopeFailed, completeScopeState) {
@@ -1879,13 +1846,13 @@ internal fun ChatsScreen(
                         },
                         onOpen = {
                             if (menuActionsCurrent()) {
-                                if (searchActive) recordSearchOpen(GlobalSearchRecent.Chat(item.group.groupIdHex))
+                                if (searchActive) chatNavigation.recordSearchOpen(GlobalSearchRecent.Chat(item.group.groupIdHex))
                                 searchViewport?.selection?.selected = GlobalSearchSelectedResult()
-                                openGroupFromVisibleList(item, null, false)
+                                chatNavigation.openGroupFromVisibleList(item, null, false)
                             }
                         },
                         onOpenProfile = { npub ->
-                            if (menuActionsCurrent()) presentProfileFromVisibleList(npub)
+                            if (menuActionsCurrent()) chatNavigation.presentProfileFromVisibleList(npub)
                         },
                         onOpenActions = { touchX ->
                             if (menuActionsCurrent()) {
@@ -2409,12 +2376,12 @@ internal fun ChatsScreen(
                 accountRef = controller.boundAccountRef,
                 existingDirectChat = { npub -> appState.existingDirectChat(npub) },
                 onOpenChat = { chat ->
-                    recordSearchOpen(GlobalSearchRecent.Chat(chat.group.groupIdHex))
-                    openGroupFromVisibleList(chat, null, false)
+                    chatNavigation.recordSearchOpen(GlobalSearchRecent.Chat(chat.group.groupIdHex))
+                    chatNavigation.openGroupFromVisibleList(chat, null, false)
                 },
                 onOpenProfile = { npub ->
-                    recordSearchOpen(GlobalSearchRecent.Profile(npub))
-                    presentProfileFromVisibleList(npub)
+                    chatNavigation.recordSearchOpen(GlobalSearchRecent.Profile(npub))
+                    chatNavigation.presentProfileFromVisibleList(npub)
                 },
             )
             GlobalSearchRecentStrip(
@@ -2423,8 +2390,8 @@ internal fun ChatsScreen(
                 visible = globalSearchRecentsVisible(globalSearchState) && !selectionMode,
                 controller = controller,
                 appState = appState,
-                onOpenChat = { chat -> openGroupFromVisibleList(chat, null, false) },
-                onOpenProfile = ::presentProfileFromVisibleList,
+                onOpenChat = { chat -> chatNavigation.openGroupFromVisibleList(chat, null, false) },
+                onOpenProfile = chatNavigation::presentProfileFromVisibleList,
             )
             ChatListBodyFrame(
                 modifier = Modifier.fillMaxSize(),
@@ -2571,7 +2538,7 @@ internal fun ChatsScreen(
                                     library = libraryContent,
                                     viewport = searchViewport,
                                     onOpenMessage = { group, message ->
-                                        openSearchMessage(group, message, libraryChats)
+                                        chatNavigation.openSearchMessage(group, message, libraryChats)
                                     },
                                 )
                             failedUnreadSnapshot && listEmpty ->

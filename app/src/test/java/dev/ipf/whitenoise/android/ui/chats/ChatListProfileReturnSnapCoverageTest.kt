@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.chats
 
 import dev.ipf.whitenoise.android.audio.kotlinFunctionBody
+import dev.ipf.whitenoise.android.motionOwnerSource
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -15,7 +16,7 @@ class ChatListProfileReturnSnapCoverageTest {
     /** Profile opens from the list capture the same filtered, pinned-aware head as direct row opens. */
     @Test
     fun chatListProfileOpenCapturesVisibleFilteredHeadForReturnSnap() {
-        val chatsScreen = chatsScreenSource().readText()
+        val chatsScreen = chatsScreenSource().motionOwnerSource()
         val mainShell = mainShellSource().readText()
 
         val presentProfileBody = chatsScreen.kotlinFunctionBody("presentProfileFromVisibleList")
@@ -59,7 +60,7 @@ class ChatListProfileReturnSnapCoverageTest {
      */
     @Test
     fun listOpensCaptureAndReturnComparesThePinnedAwareHead() {
-        val chatsScreen = chatsScreenSource().readText()
+        val chatsScreen = chatsScreenSource().motionOwnerSource()
 
         val headBody = chatsScreen.kotlinFunctionBody("visibleReturnHead")
         assertTrue(
@@ -102,7 +103,7 @@ class ChatListProfileReturnSnapCoverageTest {
      */
     @Test
     fun newMessageFlowOpensReturnAgainstTheHeadHeldWhenTheFlowOpened() {
-        val chatsScreen = chatsScreenSource().readText()
+        val chatsScreen = chatsScreenSource().motionOwnerSource()
         val mainShell = mainShellSource().readText()
 
         val openFlow =
@@ -112,7 +113,7 @@ class ChatListProfileReturnSnapCoverageTest {
             )
         assertTrue(
             "opening New Message must capture the visible head first",
-            "newChatFlowOriginHead = visibleReturnHead()" in openFlow,
+            "chatNavigation.captureNewChatFlowOriginHead()" in openFlow,
         )
 
         val flowHost =
@@ -122,11 +123,11 @@ class ChatListProfileReturnSnapCoverageTest {
             )
         assertTrue(
             "a created or reopened direct chat must return against the flow-origin head",
-            "onOpenGroup(item, null, justCreated, newChatFlowReturnHead())" in flowHost,
+            "onOpenGroup(item, null, justCreated, chatNavigation.newChatFlowReturnHead())" in flowHost,
         )
         assertTrue(
             "a created group must return against the flow-origin head",
-            "onGroupCreateCompletedOpen(item, requestToken, newChatFlowReturnHead())" in flowHost,
+            "onGroupCreateCompletedOpen(item, requestToken, chatNavigation.newChatFlowReturnHead())" in flowHost,
         )
 
         val createdGroupOpen =
@@ -144,7 +145,7 @@ class ChatListProfileReturnSnapCoverageTest {
     /** Row avatar taps reach the profile through the head-capturing path. */
     @Test
     fun chatListRowAvatarUsesProfileCapturePath() {
-        val chatsScreen = chatsScreenSource().readText()
+        val chatsScreen = chatsScreenSource().motionOwnerSource()
         val chatRow = chatRowSource().readText()
 
         assertTrue(
