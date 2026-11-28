@@ -453,6 +453,8 @@ class ConversationTranscriptExportTest {
         reactions: TimelineReactionSummaryFfi = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),
         groupSystem: GroupSystemEventFfi? = null,
     ) = TimelineMessageRecordFfi(
+        agentItem = null,
+        agentItemFirstEventMissing = false,
         clientToken = null,
         messageIdHex = messageIdHex,
         sourceMessageIdHex = null,
@@ -469,7 +471,7 @@ class ConversationTranscriptExportTest {
         replyPreview = null,
         mediaJson = null,
         media = emptyList(),
-        agentTextStreamJson = null,
+        thread = null,
         poll = null,
         groupSystem = groupSystem,
         hasReports = false,

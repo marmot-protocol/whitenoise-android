@@ -1,0 +1,43 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/SharedMediaDateJump.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "MediaDateJumpAction",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/SharedMediaDateJump.kt",
+        "anchor": "fun MediaDateJumpAction(",
+        "test_ids": [
+          "GRP-046"
+        ]
+      },
+      {
+        "surface": "MediaDateJumpEffect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/SharedMediaDateJump.kt",
+        "anchor": "fun MediaDateJumpEffect(",
+        "test_ids": [
+          "GRP-046"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:shared_media_jump_to_date",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/SharedMediaDateJump.kt",
+        "anchor": "R.string.shared_media_jump_to_date",
+        "test_ids": [
+          "GRP-046"
+        ]
+      },
+      {
+        "surface": "string:show",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/SharedMediaDateJump.kt",
+        "anchor": "R.string.show",
+        "test_ids": [
+          "GRP-046"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

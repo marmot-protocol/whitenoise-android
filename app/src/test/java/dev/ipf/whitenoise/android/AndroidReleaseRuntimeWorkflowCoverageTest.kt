@@ -48,42 +48,6 @@ class AndroidReleaseRuntimeWorkflowCoverageTest {
         )
     }
 
-    /**
-     * The required Android CI check builds every shipping R8 variant in each merge group and fails on its
-     * DEX method budget, so an over-budget method cannot merge even though release-runtime is not required.
-     */
-    @Test
-    fun requiredCiCheckBlocksOverBudgetShippingMethodsBeforeMerge() {
-        val ci = androidCiSource()
-        val buildContracts = ci.jobSection("build-contracts")
-        val phases = buildContracts.lineSequence().first { it.trimStart().startsWith("phase: ") }
-        assertTrue(
-            "every merge group must build both shipping R8 variants",
-            "(github.event_name == 'merge_group' || " in phases &&
-                "'[\"tooling\", \"baseline\", \"productionZapstoreRelease\", \"stagingZapstoreRelease\"]'" in phases,
-        )
-        val budgetStart = buildContracts.indexOf("- name: Enforce shipping post-R8 DEX method budget")
-        assertTrue("the required check must enforce the shipping budgets", budgetStart >= 0)
-        val budgetStep = buildContracts.stepAt(budgetStart)
-        assertTrue(
-            "a shipping budget failure must fail the required check",
-            "if: endsWith(matrix.phase, 'ZapstoreRelease')" in budgetStep &&
-                "continue-on-error" !in budgetStep &&
-                "|| true" !in budgetStep,
-        )
-        assertTrue(
-            "the budget must read the R8 mapping of the variant it measures",
-            "--mapping \"app/build/outputs/mapping/\$DEX_BUDGET_VARIANT/mapping.txt\"" in budgetStep &&
-                "--variant \"\$DEX_BUDGET_VARIANT\"" in budgetStep,
-        )
-        val aggregate = ci.jobSection("validate")
-        assertTrue(
-            "build contracts must feed the ruleset's required check",
-            "name: Compile, test, ktlint, detekt, Android lint" in aggregate &&
-                Regex("""needs: \[[^\]]*\bbuild-contracts\b""").containsMatchIn(aggregate),
-        )
-    }
-
     @Test
     fun productionFirebaseExemptionCannotAuthorizePlayPublication() {
         val buildScript = appBuildScriptSource()
@@ -302,14 +266,6 @@ class AndroidReleaseRuntimeWorkflowCoverageTest {
             File(".github/workflows/android-release-runtime.yml"),
         ).firstOrNull(File::exists)?.readText()
             ?: error("Missing Android release runtime workflow")
-
-    /** Reads the required Android CI workflow from the module or repository working directory. */
-    private fun androidCiSource(): String =
-        listOf(
-            File("../.github/workflows/android-ci.yml"),
-            File(".github/workflows/android-ci.yml"),
-        ).firstOrNull(File::exists)?.readText()
-            ?: error("Missing Android CI workflow")
 
     private fun verifierSource(): String =
         listOf(

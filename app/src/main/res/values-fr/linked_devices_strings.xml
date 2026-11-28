@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="linked_devices">Appareils associés</string>
+    <string name="linked_devices">Appareils</string>
+    <string name="settings_search_alias_linked_devices">appareils associés|appareils liés|associer un appareil|associer l’appareil</string>
+    <string name="group_account_devices_title">Appareils associés</string>
     <string name="linked_devices_detail">Les messages que vous envoyez depuis un appareil associé apparaissent comme les vôtres sur tous vos appareils associés.</string>
     <string name="linked_devices_this_device">Cet appareil</string>
     <string name="linked_devices_other_devices">Autres appareils</string>
@@ -36,9 +38,9 @@
     <string name="error_account_unlinked">Cet appareil a été dissocié de ce compte et ne peut donc pas s’y connecter. Retirez le compte de cet appareil, puis reconnectez-vous pour l’associer de nouveau.</string>
     <string name="wipe_report_left_to_other_devices">Discussions que vos autres appareils termineront : %1$d</string>
     <string name="wipe_report_other_devices_not_reached">Vos autres appareils n’ont pas pu être sollicités pour terminer la déconnexion de celui-ci. Ils peuvent continuer à l’afficher jusqu’à ce que vous le supprimiez depuis l’un d’eux.</string>
-    <string name="history_imported_from_device">Importé depuis %1$s</string>
-    <string name="history_imported_from_another_device">Importé depuis un autre appareil</string>
-    <string name="history_restored_from_backup">Restauré depuis une sauvegarde</string>
+    <string name="history_imported_from_device">Les messages ci-dessus viennent de %1$s</string>
+    <string name="history_imported_from_another_device">Les messages ci-dessus viennent d’un autre appareil</string>
+    <string name="history_restored_from_backup">Les messages ci-dessus ont été restaurés depuis une sauvegarde</string>
     <string name="history_receiving">Réception des messages précédents depuis un autre de vos appareils…</string>
     <string name="history_retrying">Impossible de charger les messages précédents. Nous réessaierons automatiquement.</string>
     <string name="link_device_this_title">Associer cet appareil</string>
@@ -75,7 +77,7 @@
     <string name="link_request_review">Examiner</string>
     <string name="link_request_not_now">Pas maintenant</string>
     <string name="link_request_preparing">Vérification du nouvel appareil…</string>
-    <string name="link_request_compare_detail">Vérifiez que les deux appareils affichent les mêmes émojis dans le même ordre. S’ils diffèrent, appuyez sur « Pas maintenant ».</string>
+    <string name="link_request_compare_detail">Vérifiez que l’appareil dans votre main affiche les mêmes émojis dans le même ordre. Ne les lisez à personne et n’envoyez pas de capture d’écran.</string>
     <string name="link_request_label">Nom de l’appareil</string>
     <string name="link_request_label_too_long">Ce nom est trop long.</string>
     <string name="link_request_add_to_chats">Ajouter à toutes mes discussions</string>
@@ -91,6 +93,14 @@
     <string name="link_request_linked">Le nouvel appareil est associé.</string>
     <string name="link_request_added_elsewhere">%1$s a été ajouté par %2$s.</string>
     <string name="link_request_added_elsewhere_unnamed">L’appareil a été ajouté par un autre de vos appareils.</string>
+    <string name="link_request_notice">Un nouvel appareil demande à être associé à votre compte.</string>
+    <string name="link_request_notice_other_profile">Un nouvel appareil demande à être associé à %1$s.</string>
+    <string name="link_request_repeated_notice">Demandes d’association répétées : quelqu’un a peut-être votre clé.</string>
+    <string name="link_request_repeated_notice_other_profile">Demandes d’association répétées pour %1$s : quelqu’un a peut-être votre clé.</string>
+    <string name="link_request_repeated_title">Demandes d’association répétées</string>
+    <string name="link_request_repeated_detail">Des appareils ont demandé à être associés à ce compte plusieurs fois en moins d’une heure. Quelqu’un a peut-être votre clé privée, l’association n’est donc pas proposée. Si vous avez fait ces demandes vous-même, réessayez plus tard depuis un seul appareil.</string>
+    <string name="link_request_dont_link">Ne pas associer</string>
+    <string name="link_request_review_devices">Vérifier les appareils</string>
     <string name="device_detail_rename">Renommer</string>
     <string name="device_detail_rename_detail">Le nom affiché pour cet appareil sur tous vos appareils.</string>
     <string name="device_detail_keep">Conserver même s’il est inactif</string>
@@ -109,7 +119,7 @@
     <string name="devices_leftover_chats_detail">Ces discussions ne peuvent pas appliquer la suppression depuis vos appareils. Un administrateur peut y supprimer l’appareil.</string>
     <string name="devices_key_refresh_overdue">Cet appareil n’a pas pu renouveler ses clés d’invitation. Après 30 jours, il pourrait ne plus pouvoir être ajouté à de nouvelles discussions. Gardez l’application ouverte sur vos appareils pour qu’ils se mettent à jour.</string>
     <string name="devices_stalled">Cet appareil ne peut plus suivre vos autres appareils. Réparez son association pour continuer.</string>
-    <string name="device_repair_confirm_again">Ouvrez les appareils liés dans les paramètres et confirmez de nouveau la réparation avant de lier cet appareil.</string>
+    <string name="device_repair_confirm_again">Ouvrez « Appareils » dans les paramètres et confirmez de nouveau la réparation avant de lier cet appareil.</string>
     <string name="device_repair_try_link_again">Le lien a été réinitialisé. Réessayez de lier cet appareil pour terminer la réparation.</string>
     <string name="devices_repair">Réparer l’association de cet appareil</string>
     <string name="devices_repair_confirm">L’association actuelle sera supprimée pour que vous puissiez associer à nouveau cet appareil. Vous conserverez vos discussions, messages, brouillons et réglages. L’ancienne association ne pourra pas être rétablie, même si vous annulez la nouvelle.</string>
@@ -123,8 +133,8 @@
     <string name="sign_in_signed_out">N’est plus connecté</string>
     <string name="sign_in_question_new">Était-ce vous ?</string>
     <string name="sign_in_question_before">Avez-vous toujours cet appareil ?</string>
-    <string name="sign_in_detail_new">Quelqu’un s’est connecté sur un autre appareil. Si c’était vous, vous pouvez associer cet appareil. Sinon, appuyez sur « Ce n’était pas moi ».</string>
-    <string name="sign_in_detail_before">Cet appareil était connecté au compte avant celui-ci. Si vous l’avez toujours, associez cet appareil depuis celui-là. Sinon, vous pouvez repartir de zéro.</string>
+    <string name="sign_in_detail_new">Quelqu’un s’est connecté sur un autre appareil. Si c’était vous, vous pouvez associer cet appareil. Si c’est une de vos applications que vous ne voulez pas associer, appuyez sur « C’est à moi, ne pas associer ». Si ce n’était pas vous, appuyez sur « Ce n’était pas moi ».</string>
+    <string name="sign_in_detail_before">Cet appareil était connecté au compte avant celui-ci. Si vous l’avez toujours, associez cet appareil depuis celui-là ou repartez de zéro. Si vous ne le reconnaissez pas, appuyez sur « Je ne le reconnais pas ».</string>
     <string name="sign_in_previously_linked">Un appareil précédemment associé ici est absent de la liste actuelle de cet appareil. Ouvrez les deux appareils pour vérifier l’association.</string>
     <string name="sign_in_reject">Ce n’était pas moi</string>
     <string name="sign_in_reject_confirm">Cette connexion sera signalée sur tous vos appareils comme ne venant pas de vous, et un avertissement de sécurité s’affichera. L’appareil restera connecté et votre clé restera la même.</string>
@@ -136,10 +146,10 @@
     <string name="start_fresh_title">Non, repartir de zéro</string>
     <string name="start_fresh_detail">Utilisez cet appareil seul pour le moment. Vous pourrez toujours l’associer depuis un appareil sur lequel vous vous êtes déjà connecté.</string>
     <string name="started_fresh_note">Cet appareil est reparti de zéro. Seules les discussions auxquelles vous êtes invité à partir de maintenant apparaissent ici.</string>
-    <string name="compromise_warning_title">Avertissement de sécurité</string>
-    <string name="compromise_warning_rejected">Une connexion à ce compte a été signalée comme n’étant pas la vôtre. Quelqu’un d’autre détient peut-être la clé de ce compte ou une session avec son signataire.</string>
-    <string name="compromise_warning_foreign_key">Cet appareil a trouvé dans son propre emplacement des clés d’invitation qu’il n’a pas créées et les a remplacées. Quelqu’un d’autre détient peut-être la clé de ce compte ou une session avec son signataire.</string>
-    <string name="compromise_warning_dismiss">Marquer comme vu</string>
+    <string name="compromise_warning_title">Quelqu’un d’autre a peut-être votre clé secrète</string>
+    <string name="compromise_warning_rejected">Une connexion à ce compte a été signalée comme n’étant pas la vôtre.</string>
+    <string name="compromise_warning_foreign_key">Cet appareil a trouvé dans son propre emplacement des clés d’invitation qu’il n’a pas créées.</string>
+    <string name="compromise_warning_dismiss">Masquer sur cet appareil</string>
     <string name="compromise_warning_dismiss_detail">Masque cet avertissement sur cet appareil uniquement. Cela ne supprime aucun appareil, ne refuse aucune connexion et ne protège pas votre clé.</string>
     <string name="device_move_section">Déplacement de cet appareil</string>
     <string name="device_move_waiting">En attente de l’ajout par les autres appareils</string>
@@ -158,8 +168,8 @@
     <string name="link_offer_reminder">Associez cet appareil pour voir les discussions de vos autres appareils.</string>
     <string name="link_request_default_label">Nouvel appareil</string>
     <string name="link_request_options">Options avancées</string>
-    <string name="link_request_options_detail">Choisissez le nom de l’appareil et indiquez si vous souhaitez partager les discussions et leur historique.</string>
-    <string name="explanation_link_request_options">Ouvre le nom du nouvel appareil et ce qu’il reçoit.</string>
+    <string name="link_request_options_detail">Indiquez si vous souhaitez partager les discussions et leur historique.</string>
+    <string name="explanation_link_request_options">Ouvre ce que reçoit le nouvel appareil.</string>
     <string name="device_move_advanced">Avancé</string>
     <string name="setup_device_link_next">Après la connexion, vous pourrez associer cet appareil pour y retrouver les discussions de vos autres appareils.</string>
     <string name="unlinked_account_remove_for">Retirer %1$s de cet appareil</string>
@@ -177,4 +187,42 @@
     <string name="unlinked_remove_sign_in_detail">Cet appareil a été dissocié. Voulez-vous supprimer de cet appareil les discussions et les données de ce profil, puis vous connecter avec la clé saisie ? Vos autres appareils conserveront leurs données.</string>
     <string name="invite_decline_wait_for_sync">Attendez que cette discussion soit synchronisée, puis appuyez de nouveau sur « Refuser ».</string>
     <string name="invite_decline_check_delivery">Votre dernière modification du groupe n’est pas parvenue à tous les relais. Avant de réessayer, vérifiez si un avertissement de livraison apparaît dans cette discussion.</string>
+    <string name="sign_in_claim">Se présente comme : %1$s</string>
+    <string name="sign_in_mine">C’est à moi, ne pas associer</string>
+    <string name="sign_in_mine_state">À vous, non associé</string>
+    <string name="sign_in_dont_recognize">Je ne le reconnais pas</string>
+    <string name="compromise_warning_explainer">Votre clé peut se connecter n’importe où et ne peut être ni changée ni annulée. White Noise tient les appareils inconnus à l’écart de vos appareils associés, mais ne peut pas leur couper l’accès.</string>
+    <string name="compromise_warning_steps_title">Que faire</string>
+    <string name="compromise_warning_step_remove">1. Retirez tout appareil que vous ne reconnaissez pas.</string>
+    <string name="compromise_warning_step_signer">2. Si vous utilisez une application de signature, ouvrez ses applications connectées et retirez celles que vous ne reconnaissez pas.</string>
+    <string name="compromise_warning_step_move">3. Passez à un nouveau compte. Vos contacts devront l’ajouter.</string>
+    <string name="compromise_alert_review">Vérifier les appareils</string>
+    <string name="compromise_warning_hide_failed">Impossible de masquer l’avertissement. Réessayez.</string>
+    <string name="sign_in_alert_review_banner">Un appareil que vous n’avez pas associé s’est connecté à votre compte. Vérifiez s’il est à vous.</string>
+    <string name="sign_in_alert_review_action">Vérifier</string>
+    <string name="sign_in_alert_badge_review">Connexion à vérifier</string>
+    <string name="sign_in_alert_badge_compromise">Avertissement de sécurité</string>
+    <string name="sign_in_alert_review_body">Un appareil que vous n’avez pas associé s’est connecté à votre compte. Ouvrez White Noise pour vérifier s’il est à vous.</string>
+    <string name="sign_in_alert_review_public">Connexion à vérifier</string>
+    <string name="sign_in_alert_compromise_body">Ouvrez White Noise pour voir ce qui s’est passé et que faire.</string>
+    <string name="sign_in_alert_compromise_public">Vérification de sécurité nécessaire</string>
+    <string name="device_detail_remove_stolen">Si cet appareil a été perdu ou volé, la personne qui l’a en main a peut-être encore votre clé.</string>
+    <plurals name="sign_in_alert_review_title">
+        <item quantity="one">%d nouvelle connexion à vérifier</item>
+        <item quantity="many">%d nouvelles connexions à vérifier</item>
+        <item quantity="other">%d nouvelles connexions à vérifier</item>
+    </plurals>
+    <string name="link_request_expired_attempt">Un appareil a tenté de se lier le %1$s.</string>
+    <string name="link_consent_requested_at">Demande à %1$s</string>
+    <string name="link_consent_access">Un appareil associé peut lire vos discussions, recevoir leur historique et envoyer des messages en votre nom.</string>
+    <string name="link_consent_have_device">Continuez uniquement si vous avez commencé à configurer White Noise sur un appareil que vous avez devant vous.</string>
+    <string name="link_consent_scam">White Noise ne vous contactera jamais pour vous demander d’associer un appareil ou de vérifier des émojis. Si quelqu’un vous l’a demandé, c’est une arnaque.</string>
+    <string name="link_consent_on_call">Vous êtes en communication. Les escrocs guident souvent les victimes par téléphone pour associer un appareil.</string>
+    <string name="link_consent_with_me">Le nouvel appareil est avec moi</string>
+    <string name="link_consent_did_not_start">Je n’ai pas lancé cette demande</string>
+    <string name="link_consent_someone_asked">Quelqu’un m’a demandé de le faire</string>
+    <string name="link_consent_unlock">Déverrouillez ce téléphone pour comparer les émojis</string>
+    <string name="link_consent_lock_required">Configurez un verrouillage de l’écran sur ce téléphone pour associer un appareil.</string>
+    <string name="link_consent_report_guidance">Association refusée. Ouvrez la connexion dans Appareils pour la signaler.</string>
+    <string name="link_touch_blocked">Une autre application recouvre White Noise. Fermez sa fenêtre et réessayez.</string>
 </resources>

@@ -109,7 +109,8 @@ internal fun readStagedDocument(
     return result
 }
 
-private fun prepareStagingDirectory(directory: File): Boolean {
+/** Creates [directory] private to the app, refusing a symbolic link; reports whether it is now a usable directory. */
+internal fun prepareStagingDirectory(directory: File): Boolean {
     if (Files.isSymbolicLink(directory.toPath())) return false
     Files.createDirectories(directory.toPath())
     val isDirectory = Files.isDirectory(directory.toPath(), LinkOption.NOFOLLOW_LINKS)

@@ -59,7 +59,8 @@ class KeyboardSafePopupCoverageTest {
         )
         assertTrue(
             "preview hosts without a platform dispatcher still need Back dismissal",
-            "BackHandler(enabled = true) { requestDismiss() }" in body,
+            "BackHandler(enabled = true, onBack = onBack)" in body &&
+                "if (!currentConsumeBack()) requestDismiss()" in body,
         )
     }
 
@@ -162,6 +163,7 @@ class KeyboardSafePopupCoverageTest {
         listOf(
             "sourceBounds = pressedBounds",
             "touchY = pressedY",
+            "touchX = pressedX",
             "actions = actions",
             "previewReady = previewReady",
             "onDismiss = onDismissRequest",
@@ -181,17 +183,15 @@ class KeyboardSafePopupCoverageTest {
         )
         assertTrue(
             "The travel range must be the full-height frame the system bars leave behind",
-            "windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout))" in focusedBody &&
+            "val frameInsets = WindowInsets.systemBars.union(WindowInsets.displayCutout)" in focusedBody &&
+                "windowInsetsPadding(frameInsets)" in focusedBody &&
                 "frameHeightPx = constraints.maxHeight" in focusedBody,
         )
         assertTrue(
             "Frozen message bounds and the original touch point must own where the stack rests",
             "anchorCenterPx = sourceBounds?.center?.y ?: touchY?.roundToInt()" in focusedBody &&
                 "topInsetPx = topInsetPx" in focusedBody &&
-                (
-                    "WindowInsets.systemBars.union(WindowInsets.displayCutout)" +
-                        ".getTop(LocalDensity.current)"
-                ) in focusedBody &&
+                "frameInsets.getTop(density)" in focusedBody &&
                 "previewCenterInStackPx = previewCenterInStackPx" in focusedBody,
         )
         assertTrue(

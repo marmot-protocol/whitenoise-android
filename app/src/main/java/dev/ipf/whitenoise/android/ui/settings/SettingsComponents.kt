@@ -30,6 +30,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.Explanation
+import dev.ipf.whitenoise.android.ui.common.SurfaceMorphCard
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
@@ -81,20 +82,28 @@ internal var SemanticsPropertyReceiver.settingsRow by SettingsRowKey
  * No theme, preference, or route changes occur here. Non-AMOLED rows keep Material's segmented
  * gap; AMOLED rows touch and share one-pixel seams.
  */
-@Suppress("FunctionNaming")
+@Suppress("FunctionNaming", "LongParameterList")
 @Composable
 internal fun SettingsGroup(
     modifier: Modifier = Modifier,
     containerColor: Color = MaterialTheme.colorScheme.surfaceContainerLowest,
     destination: Any? = null,
     surface: Any = destination ?: Unit,
+    onMeasured: ((SurfaceMorphCard?) -> Unit)? = null,
     content: SettingsGroupScope.() -> Unit,
 ) {
     val group = SettingsGroupScope().apply(content)
     val gap = WhiteNoiseListItemDefaults.segmentedGap
     val page = LocalSettingsCardMorph.current?.page
     val token = remember(page, destination, surface) { Any() }
-    val native = rememberSettingsNativeSurface(destination, containerColor, surface, registrationToken = token)
+    val native =
+        rememberSettingsNativeSurface(
+            destination,
+            containerColor,
+            surface,
+            registrationToken = token,
+            onMeasured = onMeasured,
+        )
     Column(
         modifier
             .fillMaxWidth()
@@ -275,7 +284,7 @@ internal fun SettingsLink(
                     settingsRow = Unit
                 },
         enabled = editable,
-        leadingContent = settingsLeadingSlot(leading, editable),
+        leadingContent = settingsLeadingSlot(leading, editable, destructive),
         supportingContent = summary?.let { { SettingsRowSupportingText(it, editable) } },
         trailingContent = {
             SettingsRowTrailing(busy) {
@@ -294,7 +303,7 @@ internal fun SettingsLink(
 /**
  * Row that performs an action in place instead of opening a destination, so it carries no chevron.
  *
- * [destructive] actions use the error role for the title; callers tint any leading icon to match.
+ * [destructive] actions use the error role for the title and for a [SettingsLeadingIcon] in the leading slot.
  */
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable
@@ -310,6 +319,8 @@ internal fun SettingsAction(
     opensRoute: Boolean = false,
     leading: (@Composable () -> Unit)?,
     routeKey: Any? = null,
+    titleCanContainEmoji: Boolean = true,
+    supportingContent: (@Composable () -> Unit)? = null,
 ) {
     val (origin, navigate) = rememberSettingsRouteClick(context, routeKey, onClick)
     ListItem(
@@ -326,10 +337,10 @@ internal fun SettingsAction(
                     settingsRow = Unit
                 },
         enabled = enabled,
-        leadingContent = settingsLeadingSlot(leading, enabled),
-        supportingContent = subtitle?.let { { SettingsRowSupportingText(it, enabled) } },
+        leadingContent = settingsLeadingSlot(leading, enabled, destructive),
+        supportingContent = supportingContent ?: subtitle?.let { { SettingsRowSupportingText(it, enabled) } },
         colors = settingsRowColors(context),
-        content = { SettingsRowTitle(title, enabled, destructive) },
+        content = { SettingsRowTitle(title, enabled, destructive, titleCanContainEmoji) },
     )
 }
 

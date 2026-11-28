@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseElevation
 
 /** Geometry the kept-message card and its parts share. */
 internal object KeptMessageMetrics {
@@ -67,7 +68,7 @@ internal object KeptMessageMetrics {
     val PaginationGap = 8.dp
 
     /** Resting elevation of the floating card. */
-    val Elevation = 6.dp
+    val Elevation = WhiteNoiseElevation.KeptCard
 
     /** Lines of plain text the collapsed preview shows. */
     const val COLLAPSED_PREVIEW_LINES = 4

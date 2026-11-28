@@ -21,8 +21,8 @@ import org.robolectric.annotation.Config
 class QuickAccountSwitchingNativeTest {
     private val context: Application = RuntimeEnvironment.getApplication()
 
-    /** A tap publishes the target's native local snapshot before its one destination confirmation. */
-    @Test fun switchUsesNativeActivationAndConfirmsOnlyTheActualAccount() =
+    /** A tap reaches the target's native local snapshot through the production activation owner. */
+    @Test fun switchUsesNativeActivation() =
         runBlocking {
             val fixture =
                 NotificationBootstrapTestFixture(
@@ -35,39 +35,26 @@ class QuickAccountSwitchingNativeTest {
                 val app = fixture.appState
                 app.updateQuickAccountSwitching(true)
                 val nativeReads = fixture.directChatListCalls.get()
-                val titleAtTap = app.accountDisplayNameCached(B.accountIdHex)
-                val notices = mutableListOf<String>()
                 var activation: Deferred<Boolean>? = null
-                var accountAtNotice: String? = null
-                app.requestQuickAccountSwitchTo(
-                    targetLabel = B.label,
-                    requestSwitch = { target, activated ->
-                        activation =
-                            async {
-                                app.setActiveAccount(
-                                    target,
-                                    preloadPolicy = AccountSwitchPreloadPolicy.INTERACTIVE_LOCAL_ROWS,
-                                    onActivated = activated,
-                                )
-                            }
-                    },
-                    onSwitched = { title ->
-                        accountAtNotice = app.activeAccountRef
-                        notices += title
-                    },
-                )
+                app.requestQuickAccountSwitchTo(B.label) { target ->
+                    activation =
+                        async {
+                            app.setActiveAccount(
+                                target,
+                                preloadPolicy = AccountSwitchPreloadPolicy.INTERACTIVE_LOCAL_ROWS,
+                            )
+                        }
+                }
                 assertTrue(withTimeout(5_000) { checkNotNull(activation).await() })
                 assertEquals(B.label, app.activeAccountRef)
-                assertEquals(B.label, accountAtNotice)
-                assertEquals(listOf(titleAtTap), notices)
                 assertEquals(nativeReads + 1, fixture.directChatListCalls.get())
             } finally {
                 fixture.close()
             }
         }
 
-    /** Rejected activation returns no confirmation and leaves the original identity active. */
-    @Test fun rejectedNativeActivationDoesNotClaimSwitchSuccess() =
+    /** Rejected activation leaves the original identity active. */
+    @Test fun rejectedNativeActivationKeepsOriginalAccount() =
         runBlocking {
             val fixture =
                 NotificationBootstrapTestFixture(
@@ -80,20 +67,11 @@ class QuickAccountSwitchingNativeTest {
                 val app = fixture.appState
                 app.updateQuickAccountSwitching(true)
                 var activation: Deferred<Boolean>? = null
-                val notices = mutableListOf<String>()
-                app.requestQuickAccountSwitchTo(
-                    targetLabel = B.label,
-                    requestSwitch = { target, activated ->
-                        activation =
-                            async {
-                                app.setActiveAccount(target, shouldActivate = { false }, onActivated = activated)
-                            }
-                    },
-                    onSwitched = { notices += it },
-                )
+                app.requestQuickAccountSwitchTo(B.label) { target ->
+                    activation = async { app.setActiveAccount(target, shouldActivate = { false }) }
+                }
                 assertFalse(withTimeout(5_000) { checkNotNull(activation).await() })
                 assertEquals(A.label, app.activeAccountRef)
-                assertTrue(notices.isEmpty())
             } finally {
                 fixture.close()
             }
@@ -118,17 +96,13 @@ class QuickAccountSwitchingNativeTest {
                     .apply { isAccessible = true }
                     .invoke(app, listOf(A, C))
 
-                app.requestQuickAccountSwitchTo(B.label, { _, _ -> error("Removed target must reject") }, {})
+                app.requestQuickAccountSwitchTo(B.label) { error("Removed target must reject") }
 
                 var activation: Deferred<Boolean>? = null
-                app.requestQuickAccountSwitchTo(
-                    targetLabel = C.label,
-                    requestSwitch = { target, activated ->
-                        assertEquals(C.label, target)
-                        activation = async { app.setActiveAccount(target, onActivated = activated) }
-                    },
-                    onSwitched = {},
-                )
+                app.requestQuickAccountSwitchTo(C.label) { target ->
+                    assertEquals(C.label, target)
+                    activation = async { app.setActiveAccount(target) }
+                }
                 assertTrue(withTimeout(5_000) { checkNotNull(activation).await() })
                 assertEquals(C.label, app.activeAccountRef)
             } finally {

@@ -1,0 +1,92 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PlaybackStrip.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "PlaybackStrip",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PlaybackStrip.kt",
+        "anchor": "fun PlaybackStrip(",
+        "test_ids": [
+          "MED-028",
+          "TTS-001"
+        ]
+      },
+      {
+        "surface": "PlaybackStripRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PlaybackStrip.kt",
+        "anchor": "fun PlaybackStripRow(",
+        "test_ids": [
+          "MED-028",
+          "TTS-001"
+        ]
+      },
+      {
+        "surface": "PlaybackStripProgressEdge",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PlaybackStrip.kt",
+        "anchor": "fun PlaybackStripProgressEdge(",
+        "test_ids": [
+          "MED-028",
+          "TTS-001"
+        ]
+      },
+      {
+        "surface": "PlaybackStripInfo",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PlaybackStrip.kt",
+        "anchor": "fun PlaybackStripInfo(",
+        "test_ids": [
+          "MED-028",
+          "TTS-001"
+        ]
+      },
+      {
+        "surface": "PlaybackStripPlayButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PlaybackStrip.kt",
+        "anchor": "fun PlaybackStripPlayButton(",
+        "test_ids": [
+          "MED-028",
+          "TTS-001"
+        ]
+      },
+      {
+        "surface": "PlaybackStripLeadingSlot",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PlaybackStrip.kt",
+        "anchor": "fun PlaybackStripLeadingSlot(",
+        "test_ids": [
+          "MED-028",
+          "TTS-001"
+        ]
+      },
+      {
+        "surface": "PlaybackSpeedChip",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PlaybackStrip.kt",
+        "anchor": "fun PlaybackSpeedChip(",
+        "test_ids": [
+          "MED-028",
+          "TTS-001"
+        ]
+      },
+      {
+        "surface": "PlaybackStripCloseButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PlaybackStrip.kt",
+        "anchor": "fun PlaybackStripCloseButton(",
+        "test_ids": [
+          "MED-028",
+          "TTS-001"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.tts_bar_return_to_source",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PlaybackStrip.kt",
+        "anchor": "R.string.tts_bar_return_to_source",
+        "test_ids": [
+          "MED-028",
+          "TTS-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

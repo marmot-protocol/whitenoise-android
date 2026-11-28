@@ -46,12 +46,15 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.Explanation
+import dev.ipf.whitenoise.android.ui.common.IdentityMonogram
 import dev.ipf.whitenoise.android.ui.common.RandomProfileNameButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
@@ -295,8 +298,14 @@ internal fun SignUpContent(
                         modifier = Modifier.fillMaxWidth().testTag("onboarding.sign_up.about"),
                         enabled = editable,
                         label = { Text(stringResource(R.string.about)) },
-                        placeholder = { Text(stringResource(R.string.signup_about_prompt)) },
-                        lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 3, maxHeightInLines = 6),
+                        placeholder = {
+                            Text(
+                                stringResource(R.string.signup_about_prompt),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        },
+                        lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 1, maxHeightInLines = 6),
                     )
                 }
                 if (offline) OnboardingOfflineNotice(onSubmit)
@@ -309,10 +318,11 @@ internal fun SignUpContent(
                         else -> null
                     }
                 error?.let {
-                    Text(
-                        stringResource(it),
-                        color = MaterialTheme.colorScheme.error,
+                    WhiteNoiseCallout(
+                        text = stringResource(it),
                         modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                        icon = R.drawable.ic_error,
+                        isError = true,
                     )
                 }
                 if (stage == SignUpStage.PhotoFailed || stage == SignUpStage.PublishFailed) {
@@ -340,7 +350,7 @@ internal fun SignUpAvatar(
         Image(photo, contentDescription = null, modifier = modifier, contentScale = ContentScale.Crop)
     } else {
         Box(modifier.background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
-            Text(name.trim().firstOrNull()?.uppercase() ?: "?", style = MaterialTheme.typography.headlineMedium)
+            IdentityMonogram(name, style = MaterialTheme.typography.headlineMedium, blank = "?")
         }
     }
 }

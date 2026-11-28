@@ -4,14 +4,18 @@ import android.content.Context
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.settings.DataUsageScreen
@@ -70,7 +74,34 @@ class DataUsageScreenScreenshotTest {
             preview = true,
         )
 
-    /** Renders the screen for one account on cleared preferences and records the window. */
+    /** Videos' network dialog at the defaults: Wi-Fi on with a filled row, the other networks off. */
+    @Test
+    fun dataUsageNetworkDialogLight() {
+        capture("data_usage_network_dialog_light", darkTheme = false, networkDialog = true)
+    }
+
+    /** The network dialog in AMOLED. */
+    @Test
+    fun dataUsageNetworkDialogAmoled() {
+        capture("data_usage_network_dialog_amoled", darkTheme = true, amoled = true, networkDialog = true)
+    }
+
+    /** The network dialog in RTL at 200 %, where switch rows grow with their titles. */
+    @Test
+    fun dataUsageNetworkDialogRtlLargeFont() =
+        capture(
+            "data_usage_network_dialog_rtl_large",
+            darkTheme = false,
+            fontScale = 2f,
+            layoutDirection = LayoutDirection.Rtl,
+            networkDialog = true,
+        )
+
+    /**
+     * Renders the screen for one account on cleared preferences and records the window, or, with [networkDialog],
+     * opens Videos' network dialog and records the dialog.
+     */
+    @Suppress("LongParameterList")
     private fun capture(
         name: String,
         darkTheme: Boolean,
@@ -78,6 +109,7 @@ class DataUsageScreenScreenshotTest {
         fontScale: Float = 1f,
         layoutDirection: LayoutDirection = LayoutDirection.Ltr,
         preview: Boolean = false,
+        networkDialog: Boolean = false,
     ) {
         val appState = testAppState(name)
         composeRule.setContent {
@@ -92,6 +124,12 @@ class DataUsageScreenScreenshotTest {
             composeRule
                 .onNodeWithTag("settings.list")
                 .performScrollToNode(hasTestTag("data_usage.public_jpeg_previews"))
+        }
+        if (networkDialog) {
+            composeRule.onNodeWithText(context.getString(R.string.download_videos)).performClick()
+            composeRule.waitForIdle()
+            composeRule.onNode(isDialog()).captureRoboImage("src/test/snapshots/$name.png")
+            return
         }
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
     }

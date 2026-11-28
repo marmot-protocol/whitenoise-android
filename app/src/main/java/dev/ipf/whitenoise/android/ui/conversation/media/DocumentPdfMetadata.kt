@@ -1,0 +1,109 @@
+package dev.ipf.whitenoise.android.ui.conversation.media
+
+import dev.ipf.whitenoise.android.media.pdf.PdfMetadataResult
+import dev.ipf.whitenoise.android.media.pdf.PdfMetadataScrubber
+import dev.ipf.whitenoise.android.state.PendingAttachment
+import dev.ipf.whitenoise.android.state.rememberingNativeDraftBody
+import dev.ipf.whitenoise.android.ui.conversation.DocumentReadFailure
+import java.io.IOException
+import java.nio.file.Files
+import java.nio.file.attribute.PosixFilePermissions
+
+// A staged snapshot is owner-read-only once staged, so the scrub lends the owner write bit for the rewrite only.
+private const val SNAPSHOT_READ_ONLY = "r--------"
+private const val SNAPSHOT_SCRUBBING = "rw-------"
+
+/**
+ * Removes private metadata from freshly read Files [bytes] the caller owns: a video's as [documentVideoAction]
+ * decides, then a PDF's (#3377). Returns whether they may be sent. A PDF whose metadata must stay, because it is
+ * signed, encrypted or cannot be rewritten exactly, keeps its original bytes; the send asks before it goes.
+ */
+internal fun removeDocumentMetadataInPlace(
+    mediaType: String,
+    bytes: ByteArray,
+    keepPdfMetadata: Boolean,
+): Boolean =
+    removeDocumentVideoMetadataInPlace(mediaType, bytes).also {
+        if (it && !keepPdfMetadata) PdfMetadataScrubber.scrub(bytes)
+    }
+
+/** Removes private metadata from this staged Files snapshot in place, as [removeDocumentMetadataInPlace] does. */
+internal fun StagedUploadSource.removeDocumentMetadata(
+    mediaType: String,
+    keepPdfMetadata: Boolean,
+): Boolean {
+    val accepted = removeDocumentVideoMetadata(mediaType)
+    if (accepted && !keepPdfMetadata) scrubPdfMetadata()
+    return accepted
+}
+
+/**
+ * Removes PDF metadata from this staged snapshot in place. The size is unchanged, so the budget that admitted the
+ * snapshot stays exact, and the snapshot is always returned to owner-read-only.
+ */
+internal fun StagedUploadSource.scrubPdfMetadata() {
+    val path = file.toPath()
+    try {
+        Files.setPosixFilePermissions(path, PosixFilePermissions.fromString(SNAPSHOT_SCRUBBING))
+        PdfMetadataScrubber.scrub(file)
+    } catch (_: IOException) {
+        // Unchanged: a PDF that still carries metadata is caught by the send's check.
+    } finally {
+        runCatching { Files.setPosixFilePermissions(path, PosixFilePermissions.fromString(SNAPSHOT_READ_ONLY)) }
+    }
+}
+
+/**
+ * Re-checks prepared Files drafts before a send reuses them: videos as [removePreparedDocumentVideoMetadata]
+ * does, then PDFs, including drafts an older app version saved before PDFs were cleaned. A draft's bytes are
+ * shared with its native draft, so a PDF is cleaned on a copy. Call off Main.
+ */
+internal fun <K> removePreparedDocumentMetadata(
+    prepared: Map<K, PendingAttachment>,
+    keepPdfMetadata: Set<K> = emptySet(),
+): PreparedVideoCheck<K> {
+    val checked = removePreparedDocumentVideoMetadata(prepared)
+    return checked.copy(
+        ready =
+            checked.ready.mapValues { (key, attachment) ->
+                if (key in keepPdfMetadata) attachment else attachment.withoutPdfMetadata()
+            },
+    )
+}
+
+/** This attachment with PDF metadata removed on a copy, remembering the body its native draft still holds. */
+private fun PendingAttachment.withoutPdfMetadata(): PendingAttachment {
+    val clean = if (sourceFile != null) null else PdfMetadataScrubber.cleanedCopyOrNull(plaintextBytes)
+    val unchanged = clean == null || clean === plaintextBytes
+    return if (unchanged) this else rememberingNativeDraftBody().copy(plaintextBytes = checkNotNull(clean))
+}
+
+/** What this attachment's content says about PDF metadata. Reads its staged file when it has one. Call off Main. */
+internal fun PendingAttachment.pdfMetadata(): PdfMetadataResult =
+    sourceFile?.let { PdfMetadataScrubber.inspect(it.file) } ?: PdfMetadataScrubber.inspect(plaintextBytes)
+
+/**
+ * Drops the attachments from [from] on that are PDFs still carrying metadata, adding
+ * [DocumentReadFailure.PDF_METADATA] for each: one whose removal failed, and one that keeps it unless the person
+ * chose to send it as it is, [keepsMetadata]. Returns the in-memory bytes it dropped, so the caller can give them
+ * back to its budget.
+ * Call off Main.
+ */
+internal fun MutableList<PendingAttachment>.dropUnconfirmedPdfMetadata(
+    from: Int,
+    failures: MutableSet<DocumentReadFailure>,
+    keepsMetadata: Boolean,
+): Long {
+    var dropped = 0L
+    val iterator = listIterator(from)
+    while (iterator.hasNext()) {
+        val attachment = iterator.next()
+        val metadata = attachment.pdfMetadata()
+        if (!keepsMetadata && (metadata is PdfMetadataResult.Removable || metadata is PdfMetadataResult.Refused)) {
+            iterator.remove()
+            failures += DocumentReadFailure.PDF_METADATA
+            dropped += attachment.inMemoryBytes?.size ?: 0
+        }
+    }
+    return dropped
+}

@@ -1,11 +1,24 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AccountSummaryFfi
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 internal data class SignOutOutcome(
     val nextActiveRef: String?,
     val phase: AppPhase,
 )
+
+/** Rethrows cancellation after Android cleanup, preserving the native cancellation as the primary cause. */
+internal suspend fun rethrowSignOutCancellation(
+    native: CancellationException?,
+    boundary: CancellationException?,
+) {
+    val cancellation = native ?: boundary
+    if (cancellation != null) throw cancellation
+    currentCoroutineContext().ensureActive()
+}
 
 /**
  * The active-account ref and app phase after signing [activeRef] out. Sign-out

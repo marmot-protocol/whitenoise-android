@@ -32,9 +32,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -66,15 +64,20 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetInset
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
+import dev.ipf.whitenoise.android.ui.theme.amoledSelectedChipBorder
+import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
@@ -100,6 +103,7 @@ internal val disappearingGridSecs: List<Long> = disappearingPresetSecs.filter { 
 private const val DEFAULT_CHIP_COLUMNS = 3
 private const val COMPACT_FONT_SCALE = 1.3f
 private val compactWindowWidth = 340.dp
+private val timerChoiceMinHeight = 48.dp
 
 private const val PAGE_SLIDE_WIDTH_DIVISOR = 4
 
@@ -231,6 +235,7 @@ internal fun DisappearingMessagesPickerSheet(
     }
 }
 
+/** First page of the disappearing-messages sheet: the preset durations and the custom entry. */
 @Composable
 @Suppress("LongParameterList")
 private fun DisappearingPresetsPage(
@@ -245,34 +250,33 @@ private fun DisappearingPresetsPage(
     onConfirm: (Long) -> Unit,
     onCancelConfirm: () -> Unit,
 ) {
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = WhiteNoiseSpacing.Section)
-            .padding(bottom = WhiteNoiseSpacing.Section),
-        verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
-    ) {
-        DisappearingSheetTitle(stringResource(R.string.disappearing_messages))
-        Text(
-            explainer,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        AnimatedVisibility(
-            visible = confirmOpen,
-            enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
-            exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut(),
+    Column(Modifier.fillMaxWidth().padding(bottom = WhiteNoiseSheetInset)) {
+        WhiteNoiseSheetHeader(stringResource(R.string.disappearing_messages))
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSheetInset),
+            verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
         ) {
-            DisappearingPruneConfirm(
-                secs = confirmSecs,
-                identity = confirmIdentity,
-                enabled = confirmEnabled && confirmOpen,
-                onConfirm = { onConfirm(confirmSecs) },
-                onCancel = onCancelConfirm,
+            Text(
+                explainer,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            AnimatedVisibility(
+                visible = confirmOpen,
+                enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
+                exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut(),
+            ) {
+                DisappearingPruneConfirm(
+                    secs = confirmSecs,
+                    identity = confirmIdentity,
+                    enabled = confirmEnabled && confirmOpen,
+                    onConfirm = { onConfirm(confirmSecs) },
+                    onCancel = onCancelConfirm,
+                )
+            }
+            Spacer(Modifier.size(WhiteNoiseSpacing.Related))
+            DisappearingPresetGrid(selected, onChoose, onCustom)
         }
-        Spacer(Modifier.size(WhiteNoiseSpacing.Related))
-        DisappearingPresetGrid(selected, onChoose, onCustom)
     }
 }
 
@@ -334,16 +338,6 @@ private fun disappearingChipColumns(): Int =
     }
 
 @Composable
-private fun DisappearingSheetTitle(text: String) {
-    Text(
-        text,
-        style = MaterialTheme.typography.titleLarge,
-        color = MaterialTheme.colorScheme.onSurface,
-        modifier = Modifier.semantics { heading() },
-    )
-}
-
-@Composable
 private fun ChipRow(content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) {
     Row(
         Modifier.fillMaxWidth(),
@@ -353,7 +347,7 @@ private fun ChipRow(content: @Composable androidx.compose.foundation.layout.RowS
     )
 }
 
-/** A compact, square-cornered choice; the selected one fills with the accent and gains a check. */
+/** A compact timer choice with a gray selection outline on AMOLED and an accent fill elsewhere. */
 @Composable
 private fun DisappearingChip(
     label: String,
@@ -364,35 +358,41 @@ private fun DisappearingChip(
     enabled: Boolean = true,
 ) {
     val scheme = MaterialTheme.colorScheme
+    val amoled = isAmoledSurfaceTheme()
+    val filled = selected && !amoled
     val container by animateColorAsState(
-        if (selected) scheme.primary else Color.Transparent,
+        if (filled) scheme.primary else Color.Transparent,
         label = "disappearing-chip-container",
     )
     val content by animateColorAsState(
-        if (selected) scheme.onPrimary else scheme.onSurface,
+        if (filled) scheme.onPrimary else scheme.onSurface,
         label = "disappearing-chip-content",
     )
     val border by animateColorAsState(
         if (selected) scheme.primary else scheme.outlineVariant,
         label = "disappearing-chip-border",
     )
+    // The selectable Surface clips its press highlight to the chip's rounded corners.
     Surface(
+        selected = selected,
+        onClick = onClick,
+        enabled = enabled,
         modifier =
             modifier
-                .heightIn(min = 48.dp)
-                .selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onClick),
-        shape = RoundedCornerShape(10.dp),
+                .heightIn(min = timerChoiceMinHeight)
+                .semantics { role = Role.RadioButton },
+        shape = MaterialTheme.shapes.medium,
         color = container,
         contentColor = content,
-        border = BorderStroke(1.dp, border),
+        border = if (amoled) amoledSelectedChipBorder(selected) else BorderStroke(1.dp, border),
     ) {
         Row(
-            Modifier.padding(horizontal = 6.dp, vertical = 12.dp),
+            Modifier.padding(horizontal = Dimens.spaceXs, vertical = Dimens.spaceMd),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
             AnimatedVisibility(
-                visible = selected,
+                visible = filled,
                 enter = expandHorizontally() + fadeIn(),
                 exit = shrinkHorizontally() + fadeOut(),
             ) {
@@ -402,12 +402,12 @@ private fun DisappearingChip(
                         contentDescription = null,
                         modifier = Modifier.size(12.dp),
                     )
-                    Spacer(Modifier.width(4.dp))
+                    Spacer(Modifier.width(Dimens.spaceXs))
                 }
             }
-            if (iconRes != null && !selected) {
+            if (iconRes != null && !filled) {
                 Icon(painterResource(iconRes), contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(6.dp))
+                Spacer(Modifier.width(Dimens.spaceXs))
             }
             Text(
                 label,
@@ -438,12 +438,15 @@ private fun DisappearingPruneConfirm(
             .testTag(DISAPPEARING_CONFIRM_TAG),
         verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
     ) {
-        Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
+        ) {
             Icon(
                 painterResource(R.drawable.ic_warning),
                 contentDescription = null,
                 tint = scheme.error,
-                modifier = Modifier.padding(top = 2.dp).size(18.dp),
+                modifier = Modifier.padding(top = Dimens.spaceXxs).size(16.dp),
             )
             Text(
                 stringResource(R.string.disappearing_confirm_message, disappearingMessagesLabel(secs)),
@@ -462,7 +465,7 @@ private fun DisappearingPruneConfirm(
             Button(
                 onClick = onConfirm,
                 enabled = enabled,
-                shape = RoundedCornerShape(10.dp),
+                shape = MaterialTheme.shapes.medium,
                 colors = ButtonDefaults.buttonColors(containerColor = scheme.error, contentColor = scheme.onError),
                 modifier = Modifier.testTag(DISAPPEARING_CONFIRM_ACTION_TAG),
             ) { Text(stringResource(R.string.disappearing_confirm_button)) }
@@ -492,16 +495,7 @@ private fun DisappearingCustomPage(
             .testTag(DISAPPEARING_CUSTOM_PAGE_TAG),
         verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
     ) {
-        Row(
-            Modifier.fillMaxWidth().padding(start = 4.dp, end = WhiteNoiseSpacing.Section),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(painterResource(R.drawable.ic_arrow_back), stringResource(R.string.back))
-            }
-            Spacer(Modifier.width(4.dp))
-            DisappearingSheetTitle(stringResource(R.string.disappearing_custom))
-        }
+        WhiteNoiseSheetHeader(stringResource(R.string.disappearing_custom), onBack = onBack)
         Column(
             Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.Section),
             verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
@@ -571,8 +565,12 @@ private fun DisappearingCustomPage(
             Spacer(Modifier.size(WhiteNoiseSpacing.Related))
             Button(
                 onClick = { onSet(secs) },
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag(DISAPPEARING_CUSTOM_SET_TAG),
+                shape = MaterialTheme.shapes.medium,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = timerChoiceMinHeight)
+                        .testTag(DISAPPEARING_CUSTOM_SET_TAG),
             ) { Text(stringResource(R.string.disappearing_set)) }
         }
     }

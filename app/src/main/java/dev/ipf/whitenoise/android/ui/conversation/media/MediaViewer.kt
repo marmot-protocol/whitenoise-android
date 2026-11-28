@@ -8,27 +8,23 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -56,8 +52,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.offset
@@ -79,6 +73,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.common.IdentityImageCropDialog
+import dev.ipf.whitenoise.android.ui.common.StateContent
 import dev.ipf.whitenoise.android.ui.common.SwipeDismissibleSnackbar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.currentDateTimeDisplay
@@ -87,29 +82,13 @@ import dev.ipf.whitenoise.android.ui.common.viewerPagerScrollEnabled
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 import dev.ipf.whitenoise.android.ui.group.GroupImageFailureScope
 import dev.ipf.whitenoise.android.ui.group.groupImageFailureDetail
-import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
-/**
- * Upgrade receive-side compatibility references before a transfer. Timeline
- * fallback records can temporarily carry sourceEpoch=0; passing that value to
- * MarmotKit can never succeed and previously left visual media spinning.
- */
-internal suspend fun authoritativeVisualMediaReference(
-    reference: MediaAttachmentReferenceFfi,
-    mine: Boolean,
-    resolve: suspend () -> MediaAttachmentReferenceFfi,
-): MediaAttachmentReferenceFfi =
-    if (mine || reference.sourceEpoch != 0uL) {
-        reference
-    } else {
-        resolve()
-    }
 
 /**
  * Resolve the decrypted bytes for an attachment, preferring the retained
@@ -306,11 +285,13 @@ internal fun FullScreenMediaViewer(
     }
 
     // Render ownership is independent of action retirement during a valid visual exit.
-    val accountOwnerCurrent = actionOwner.accountRef != null && currentActionOwner() == actionOwner
-    val sourceOwnerCurrent =
-        accountOwnerCurrent &&
+    fun viewerSourceIsCurrent(): Boolean =
+        actionOwner.accountRef != null &&
+            currentActionOwner() == actionOwner &&
             controller.ownsRetainedForegroundPresentation &&
             controller.boundAccountRef == actionOwner.accountRef
+
+    val sourceOwnerCurrent = viewerSourceIsCurrent()
     val privacyBlocked = viewerPrivacyBlocked()
     LaunchedEffect(sourceOwnerCurrent, privacyBlocked) {
         if (!sourceOwnerCurrent || privacyBlocked) onDismiss()
@@ -492,7 +473,7 @@ internal fun FullScreenMediaViewer(
             closing = closingMotion,
             allowMotion =
                 mediaViewerPlatformMotionAllowed(
-                    MediaReferenceSupport.isVideoMedia(currentReference),
+                    currentPageIsVideo,
                     android.os.Build.VERSION.SDK_INT,
                 ) &&
                     scale == 1f &&
@@ -515,9 +496,10 @@ internal fun FullScreenMediaViewer(
             attachmentAspectRatio = aspectRatioFromDim(currentReference.dim),
             fallbackCloseAllowed =
                 mediaViewerPlatformMotionAllowed(
-                    MediaReferenceSupport.isVideoMedia(currentReference),
+                    currentPageIsVideo,
                     android.os.Build.VERSION.SDK_INT,
                 ),
+            hasVideoSurface = currentPageIsVideo,
         ) { motionBodyModifier ->
             MediaViewerFrame(
                 senderLabel = appState.displayName(currentPage.sender),
@@ -734,7 +716,11 @@ internal fun FullScreenMediaViewer(
                     val sourceController = pageController(pageDescriptor)
                     // Retained cross-chat pages can outlive their controller lookup. Reject the opener's
                     // fallback before either renderer reads thumbnails, pending media, files or decoded pixels.
-                    if (!exportPageOwnerIsCurrent(pageDescriptor, sourceController)) {
+                    val pageSourceCurrent =
+                        viewerSourceIsCurrent() &&
+                            !viewerPrivacyBlocked() &&
+                            actionOwner.matchesPageSource(pageDescriptor, sourceController)
+                    if (!pageSourceCurrent) {
                         Box(Modifier.fillMaxSize())
                         return@StableMediaViewerPager
                     }
@@ -808,10 +794,10 @@ internal fun FullScreenMediaViewer(
 }
 
 /**
- * Draws native edge-to-edge media with prototype chrome inside the supplied cutout/system safe insets. The media
- * [body] always fills the safe area, whether or not the chrome shows, so toggling the chrome never resizes or moves
- * the media (#3801). The bars fade in and out above the body on a translucent scrim, and the body learns how far the
- * bottom actions reach into it through [LocalMediaViewerBottomActionsClearance].
+ * Draws native edge-to-edge media with the shared viewer chrome inside the supplied cutout/system safe insets. The
+ * media [body] always fills the safe area, whether or not the chrome shows, so toggling the chrome never resizes or
+ * moves the media (#3801). The bars fade in and out above the body on a translucent scrim, and the body learns how
+ * far the bottom actions reach into it through [LocalMediaViewerBottomActionsClearance].
  */
 @Composable
 @Suppress("FunctionNaming", "LongParameterList", "LongMethod")
@@ -849,7 +835,7 @@ internal fun MediaViewerFrame(
             WindowInsetsSides.Top + WindowInsetsSides.Horizontal
         }
     val hasBottomActions = hasViewerBottomActions(onShare, onForwardMessage)
-    val scrim = MaterialTheme.colorScheme.background.copy(alpha = ScrimAlpha.HEAVY)
+    val scrim = AttachmentViewerChromeDefaults.overlayColor()
     val topChrome: @Composable BoxScope.() -> Unit = {
         AnimatedVisibility(
             visible = chromeShown,
@@ -857,80 +843,58 @@ internal fun MediaViewerFrame(
             enter = fadeIn(tween(MEDIA_VIEWER_CHROME_FADE_MILLIS)),
             exit = fadeOut(tween(MEDIA_VIEWER_CHROME_FADE_MILLIS)),
         ) {
-            Surface(
+            AttachmentViewerChrome(
+                title = senderLabel,
+                onClose = onDismiss,
                 modifier =
                     Modifier
-                        .fillMaxWidth()
                         .onSizeChanged { topChromeHeight = it.height }
                         .testTag(MEDIA_VIEWER_TOP_CHROME_TAG),
-                color = scrim,
+                containerColor = scrim,
                 contentColor = MaterialTheme.colorScheme.onBackground,
-            ) {
-                Row(
-                    modifier =
-                        Modifier
-                            .windowInsetsPadding(
-                                contentWindowInsets.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
-                            ).fillMaxWidth()
-                            .heightIn(min = 64.dp)
-                            .padding(horizontal = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    MediaViewerCloseButton(onDismiss = onDismiss, enabled = actionsEnabled, icon = icons.close)
-                    Column(Modifier.weight(1f).padding(horizontal = 8.dp)) {
-                        Text(
-                            text = senderLabel,
-                            modifier = Modifier.testTag("conversation.media.viewer.sender"),
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        if (recordedAtLabel.isNotBlank()) {
-                            Text(
-                                text =
-                                    stringResource(
-                                        R.string.media_viewer_metadata,
-                                        recordedAtLabel,
-                                        currentPosition,
-                                        pageCount,
-                                    ),
-                                modifier = Modifier.testTag("conversation.media.viewer.position"),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
+                windowInsets = contentWindowInsets.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
+                subtitle =
+                    recordedAtLabel.takeIf { it.isNotBlank() }?.let {
+                        stringResource(R.string.media_viewer_metadata, it, currentPosition, pageCount)
+                    },
+                titleModifier = Modifier.testTag("conversation.media.viewer.sender"),
+                subtitleModifier = Modifier.testTag("conversation.media.viewer.position"),
+                closeEnabled = actionsEnabled,
+                closeButton = { close, enabled ->
+                    MediaViewerCloseButton(onDismiss = close, enabled = enabled, icon = icons.close)
+                },
+                overflow =
                     if (hasViewerOverflowActions(onSave, onSetGroupPicture, onGoToMessage)) {
-                        Box {
-                            IconButton(
-                                onClick = { moreExpanded = true },
-                                enabled = actionsEnabled,
-                                modifier = Modifier.size(48.dp),
-                            ) {
-                                Icon(
-                                    icons.more,
-                                    contentDescription = stringResource(R.string.more_options),
+                        {
+                            Box {
+                                IconButton(
+                                    onClick = { moreExpanded = true },
+                                    enabled = actionsEnabled,
+                                    modifier = Modifier.size(48.dp),
+                                ) {
+                                    Icon(
+                                        icons.more,
+                                        contentDescription = stringResource(R.string.more_options),
+                                    )
+                                }
+                                WhiteNoiseDropdownMenu(
+                                    expanded = moreExpanded && actionsEnabled,
+                                    onDismissRequest = { moreExpanded = false },
+                                    items =
+                                        mediaViewerMenuItems(
+                                            onSave,
+                                            onSetGroupPicture,
+                                            onGoToMessage,
+                                            actionsEnabled,
+                                            groupPictureBusy,
+                                        ),
                                 )
                             }
-                            WhiteNoiseDropdownMenu(
-                                expanded = moreExpanded && actionsEnabled,
-                                onDismissRequest = { moreExpanded = false },
-                                items =
-                                    mediaViewerMenuItems(
-                                        onSave,
-                                        onSetGroupPicture,
-                                        onGoToMessage,
-                                        actionsEnabled,
-                                        groupPictureBusy,
-                                    ),
-                            )
                         }
-                    }
-                }
-            }
+                    } else {
+                        null
+                    },
+            )
         }
     }
     val bottomChrome: @Composable BoxScope.() -> Unit = {
@@ -1008,14 +972,11 @@ internal fun MediaViewerFrame(
                 Modifier.align(Alignment.Center).testTag("conversation.media.viewer.group-picture-progress"),
                 shape = MaterialTheme.shapes.medium,
             ) {
-                Column(
-                    Modifier.padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    CircularProgressIndicator()
-                    Text(stringResource(R.string.group_preparing_photo))
-                }
+                StateContent(
+                    modifier = Modifier.padding(WhiteNoiseSpacing.Section),
+                    progress = true,
+                    progressLabel = stringResource(R.string.group_preparing_photo),
+                )
             }
         }
         SnackbarHost(
@@ -1031,7 +992,7 @@ internal fun MediaViewerFrame(
                             placeable.placeRelative(0, inset)
                         }
                     }.windowInsetsPadding(contentWindowInsets.only(snackbarInsetSides)),
-            snackbar = { SwipeDismissibleSnackbar(it) },
+            snackbar = { SwipeDismissibleSnackbar(it, overlayConfirmation = true) },
         )
     }
 }

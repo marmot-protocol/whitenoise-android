@@ -14,7 +14,6 @@ internal enum class OverridableConversationNotificationCategory(
     MENTIONS(NotificationChannelSpec.MENTIONS),
     REACTIONS(NotificationChannelSpec.REACTIONS),
     INVITES(NotificationChannelSpec.INVITES),
-    AGENT_ACTIVITY(NotificationChannelSpec.AGENT_ACTIVITY),
     ;
 
     companion object {
@@ -89,11 +88,15 @@ internal class ConversationNotificationRouting(
     val state: StateFlow<Map<ConversationNotificationRoutingKey, ConversationNotificationScope>> =
         preferences.state
 
+    /** Resolves the channel for a post, materializing and recording ownership of `:conv:` children. */
+    @Suppress("LongParameterList") // Post routing inputs plus lock-guarded write predicate.
     fun resolveForPost(
         channel: NotificationChannelSpec,
         conversationShortcutId: String?,
         conversationTitle: String?,
         primaryVibrationPattern: ConversationVibrationPattern,
+        accountRef: String? = null,
+        isWriteAllowed: () -> Boolean = { true },
     ): ConversationNotificationPostRoute {
         if (conversationShortcutId == null || channel.conversationPolicy == ConversationChannelPolicy.GLOBAL_ONLY) {
             return globalRoute(channel, conversationShortcutId)
@@ -107,6 +110,8 @@ internal class ConversationNotificationRouting(
                         conversationShortcutId = conversationShortcutId,
                         conversationTitle = conversationTitle,
                         vibrationPattern = primaryVibrationPattern,
+                        accountRef = accountRef,
+                        isWriteAllowed = isWriteAllowed,
                     )
                 ConversationNotificationPostRoute(
                     channelId = child ?: channel.id,
@@ -128,6 +133,8 @@ internal class ConversationNotificationRouting(
                                 parentChannelId = channel.id,
                                 conversationShortcutId = conversationShortcutId,
                                 conversationTitle = conversationTitle,
+                                accountRef = accountRef,
+                                isWriteAllowed = isWriteAllowed,
                             )
                         } else {
                             null

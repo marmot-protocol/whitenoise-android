@@ -8,7 +8,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
         "anchor": "fun ReceivedAudioTranscription(",
         "test_ids": [
-          "MED-038"
+          "MED-038",
+          "MED-058"
         ]
       },
       {
@@ -16,7 +17,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
         "anchor": "fun AudioTranscriptionToggle(",
         "test_ids": [
-          "MED-038"
+          "MED-038",
+          "MED-058"
         ]
       },
       {
@@ -31,6 +33,15 @@
         "surface": "AudioTranscriptBody",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
         "anchor": "fun AudioTranscriptBody(",
+        "test_ids": [
+          "MED-038",
+          "MED-058"
+        ]
+      },
+      {
+        "surface": "AudioTranscriptWithFooter",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
+        "anchor": "fun AudioTranscriptWithFooter(",
         "test_ids": [
           "MED-038"
         ]
@@ -138,6 +149,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
         "anchor": "R.string.dictation_ostt_recommendation_title",
         "test_ids": [
+          "DIC-021",
           "MED-038"
         ]
       },

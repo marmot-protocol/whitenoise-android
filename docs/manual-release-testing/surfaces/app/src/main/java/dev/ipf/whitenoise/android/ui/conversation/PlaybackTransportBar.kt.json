@@ -30,17 +30,17 @@
     ],
     "source_coverage": [
       {
-        "surface": "R.string.reply_media_voice",
+        "surface": "Voice transport return to source",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PlaybackTransportBar.kt",
-        "anchor": "R.string.reply_media_voice",
+        "anchor": "R.string.tts_bar_return_to_source",
         "test_ids": [
           "MED-028"
         ]
       },
       {
-        "surface": "R.string.tts_bar_return_to_source",
+        "surface": "R.string.reply_media_voice",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PlaybackTransportBar.kt",
-        "anchor": "R.string.tts_bar_return_to_source",
+        "anchor": "R.string.reply_media_voice",
         "test_ids": [
           "MED-028"
         ]

@@ -7,9 +7,23 @@ RELEASE_SCRIPT_UNDER_TEST="${RELEASE_SCRIPT_UNDER_TEST:-$REPO_DIR/scripts/releas
 FIXTURE_DIR="$(mktemp -d)"
 trap 'rm -rf "$FIXTURE_DIR"' EXIT
 
-mkdir -p "$FIXTURE_DIR/repo/app" "$FIXTURE_DIR/repo/scripts" "$FIXTURE_DIR/bin"
+mkdir -p "$FIXTURE_DIR/repo/app/src/main/marmotkit" "$FIXTURE_DIR/repo/scripts" "$FIXTURE_DIR/bin"
 cp "$RELEASE_SCRIPT_UNDER_TEST" "$FIXTURE_DIR/repo/scripts/release.sh"
+cp "$REPO_DIR/scripts/check_marmotkit_release_channel.py" \
+  "$REPO_DIR/scripts/prepare_marmotkit_artifact.py" "$FIXTURE_DIR/repo/scripts/"
 chmod +x "$FIXTURE_DIR/repo/scripts/release.sh"
+
+# Use matching coordinates even when the checkout running this test pins an RC.
+write_marmotkit_lock() {
+  local version="$1"
+  local tag="marmotkit-v$version"
+  local archive="marmotkit-android-$version"
+  sed -e "s|^artifact-id=.*|artifact-id=$version|" \
+    -e "s|^artifact-tag=.*|artifact-tag=$tag|" \
+    -e "s|^artifact-url=.*|artifact-url=https://github.com/marmot-protocol/mdk/releases/download/$tag/$archive.zip|" \
+    -e "s|^archive-root=.*|archive-root=$archive|" \
+    "$REPO_DIR/app/src/main/marmotkit/MARMOT_VERSION" > "$FIXTURE_DIR/repo/app/src/main/marmotkit/MARMOT_VERSION"
+}
 
 touch "$FIXTURE_DIR/release.p12"
 touch "$FIXTURE_DIR/compact.gradle"
@@ -75,6 +89,21 @@ export WHITENOISE_PRODUCTION_KEY_PASSWORD="password"
 
 : > "$RELEASE_TEST_AAPT_LOG"
 : > "$RELEASE_TEST_GRADLE_LOG"
+
+write_marmotkit_lock 0.19.0-rc.1
+if output="$({
+  cd "$FIXTURE_DIR/repo"
+  PATH="$FIXTURE_DIR/bin:$PATH" ./scripts/release.sh --abi universal
+} 2>&1)" || [[ "$output" != *"artifact-id must be a final X.Y.Z version"* ]]; then
+  printf 'error: production release did not reject the RC pin\n%s\n' "$output" >&2
+  exit 1
+fi
+if [[ -s "$RELEASE_TEST_GRADLE_LOG" ]]; then
+  echo 'error: Gradle ran before the RC pin was rejected' >&2
+  exit 1
+fi
+
+write_marmotkit_lock 0.19.0
 set +e
 output="$({
   cd "$FIXTURE_DIR/repo"

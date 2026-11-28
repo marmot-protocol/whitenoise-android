@@ -27,6 +27,7 @@ internal data class DraftSendClearToken(
     val generation: MessageDraftGeneration,
     val recoveryDraft: ComposerDraftSnapshot?,
     val composerExpansionRevision: Long?,
+    val keepAttachments: Boolean = false,
 )
 
 internal class StartProfileChatNoActiveAccountException : IllegalStateException("No active account")
@@ -146,13 +147,26 @@ data class ToastMessage(
     // recovery of that same send can retire it (#2666).
     val sendAttempt: SendFailureAttempt? = null,
     val localDeleteNotice: LocalDeleteNotice? = null,
+    // The account and ID of the group change this notice reports, so two
+    // changes with the same wording are two toasts, each seen before it is
+    // acknowledged.
+    val groupChangeKey: String? = null,
+    // The account this notice says was unlinked, so removing that account retires it.
+    val unlinkedAccount: String? = null,
 )
+
+enum class TransientNoticeKind {
+    Confirmation,
+    Information,
+    Partial,
+}
 
 data class TransientNotice(
     val id: Long,
     val title: AppText,
     val detail: AppText? = null,
     val conversation: ConversationNoticeDestination? = null,
+    val kind: TransientNoticeKind = TransientNoticeKind.Information,
 )
 
 data class ConversationNoticeDestination(
@@ -191,13 +205,11 @@ internal fun refreshedProfilePresentation(
     rawDisplayName: String?,
 ): ProfilePresentation {
     val refreshedDisplayName =
-        ProfileSanitizer.displayName(
-            if (profile != null) {
-                profile.displayName ?: profile.name
-            } else {
-                rawDisplayName
-            },
-        )
+        if (profile != null) {
+            ProfileSanitizer.displayName(profile.displayName ?: profile.name)
+        } else {
+            mdkFallbackDisplayName(rawDisplayName)
+        }
     return ProfilePresentation(
         displayName =
             if (profile != null) {

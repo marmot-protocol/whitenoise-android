@@ -1,26 +1,18 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.MinimumTouchTarget
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerExplanation
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.GpsFixed
+import dev.ipf.whitenoise.android.ui.navigation.FloatingControlDisc
 
+/** Scrolls back to the passage being read aloud after the reader moved away, as the shared floating disc. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun TtsResumeFollowButton(
@@ -29,33 +21,19 @@ internal fun TtsResumeFollowButton(
 ) {
     val resumeFollowLabel = stringResource(R.string.tts_resume_follow)
 
-    Box(
-        modifier =
-            modifier
-                .size(48.dp)
-                .semantics { contentDescription = resumeFollowLabel }
-                .explainOnLongPress(
-                    composerExplanation(
-                        R.string.tts_resume_follow,
-                        R.string.explanation_conversation_tts_resume_follow,
-                    ),
-                ).clickable(role = Role.Button, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Surface(
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.secondaryContainer,
-            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-            shadowElevation = 2.dp,
-            modifier = Modifier.size(34.dp),
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    Icons.Default.GpsFixed,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                )
-            }
-        }
-    }
+    FloatingControlDisc(
+        icon = rememberVectorPainter(Icons.Default.GpsFixed),
+        contentDescription = resumeFollowLabel,
+        onClick = onClick,
+        modifier = modifier,
+        // Resume following always took a full 48 dp slot in the stack, so it keeps it and does not move.
+        slot = MinimumTouchTarget,
+        targetModifier =
+            Modifier.explainOnLongPress(
+                composerExplanation(
+                    R.string.tts_resume_follow,
+                    R.string.explanation_conversation_tts_resume_follow,
+                ),
+            ),
+    )
 }

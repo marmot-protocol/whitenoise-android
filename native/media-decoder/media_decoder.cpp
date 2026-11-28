@@ -135,6 +135,7 @@ constexpr int64_t kMaxConversionPixels = 8388608;
 constexpr int kConversionAlignment = 64;
 constexpr int64_t kConversionPadding = 1024;
 constexpr int kMaxSamples = 65536;
+constexpr long kMaxWorkerThreads = 4;
 constexpr size_t kMaxAllocation = 64U * 1024 * 1024;
 constexpr int kIoBytes = 32768;
 constexpr int kMaxReadSteps = 8192;
@@ -178,9 +179,13 @@ void check(bool condition, const char* reason) {
 }
 
 constexpr size_t kMaxQueuedBytes = 8U * 1024 * 1024;
+constexpr size_t kMaxQueuedPackets = 512;
+constexpr size_t kMaxReserveVideoFrames = 12;
+constexpr size_t kMaxReserveVideoBytes = 40U * 1024 * 1024;
+constexpr int64_t kReserveVideoWorkMs = 40;
 
 // Charge copied packet data and referenced buffer view bytes retained by clone.
-// Allocator bookkeeping is bounded separately by the 512-packet limit.
+// Allocator bookkeeping is bounded separately by the packet limit.
 /** Add retained queue bytes only after subtraction-based overflow and aggregate-budget checks. */
 constexpr bool addRetainedBytes(size_t bytes, size_t& total) {
     if (total > kMaxQueuedBytes || bytes > kMaxQueuedBytes - total) return false;
@@ -257,6 +262,36 @@ struct QueuedPacket {
     size_t retainedBytes;
 };
 
+struct QueuedFrame {
+    AVFrame* frame;
+    size_t retainedBytes;
+};
+
+/** Charge buffer references, including shared storage and side data, to the optional video queue. */
+bool reserveFrameBytes(const AVFrame& frame, size_t& total) {
+    if (frame.nb_extended_buf != 0 || frame.hw_frames_ctx || frame.opaque_ref || frame.metadata ||
+        frame.nb_side_data < 0 || frame.nb_side_data > 64) return false;
+
+    total = sizeof(AVFrame) + sizeof(QueuedFrame);
+    const auto charge = [&total](size_t bytes) {
+        if (bytes > kMaxReserveVideoBytes - total) return false;
+        total += bytes;
+        return true;
+    };
+    const auto chargeBuffer = [&charge](const AVBufferRef* buffer) {
+        return buffer && charge(sizeof(AVBufferRef)) && charge(buffer->size);
+    };
+    for (const auto* buffer : frame.buf) {
+        if (buffer && !chargeBuffer(buffer)) return false;
+    }
+    for (int i = 0; i < frame.nb_side_data; ++i) {
+        const auto* side = frame.side_data[i];
+        if (side->metadata || !charge(sizeof(AVFrameSideData) + sizeof(AVFrameSideData*)) ||
+            !chargeBuffer(side->buf)) return false;
+    }
+    return frame.buf[0] != nullptr;
+}
+
 struct Track {
     int index = -1;
     AVCodecContext* codec = nullptr;
@@ -265,8 +300,33 @@ struct Track {
     bool hasFrame = false;
     AVFrame* frame = nullptr;
     std::deque<QueuedPacket> packets;
+    std::deque<QueuedFrame> reserveFrames;
+    size_t reserveFrameBytes = 0;
+
+    AVFrame* pendingFrame() const {
+        if (!reserveFrames.empty()) return reserveFrames.front().frame;
+        return hasFrame ? frame : nullptr;
+    }
+
+    void consumeFrame() {
+        if (reserveFrames.empty()) {
+            av_frame_unref(frame);
+            hasFrame = false;
+        } else {
+            auto& queued = reserveFrames.front();
+            reserveFrameBytes -= queued.retainedBytes;
+            av_frame_free(&queued.frame);
+            reserveFrames.pop_front();
+        }
+    }
+
+    void clearReservedFrames() {
+        while (!reserveFrames.empty()) consumeFrame();
+    }
+
     /** Free every retained packet and its exact decoded-frame/codec owners when this track retires. */
     ~Track() {
+        clearReservedFrames();
         for (auto& queued : packets) av_packet_free(&queued.packet);
         av_frame_free(&frame);
         avcodec_free_context(&codec);
@@ -280,6 +340,9 @@ struct Session {
     int64_t position = 0;
     int64_t deadline = 0;
     int edge = 0;
+    bool playbackColors = false;
+    // Explicit playback reads raise this before opening tracks; automatic posters and probes stay single-threaded.
+    int threads = 1;
     AVFormatContext* format = nullptr;
     AVIOContext* io = nullptr;
     AVPacket* packet = nullptr;
@@ -305,8 +368,10 @@ struct Session {
     int64_t playbackSeekTargetUs = 0;
     int64_t playbackAudioEndSample = 0;
     int64_t videoSkipBeforeUs = INT64_MIN;
+    AVFrame* prerollVideo = nullptr;
     /** Release resampling, packet, demuxer, custom-I/O and duplicated descriptor resources for this exact session. */
     ~Session() {
+        av_frame_free(&prerollVideo);
         sws_free_context(&scale);
         sws_free_context(&colors);
         swr_free(&resample);
@@ -395,12 +460,41 @@ bool allowedAudio(AVCodecID id) {
     }
 }
 
-/** Select a supported stream of the requested media type without opening an unapproved decoder. */
+/** Bounded worker thread count for video decode and pixel conversion: online cores, at most four. */
+int workerThreads() {
+    const long online = sysconf(_SC_NPROCESSORS_ONLN);
+    return int(std::clamp<long>(online, 1, kMaxWorkerThreads));
+}
+
+/** Resolve only a reviewed decoder, without opening it during stream selection. */
+const AVCodec* reviewedDecoder(AVCodecID id, AVMediaType type) {
+    if (!(type == AVMEDIA_TYPE_VIDEO ? allowedVideo(id) : allowedAudio(id))) return nullptr;
+    return id == AV_CODEC_ID_AV1 ? avcodec_find_decoder_by_name("libdav1d") : avcodec_find_decoder(id);
+}
+
+bool selectableTrack(const AVStream& stream, AVMediaType type) {
+    return stream.codecpar->codec_type == type &&
+        !(type == AVMEDIA_TYPE_VIDEO && (stream.disposition & AV_DISPOSITION_ATTACHED_PIC));
+}
+
+/** Keep the preferred stream when supported; otherwise prefer a supported default, then the first supported track. */
 void selectTrack(Session& s, Track& track, AVMediaType type) {
-    int best = av_find_best_stream(s.format, type, -1, -1, nullptr, 0);
-    if (best < 0) return;
-    if (type == AVMEDIA_TYPE_VIDEO && (s.format->streams[best]->disposition & AV_DISPOSITION_ATTACHED_PIC)) return;
-    track.index = best;
+    const int best = av_find_best_stream(s.format, type, -1, -1, nullptr, 0);
+    if (best >= 0 && selectableTrack(*s.format->streams[best], type)) {
+        track.index = best; // Preserve explicit codec refusal if there is no supported alternative.
+        if (reviewedDecoder(s.format->streams[best]->codecpar->codec_id, type)) return;
+    }
+    int fallback = -1;
+    for (unsigned i = 0; i < s.format->nb_streams; ++i) {
+        const auto& stream = *s.format->streams[i];
+        if (!selectableTrack(stream, type) || !reviewedDecoder(stream.codecpar->codec_id, type)) continue;
+        if (fallback < 0) fallback = static_cast<int>(i);
+        if (stream.disposition & AV_DISPOSITION_DEFAULT) {
+            fallback = static_cast<int>(i);
+            break;
+        }
+    }
+    if (fallback >= 0) track.index = fallback;
 }
 
 /** Open the selected bounded software decoder and validate its video/audio resource limits. */
@@ -409,8 +503,7 @@ void openTrack(Session& s, Track& track, AVMediaType type) {
     auto* parameters = s.format->streams[track.index]->codecpar;
     check(type == AVMEDIA_TYPE_VIDEO ? allowedVideo(parameters->codec_id) : allowedAudio(parameters->codec_id),
           "unsupported_codec");
-    const AVCodec* decoder = parameters->codec_id == AV_CODEC_ID_AV1 ?
-        avcodec_find_decoder_by_name("libdav1d") : avcodec_find_decoder(parameters->codec_id);
+    const AVCodec* decoder = reviewedDecoder(parameters->codec_id, type);
     check(decoder, "unsupported_decoder");
     if (type == AVMEDIA_TYPE_VIDEO) {
         check(parameters->width > 0 && parameters->height > 0 && parameters->width <= kMaxDimension &&
@@ -425,8 +518,11 @@ void openTrack(Session& s, Track& track, AVMediaType type) {
     track.codec = avcodec_alloc_context3(decoder);
     check(track.codec, "decoder_allocation_refused");
     check(avcodec_parameters_to_context(track.codec, parameters) >= 0, "invalid_codec_parameters");
-    track.codec->thread_count = 1;
-    track.codec->thread_type = 0;
+    // Software video decode is the playback bottleneck: frame and slice threads keep 1080p/4K inside the frame
+    // interval. Threads share this process and its seccomp filter; audio decoding stays single-threaded.
+    const bool threaded = type == AVMEDIA_TYPE_VIDEO && s.threads > 1;
+    track.codec->thread_count = threaded ? s.threads : 1;
+    track.codec->thread_type = threaded ? FF_THREAD_FRAME | FF_THREAD_SLICE : 0;
     track.codec->max_pixels = kMaxPixels;
     track.codec->max_samples = kMaxSamples * 8LL;
     AVDictionary* options = nullptr;
@@ -554,11 +650,11 @@ void validateVideoColor(Session& s, const AVFrame* frame) {
 }
 
 /** Create the reusable scaler context with the required bounded conversion and color-management configuration. */
-SwsContext* dynamicScaler(SwsContext*& context) {
+SwsContext* dynamicScaler(SwsContext*& context, int threads) {
     if (!context) {
         context = sws_alloc_context();
         check(context, "pixel_context_allocation_refused");
-        context->threads = 1;
+        context->threads = threads;
         context->scaler = SWS_SCALE_BILINEAR;
         context->intent = SWS_INTENT_PERCEPTUAL;
         context->backends = SWS_BACKEND_STABLE;
@@ -574,8 +670,7 @@ struct ConversionFrames {
 };
 
 /** Convert one validated video frame to bounded packed RGBA and copy only the declared output rows. */
-jlongArray video(JNIEnv* env, Session& s, jobject destination) {
-    auto* frame = s.video.frame;
+jlongArray video(JNIEnv* env, Session& s, jobject destination, AVFrame* frame) {
     check(frame->width > 0 && frame->height > 0 && frame->width <= kMaxDimension && frame->height <= kMaxDimension &&
           int64_t(frame->width) * frame->height <= kMaxPixels, "decoded_surface_budget_refused");
     validateVideoColor(s, frame);
@@ -602,7 +697,7 @@ jlongArray video(JNIEnv* env, Session& s, jobject destination) {
         converted.scaled->crop_left = converted.scaled->crop_right = 0;
         converted.scaled->crop_top = converted.scaled->crop_bottom = 0;
         check(av_frame_get_buffer(converted.scaled, kConversionAlignment) >= 0, "pixel_scale_allocation_refused");
-        check(sws_scale_frame(dynamicScaler(s.scale), converted.scaled, frame) >= 0, "pixel_scale_failed");
+        check(sws_scale_frame(dynamicScaler(s.scale, s.threads), converted.scaled, frame) >= 0, "pixel_scale_failed");
         colorSource = converted.scaled;
     }
     // Do not copy source HDR side data onto this SDR destination.
@@ -613,9 +708,19 @@ jlongArray video(JNIEnv* env, Session& s, jobject destination) {
     converted.rgba->colorspace = AVCOL_SPC_RGB;
     converted.rgba->color_primaries = AVCOL_PRI_BT709;
     converted.rgba->color_trc = AVCOL_TRC_IEC61966_2_1;
+    // Playing frames and player posters retain the transfer of explicitly tagged SDR BT.709.
+    // Matrix and range conversion still produce packed RGB.
+    const bool displayReferredBt709 = s.playbackColors && frame->format == AV_PIX_FMT_YUV420P &&
+        frame->color_range == AVCOL_RANGE_MPEG && frame->colorspace == AVCOL_SPC_BT709 &&
+        frame->color_primaries == AVCOL_PRI_BT709 && frame->color_trc == AVCOL_TRC_BT709 &&
+        !av_frame_get_side_data(frame, AV_FRAME_DATA_ICC_PROFILE) &&
+        !av_frame_get_side_data(frame, AV_FRAME_DATA_MASTERING_DISPLAY_METADATA) &&
+        !av_frame_get_side_data(frame, AV_FRAME_DATA_DYNAMIC_HDR_PLUS) &&
+        !av_frame_get_side_data(frame, AV_FRAME_DATA_CONTENT_LIGHT_LEVEL);
+    if (displayReferredBt709) converted.rgba->color_trc = AVCOL_TRC_BT709;
     converted.rgba->flags = frame->flags & (AV_FRAME_FLAG_INTERLACED | AV_FRAME_FLAG_TOP_FIELD_FIRST);
     check(av_frame_get_buffer(converted.rgba, kConversionAlignment) >= 0, "pixel_rgba_allocation_refused");
-    check(sws_scale_frame(dynamicScaler(s.colors), converted.rgba, colorSource) >= 0, "pixel_color_conversion_failed");
+    check(sws_scale_frame(dynamicScaler(s.colors, s.threads), converted.rgba, colorSource) >= 0, "pixel_color_conversion_failed");
     // Copy only packed pixel bytes; SIMD/aligned AVFrame padding never crosses the shared-output boundary.
     for (int row = 0; row < height; ++row) {
         std::memcpy(out + int64_t(row) * width * 4,
@@ -733,10 +838,12 @@ jlongArray audio(JNIEnv* env, Session& s, jobject destination, bool draining) {
  * Drive one codec through bounded receive/send steps and dequeue a retained packet only after successful
  * acceptance.
  */
-bool pump(Session& s, Track& track) {
+bool pump(Session& s, Track& track, int64_t deferAfterMs = INT64_MAX) {
     if (!track.codec || track.ended || track.hasFrame) return track.hasFrame;
     for (int step = 0; step < kMaxReadSteps; ++step) {
-        check(!interrupted(&s), "media_read_deadline");
+        const auto now = monotonicMs();
+        if (now >= deferAfterMs) return false;
+        check(now < s.deadline, "media_read_deadline");
         av_frame_unref(track.frame);
         const int result = avcodec_receive_frame(track.codec, track.frame);
         if (result >= 0) { track.hasFrame = true; return true; }
@@ -767,8 +874,30 @@ bool pump(Session& s, Track& track) {
     throw Failure("media_decode_work_budget_refused");
 }
 
+/** Convert compressed lookahead into bounded native video frames, without reading the demuxer. */
+void consumeQueuedVideoForAudio(Session& s, int64_t deferAfterMs) {
+    auto& video = s.video;
+    while (!video.packets.empty() && video.reserveFrames.size() < kMaxReserveVideoFrames &&
+           monotonicMs() < deferAfterMs) {
+        if (!pump(s, video, deferAfterMs)) break;
+        size_t bytes = 0;
+        if (!reserveFrameBytes(*video.frame, bytes) ||
+            bytes > kMaxReserveVideoBytes - video.reserveFrameBytes) break;
+        video.reserveFrames.push_back({nullptr, bytes});
+        auto& queued = video.reserveFrames.back();
+        queued.frame = av_frame_alloc();
+        if (!queued.frame) {
+            video.reserveFrames.pop_back();
+            break;
+        }
+        av_frame_move_ref(queued.frame, video.frame);
+        video.hasFrame = false;
+        video.reserveFrameBytes += bytes;
+    }
+}
+
 /** Admit a cloned packet only after the complete retained-view cost and packet-count budgets pass. */
-void queuePacket(Session& s) {
+void queuePacket(Session& s, size_t packetLimit = kMaxQueuedPackets) {
     const int result = av_read_frame(s.format, s.packet);
     if (invalidContainerRead(result)) throw MalformedContainerRead();
     check(result >= 0 || result == AVERROR_EOF, "media_container_read_failed");
@@ -779,7 +908,7 @@ void queuePacket(Session& s) {
     if (track && !track->ended) {
         size_t retainedBytes = 0;
         check(packetRetainedBytes(*s.packet, retainedBytes) &&
-              s.queuedBytes <= kMaxQueuedBytes - retainedBytes && s.queuedPackets < 512,
+              s.queuedBytes <= kMaxQueuedBytes - retainedBytes && s.queuedPackets < packetLimit,
               "compressed_lookahead_budget_refused");
         auto* owned = av_packet_clone(s.packet);
         check(owned, "packet_queue_allocation_refused");
@@ -796,52 +925,72 @@ void queuePacket(Session& s) {
 }
 
 /**
- * Decide whether a decoded video frame before the last seek target can be dropped without conversion.
- * The parent discards such frames anyway; skipping stops while the compressed lookahead is half full,
- * so the parent's preroll audio drain keeps the queue bounded, before the conversion reserve, and
- * before half of the read step budget.
+ * Defer conversion of pre-target video while compressed lookahead, time and read steps allow it.
+ * Keep one deferred frame to cover the target when the next frame is later or the decoder ends.
  */
-bool skipPrerollVideo(Session& s, int step) {
-    if (timestamp(s, s.video, s.video.frame) >= s.videoSkipBeforeUs) {
+bool skipPrerollVideo(Session& s, AVFrame* frame, int step) {
+    if (timestamp(s, s.video, frame) >= s.videoSkipBeforeUs) {
         s.videoSkipBeforeUs = INT64_MIN;
         return false;
     }
-    return step < kMaxReadSteps / 2 && s.queuedPackets < 256 && s.queuedBytes < kMaxQueuedBytes / 2 &&
+    return step < kMaxReadSteps / 2 && s.queuedPackets < kMaxQueuedPackets / 2 && s.queuedBytes < kMaxQueuedBytes / 2 &&
         monotonicMs() + kPrerollReserveMs < s.deadline;
 }
 
 // Playback may hold one video while requesting the PCM needed by its bounded raw processor.
-// The other track keeps at most its existing decoded frame; compressed queues retain their old limits.
+// Optional PCM reserve can hold a bounded queue of decoded video; compressed queues retain their old limits.
 /** Advance the requested track while preserving its separate EOF and bounded inter-track compressed lookahead. */
 jlongArray readPreferred(JNIEnv* env, Session& s, jobject videoOut, jobject audioOut, int preferred) {
+    const bool reserveAudio = preferred == 3;
+    if (reserveAudio) preferred = 2;
     check(preferred == 1 || preferred == 2, "preferred_track_refused");
     const bool wantVideo = videoOut != nullptr;
     const bool wantAudio = audioOut != nullptr;
-    check((preferred == 1 && wantVideo) || (preferred == 2 && wantAudio), "preferred_track_not_selected");
+    check((preferred == 1 && wantVideo) || (preferred == 2 && wantAudio && (!reserveAudio || wantVideo)),
+          "preferred_track_not_selected");
     if (!s.modeChosen) {
+        s.threads = workerThreads();
         if (wantVideo) openTrack(s, s.video, AVMEDIA_TYPE_VIDEO);
         if (wantAudio) openTrack(s, s.audio, AVMEDIA_TYPE_AUDIO);
         s.modeChosen = true; s.wantVideo = wantVideo; s.wantAudio = wantAudio;
     }
     check(s.wantVideo == wantVideo && s.wantAudio == wantAudio, "output_track_selection_changed");
     Track& selected = preferred == 1 ? s.video : s.audio;
+    // Frame threads may need several video packets before returning a frame, with
+    // hundreds of small audio packets in between. Retained bytes stay capped.
+    const bool frameThreadedVideo = preferred == 1 && s.wantAudio && selected.codec &&
+        (selected.codec->active_thread_type & FF_THREAD_FRAME);
+    const size_t packetLimit = kMaxQueuedPackets * (frameThreadedVideo ? s.threads : 1);
+    const auto reserveWorkDeadline = std::min(s.deadline, monotonicMs() + kReserveVideoWorkMs);
     for (int step = 0; step < kMaxReadSteps; ++step) {
         check(!interrupted(&s), "media_read_deadline");
-        pump(s, selected);
-        if (selected.hasFrame) {
-            if (preferred == 1 && skipPrerollVideo(s, step)) {
-                selected.hasFrame = false; av_frame_unref(selected.frame);
+        if (!selected.pendingFrame()) pump(s, selected);
+        auto* frame = selected.pendingFrame();
+        if (preferred == 1 && s.prerollVideo &&
+            ((!frame && selected.ended) || (frame && timestamp(s, selected, frame) > s.videoSkipBeforeUs))) {
+            auto result = video(env, s, videoOut, s.prerollVideo);
+            av_frame_free(&s.prerollVideo);
+            return result;
+        }
+        if (frame) {
+            if (preferred == 1 && skipPrerollVideo(s, frame, step)) {
+                if (!s.prerollVideo) s.prerollVideo = av_frame_alloc();
+                check(s.prerollVideo != nullptr, "video_frame_allocation");
+                av_frame_unref(s.prerollVideo);
+                av_frame_move_ref(s.prerollVideo, frame);
+                selected.consumeFrame();
                 continue;
             }
             if (preferred == 1) {
-                auto result = video(env, s, videoOut);
-                selected.hasFrame = false; av_frame_unref(selected.frame);
+                av_frame_free(&s.prerollVideo);
+                auto result = video(env, s, videoOut, frame);
+                selected.consumeFrame();
                 return result;
             }
-            auto padding = playbackPadding(env, s, audioOut, timestamp(s, s.audio, s.audio.frame));
+            auto padding = playbackPadding(env, s, audioOut, timestamp(s, selected, frame));
             if (padding) return padding;
             auto result = audio(env, s, audioOut, false);
-            selected.hasFrame = false; av_frame_unref(selected.frame);
+            selected.consumeFrame();
             if (result) return result;
             continue;
         }
@@ -855,13 +1004,20 @@ jlongArray readPreferred(JNIEnv* env, Session& s, jobject videoOut, jobject audi
             return longs(env, {preferred == 1 ? 3 : 4, 0, 0, 0, 0, 0, 0});
         }
         check(!s.inputEnded, "media_track_drain_stalled");
-        queuePacket(s);
+        // An unread packet can use the whole byte budget; optional PCM probes only after the queue drains.
+        if (reserveAudio) {
+            consumeQueuedVideoForAudio(s, reserveWorkDeadline);
+            if (s.queuedPackets != 0 || monotonicMs() >= reserveWorkDeadline) {
+                return longs(env, {5, 0, 0, 0, 0, 0, 0});
+            }
+        }
+        queuePacket(s, packetLimit);
     }
     throw Failure("media_decode_work_budget_refused");
 }
 
 /** Return the next bounded audio/video result while retaining the global EOF contract for legacy any-track reads. */
-jlongArray read(JNIEnv* env, Session& s, jobject videoOut, jobject audioOut) {
+jlongArray read(JNIEnv* env, Session& s, jobject videoOut, jobject audioOut, int64_t videoEndAfterUs) {
     const bool wantVideo = videoOut != nullptr;
     const bool wantAudio = audioOut != nullptr;
     check(wantVideo || wantAudio, "output_track_required");
@@ -875,8 +1031,9 @@ jlongArray read(JNIEnv* env, Session& s, jobject videoOut, jobject audioOut) {
     check(s.wantVideo == wantVideo && s.wantAudio == wantAudio, "output_track_selection_changed");
     for (int step = 0; step < kMaxReadSteps; ++step) {
         check(!interrupted(&s), "media_read_deadline");
-        if (wantVideo) pump(s, s.video);
+        if (wantVideo && !s.video.pendingFrame()) pump(s, s.video);
         if (wantAudio) pump(s, s.audio);
+        auto* videoFrame = s.video.pendingFrame();
         const bool videoDone = !wantVideo || !s.video.codec || s.video.ended;
         const bool audioDone = !wantAudio || !s.audio.codec || s.audio.ended;
         if (wantAudio && audioDone && !s.resampleDrained) {
@@ -886,23 +1043,24 @@ jlongArray read(JNIEnv* env, Session& s, jobject videoOut, jobject audioOut) {
             if (result) return result;
             s.resampleDrained = true;
         }
-        const bool videoReady = videoDone || s.video.hasFrame;
+        const bool videoReady = videoDone || videoFrame;
         const bool audioReady = audioDone || s.audio.hasFrame;
         // Read ahead compressed packets until each active track has one decoded
         // frame. MP4 chunk order cannot cause video to block discovery of audio.
         if (videoReady && audioReady) {
-            if (s.video.hasFrame || s.audio.hasFrame) {
-                const int64_t videoPts = s.video.hasFrame ? timestamp(s, s.video, s.video.frame) : INT64_MAX;
+            const int64_t videoPts = videoFrame ? timestamp(s, s.video, videoFrame) : INT64_MAX;
+            if (videoFrame || s.audio.hasFrame) {
                 const int64_t audioPts = s.audio.hasFrame ? timestamp(s, s.audio, s.audio.frame) : INT64_MAX;
                 auto padding = playbackPadding(env, s, audioOut, std::min(videoPts, audioPts));
                 if (padding) return padding;
             }
-            const bool chooseVideo = s.video.hasFrame &&
-                (!s.audio.hasFrame || timestamp(s, s.video, s.video.frame) <= timestamp(s, s.audio, s.audio.frame));
+            const bool chooseVideo = videoFrame &&
+                (!s.audio.hasFrame || videoPts <= timestamp(s, s.audio, s.audio.frame));
             if (chooseVideo) {
-                auto result = video(env, s, videoOut);
-                s.video.hasFrame = false;
-                av_frame_unref(s.video.frame);
+                // A paused probe already has the covering pixels in videoOut.
+                if (!wantAudio && videoPts > videoEndAfterUs) return longs(env, {0, 0, 0, 0, 0, 0, 0});
+                auto result = video(env, s, videoOut, videoFrame);
+                s.video.consumeFrame();
                 return result;
             }
             if (s.audio.hasFrame) {
@@ -934,7 +1092,7 @@ jlongArray read(JNIEnv* env, Session& s, jobject videoOut, jobject audioOut) {
  */
 extern "C" JNIEXPORT jlong JNICALL
 Java_dev_ipf_whitenoise_android_media_sandbox_NativeMediaEngine_nativeOpen(
-    JNIEnv* env, jobject, jint fd, jlong offset, jlong length, jint edge) {
+    JNIEnv* env, jobject, jint fd, jlong offset, jlong length, jint edge, jboolean playbackColors) {
     std::lock_guard<std::mutex> guard(sessionMutex);
     try {
         check(sandboxInstalled.load(std::memory_order_acquire), "media_process_restriction_missing");
@@ -950,6 +1108,7 @@ Java_dev_ipf_whitenoise_android_media_sandbox_NativeMediaEngine_nativeOpen(
         s->fd = fcntl(fd, F_DUPFD_CLOEXEC, 0);
         check(s->fd >= 0, "selected_media_dup_failed");
         s->offset = offset; s->length = length; s->edge = edge;
+        s->playbackColors = playbackColors == JNI_TRUE;
         s->deadline = monotonicMs() + kCallMs;
         av_max_alloc(kMaxAllocation);
         av_log_set_level(AV_LOG_QUIET);
@@ -1041,9 +1200,9 @@ Java_dev_ipf_whitenoise_android_media_sandbox_NativeMediaEngine_nativeInfo(JNIEn
 /** Serialize one any-track read and translate worker failures before returning a JNI payload. */
 extern "C" JNIEXPORT jlongArray JNICALL
 Java_dev_ipf_whitenoise_android_media_sandbox_NativeMediaEngine_nativeRead(
-    JNIEnv* env, jobject, jlong handle, jobject videoOut, jobject audioOut) {
+    JNIEnv* env, jobject, jlong handle, jobject videoOut, jobject audioOut, jlong videoEndAfterUs) {
     std::lock_guard<std::mutex> guard(sessionMutex);
-    try { return read(env, session(handle), videoOut, audioOut); }
+    try { return read(env, session(handle), videoOut, audioOut, videoEndAfterUs); }
     catch (const MalformedContainerRead&) { return longs(env, {-1}); }
     catch (const std::exception& error) { fail(env, error.what()); return nullptr; }
 }
@@ -1077,6 +1236,7 @@ Java_dev_ipf_whitenoise_android_media_sandbox_NativeMediaEngine_nativeSeek(
         for (auto* track : {&s.video, &s.audio}) {
             if (track->codec) avcodec_flush_buffers(track->codec);
             track->flushed = false; track->ended = false; track->hasFrame = false;
+            track->clearReservedFrames();
             if (track->frame) av_frame_unref(track->frame);
             for (auto& queued : track->packets) av_packet_free(&queued.packet);
             track->packets.clear();
@@ -1087,6 +1247,7 @@ Java_dev_ipf_whitenoise_android_media_sandbox_NativeMediaEngine_nativeSeek(
         swr_free(&s.resample); av_channel_layout_uninit(&s.resampleInput);
         s.resampleRate = 0; s.resampleFormat = -1; s.lastAudioPts = timeUs;
         s.playbackAudioClock = false; s.playbackSeekTargetUs = timeUs; s.playbackAudioEndSample = 0;
+        av_frame_free(&s.prerollVideo);
         s.videoSkipBeforeUs = timeUs;
     } catch (const std::exception& error) { fail(env, error.what()); }
 }

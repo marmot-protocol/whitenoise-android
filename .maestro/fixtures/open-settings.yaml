@@ -1,9 +1,18 @@
 appId: dev.ipf.whitenoise.android.maestrolab
 ---
-# All generated fixture identities are signing accounts: the avatar opens the selector.
-- tapOn: "Switch Profile, Maestro (Alice|Bob|Carol)"
-- assertVisible: "Switch Profile"
-- tapOn: "Settings"
+# The avatar opens Settings directly when quick switching is on.
+- tapOn:
+    id: "chats.switchProfile"
+- extendedWaitUntil:
+    visible:
+      id: "^(account-selector-content|settings-home-content)$"
+    timeout: 5000
+- runFlow:
+    when:
+      visible:
+        id: "account-selector-content"
+    commands:
+      - tapOn: "Settings"
 - assertVisible: "Settings"
 - assertVisible:
     id: "settings-home-content"

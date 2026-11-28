@@ -1,0 +1,67 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateCaptureOwners.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Interrupted recording save failure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateCaptureOwners.kt",
+        "anchor": "R.string.voice_recording_save_failed",
+        "test_ids": [
+          "MED-008"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.voice_message_microphone_busy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateCaptureOwners.kt",
+        "anchor": "R.string.voice_message_microphone_busy",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "R.string.voice_message_recording_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateCaptureOwners.kt",
+        "anchor": "R.string.voice_message_recording_failed",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "R.string.voice_message_too_short",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateCaptureOwners.kt",
+        "anchor": "R.string.voice_message_too_short",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "Recording in another chat notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateCaptureOwners.kt",
+        "anchor": "R.string.voice_recording_elsewhere",
+        "test_ids": [
+          "MED-061"
+        ]
+      },
+      {
+        "surface": "Wipe cleanup retains voice drafts until the native account removal is confirmed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateCaptureOwners.kt",
+        "anchor": "if (outcome.localCleanup.completed) purgeCaptureDrafts(account)",
+        "test_ids": [
+          "ACC-014"
+        ]
+      },
+      {
+        "surface": "Confirmed chat removal stops capture and retires its draft across rejoin and restart",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateCaptureOwners.kt",
+        "anchor": "voiceDraftEvictions.stage(key, confirmed = true)",
+        "test_ids": [
+          "MED-061"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

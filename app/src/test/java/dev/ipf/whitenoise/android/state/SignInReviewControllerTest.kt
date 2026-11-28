@@ -242,6 +242,50 @@ class SignInReviewControllerTest {
             assertEquals(3, reads)
         }
 
+    /** Mine, don't link sets a waiting sign-in aside in MDK, then keeps it as the user's on this device. */
+    @Test
+    fun mineSetsAWaitingSignInAsideAndKeepsIt() =
+        runTest {
+            val native = Native()
+            val kept = mutableListOf<String>()
+            val controller = SignInReviewController(ACCOUNT, native) { kept += it }
+
+            controller.markMine(signIn("a"))
+
+            assertEquals(listOf("answer:$ACCOUNT:a:NOT_NOW"), native.calls)
+            assertEquals(listOf("a"), kept)
+            assertNull(controller.failure)
+        }
+
+    /** A sign-in already set aside is only kept: MDK takes Not now once, so it is not sent again. */
+    @Test
+    fun mineOnASignInSetAsideSendsNothing() =
+        runTest {
+            val native = Native()
+            val kept = mutableListOf<String>()
+            val controller = SignInReviewController(ACCOUNT, native) { kept += it }
+
+            controller.markMine(signIn("a").copy(state = UnrecognizedSignInStateFfi.NOT_NOW))
+
+            assertEquals(emptyList<String>(), native.calls)
+            assertEquals(listOf("a"), kept)
+        }
+
+    /** When MDK refuses the answer nothing is kept, and the failure is shown once. */
+    @Test
+    fun aRefusedMineKeepsNothing() =
+        runTest {
+            val native = Native()
+            native.act = { throw MarmotKitException.TransportClosed() }
+            val kept = mutableListOf<String>()
+            val controller = SignInReviewController(ACCOUNT, native) { kept += it }
+
+            controller.markMine(signIn("a"))
+
+            assertEquals(emptyList<String>(), kept)
+            assertEquals(SignInReviewAction.Answer, controller.failure?.action)
+        }
+
     private companion object {
         const val ACCOUNT = "account"
         val WARNING = CompromiseWarningItemFfi(CompromiseWarningReasonFfi.REJECTED_SIGN_IN, "slot", null, 1u)

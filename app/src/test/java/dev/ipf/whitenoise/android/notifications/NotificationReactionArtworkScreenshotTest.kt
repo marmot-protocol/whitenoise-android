@@ -4,13 +4,19 @@ import android.Manifest
 import android.app.Activity
 import android.app.Notification
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
+import androidx.core.app.NotificationCompat
+import androidx.core.app.Person
+import androidx.core.app.RemoteInput
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -155,6 +161,51 @@ class NotificationReactionArtworkScreenshotTest {
             assertNotNull(card.shortcutId)
             capture(card, "notification_reaction_native_conversation")
         }
+
+    @Test
+    @Config(qualifiers = "w411dp-h800dp-mdpi")
+    fun compactQuickReactionChipsLight() {
+        capture(compactQuickReactionCard(), "notification_quick_reaction_chips", width = 411)
+    }
+
+    @Test
+    @Config(qualifiers = "ldrtl-w360dp-h800dp-night-mdpi")
+    fun compactQuickReactionChipsDarkRtl() {
+        RuntimeEnvironment.setFontScale(2f)
+        capture(compactQuickReactionCard(), "notification_quick_reaction_chips_dark_rtl")
+    }
+
+    private fun compactQuickReactionCard(): Notification {
+        val values = listOf("👍", "😂", "❤️", ":marmot:", ":wn:")
+        val pending =
+            PendingIntent.getBroadcast(
+                context,
+                1,
+                Intent(context, NotificationActionReceiver::class.java),
+                PendingIntent.FLAG_IMMUTABLE,
+            )
+        val images =
+            values.mapNotNull { value -> notificationBuiltinEmojiBitmap(context, value)?.let { value to it } }.toMap()
+        val chips = quickReactionChipsExtra(values, images) { pending }
+        val user = Person.Builder().setName("Me").build()
+        val sender = Person.Builder().setName("Alex").build()
+        val source =
+            NotificationCompat
+                .Builder(context, "messages")
+                .setSmallIcon(R.drawable.ic_stat_whitenoise)
+                .setWhen(0L)
+                .setShowWhen(false)
+                .setStyle(NotificationCompat.MessagingStyle(user).addMessage("Thanks for coming along.", 0L, sender))
+                .addAction(
+                    NotificationCompat.Action
+                        .Builder(0, "Reply", pending)
+                        .addRemoteInput(RemoteInput.Builder("reply").setChoices(values.toTypedArray()).build())
+                        .setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_REPLY)
+                        .build(),
+                ).addAction(0, "Mark as read", pending)
+        source.extras.putBundle(EXTRA_QUICK_REACTION_CHIPS, chips)
+        return withQuickReactionRows(context, source.build())
+    }
 
     /** Capture real platform RemoteViews, showing collapsed then expanded forms. */
     @Suppress("DEPRECATION")

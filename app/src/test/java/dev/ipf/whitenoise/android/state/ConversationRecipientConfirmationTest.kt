@@ -57,7 +57,7 @@ class ConversationRecipientConfirmationTest {
                 assertTrue(controller.awaitingDelivery(controller.timeline.single()))
 
                 val confirmed = confirmedRecord(pending)
-                controller.testApplyLiveTimelineChangesAndRegisterStreams(
+                controller.testApplyLiveTimelineChanges(
                     listOf(
                         TimelineMessageChangeFfi.Upsert(
                             TimelineUpdateTriggerFfi.DELIVERY_OR_SEND_STATE_CHANGED,
@@ -111,7 +111,7 @@ class ConversationRecipientConfirmationTest {
             try {
                 assertEquals(MessageStatus.Failed, optimistic["msg:temp-send"]?.status)
 
-                controller.testApplyLiveTimelineChangesAndRegisterStreams(
+                controller.testApplyLiveTimelineChanges(
                     listOf(
                         TimelineMessageChangeFfi.Upsert(
                             TimelineUpdateTriggerFfi.DELIVERY_OR_SEND_STATE_CHANGED,
@@ -170,7 +170,7 @@ class ConversationRecipientConfirmationTest {
                 initialMemberSnapshot = conversationTimelineMemberSnapshot(),
             )
         try {
-            controller.testApplyLiveTimelineChangesAndRegisterStreams(
+            controller.testApplyLiveTimelineChanges(
                 listOf(
                     TimelineMessageChangeFfi.Upsert(
                         TimelineUpdateTriggerFfi.DELIVERY_OR_SEND_STATE_CHANGED,
@@ -220,7 +220,7 @@ class ConversationRecipientConfirmationTest {
                 initialMemberSnapshot = conversationTimelineMemberSnapshot(),
             )
         try {
-            controller.testApplyLiveTimelineChangesAndRegisterStreams(
+            controller.testApplyLiveTimelineChanges(
                 listOf(
                     TimelineMessageChangeFfi.Upsert(
                         TimelineUpdateTriggerFfi.DELIVERY_OR_SEND_STATE_CHANGED,
@@ -228,7 +228,7 @@ class ConversationRecipientConfirmationTest {
                     ),
                 ),
             )
-            controller.testApplyLiveTimelineChangesAndRegisterStreams(
+            controller.testApplyLiveTimelineChanges(
                 listOf(
                     TimelineMessageChangeFfi.Upsert(
                         TimelineUpdateTriggerFfi.DELIVERY_OR_SEND_STATE_CHANGED,

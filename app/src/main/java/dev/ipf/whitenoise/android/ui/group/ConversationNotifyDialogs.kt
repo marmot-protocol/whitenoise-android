@@ -29,7 +29,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.ConversationVibrationPattern
 import dev.ipf.whitenoise.android.notifications.previewConversationVibration
 import dev.ipf.whitenoise.android.state.ChatNotifyMode
-import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 
 @Suppress("FunctionNaming")
@@ -39,7 +39,7 @@ internal fun NotifyForDialog(
     onDismiss: () -> Unit,
     onSelect: (ChatNotifyMode) -> Unit,
 ) {
-    AnimatedAlertDialog(
+    WhiteNoiseAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.notify_for)) },
         text = {
@@ -66,7 +66,7 @@ internal fun VibrationPatternDialog(
 ) {
     val context = LocalContext.current
     var selected by remember(currentPattern) { mutableStateOf(currentPattern) }
-    AnimatedAlertDialog(
+    WhiteNoiseAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.vibration_pattern)) },
         text = {

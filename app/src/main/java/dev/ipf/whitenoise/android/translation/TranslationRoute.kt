@@ -21,6 +21,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.state.TransientNotice
+import dev.ipf.whitenoise.android.state.TransientNoticeKind
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -48,12 +49,14 @@ internal fun rememberConversationTranslation(
     val scope = rememberCoroutineScope()
     val runtime = appState.runtimeGeneration
     val active by rememberUpdatedState(routeActive)
+    val detector = IncomingLanguageDetector.shared(context.applicationContext.resources)
     val session =
         remember(account, group, runtime) {
             ConversationTranslationSession(
                 scope,
                 { withContext(Dispatchers.IO) { OfflineTranslatorClient(context.applicationContext) } },
                 { active && account != null && appState.translationOwnerCurrent(account, runtime, lifecycle) },
+                detectIncoming = { text -> withContext(Dispatchers.Default) { detector.detect(text) } },
             )
         }
     val preferencesRevision by preferences.changes.collectAsState()
@@ -63,7 +66,13 @@ internal fun rememberConversationTranslation(
         ownedNotice?.let { appState.clearTransientNotice(it) }
         ownedNotice = null
         if (session.failure != null && account != null) {
-            ownedNotice = appState.presentConversationTransient(account, group, recoveryNotice(session.failure))
+            ownedNotice =
+                appState.presentConversationTransient(
+                    account,
+                    group,
+                    recoveryNotice(session.failure),
+                    kind = TransientNoticeKind.Information,
+                )
         }
     }
     TranslationOwnerResetEffect(session, onReset = session::clear) {

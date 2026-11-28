@@ -24,34 +24,31 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.SecureFlagPolicy
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.Nip05Resolver
-import dev.ipf.whitenoise.android.core.ProfileFieldValidation
-import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.diagnostics.DmCreationDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.DmCreationInteraction
-import dev.ipf.whitenoise.android.share.launchInviteShare
-import dev.ipf.whitenoise.android.share.presentOutboundShareFailure
+import dev.ipf.whitenoise.android.share.activeAccountInvite
+import dev.ipf.whitenoise.android.share.shareAppInviteText
 import dev.ipf.whitenoise.android.state.BlockOutcome
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MemberMutePreferences
+import dev.ipf.whitenoise.android.state.NoticeTier
 import dev.ipf.whitenoise.android.state.ProfileGroupPickerLoadState
 import dev.ipf.whitenoise.android.state.ToastMessage
+import dev.ipf.whitenoise.android.state.TransientNotice
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.createProfileChatGroup
 import dev.ipf.whitenoise.android.state.forwardTargetsRevision
@@ -77,12 +74,14 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.StartChatErrorUiState
 import dev.ipf.whitenoise.android.ui.chats.newchat.attemptOpenOrStartProfileChat
 import dev.ipf.whitenoise.android.ui.chats.newchat.recipientNip05Verified
 import dev.ipf.whitenoise.android.ui.chats.newchat.withDmCreationOwner
+import dev.ipf.whitenoise.android.ui.common.LocalTopNoticeScope
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseTextFieldContainerColor
 import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
 import dev.ipf.whitenoise.android.ui.common.VISIBLE_GROUP_AVATAR_LIMIT
 import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
+import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.conversation.rememberConversationMotionEnabled
@@ -157,81 +156,6 @@ internal fun profileFollowRowState(
         showsUnfollow = following == true,
     )
 
-internal data class ProfileSheetMetadata(
-    val displayName: String?,
-    val pictureUrl: String?,
-    val bannerUrl: String?,
-    val about: String?,
-    val nip05: String?,
-    val lightningAddress: String?,
-)
-
-private inline fun firstSanitizedProfileField(
-    vararg candidates: String?,
-    sanitize: (String?) -> String?,
-): String? = candidates.firstNotNullOfOrNull(sanitize)
-
-private fun sanitizedProfileNip05(raw: String?): String? =
-    raw
-        ?.trim()
-        ?.takeIf { it.isNotEmpty() && ProfileFieldValidation.isAcceptableNip05(it) }
-
-private fun sanitizedProfileLightningAddress(raw: String?): String? =
-    raw
-        ?.trim()
-        ?.takeIf { it.isNotEmpty() && ProfileFieldValidation.isAcceptableLud16(it) }
-
-/**
- * Keeps locally materialized fields authoritative without letting a sparse or
- * invalid cached record hide richer metadata carried by a discovery result.
- */
-internal fun resolveProfileSheetMetadata(
-    cached: UserProfileMetadataFfi?,
-    discovered: UserProfileMetadataFfi?,
-    cachedAvatarUrl: String?,
-): ProfileSheetMetadata =
-    ProfileSheetMetadata(
-        displayName =
-            firstSanitizedProfileField(
-                cached?.displayName,
-                discovered?.displayName,
-                cached?.name,
-                discovered?.name,
-                sanitize = ProfileSanitizer::displayName,
-            ),
-        pictureUrl =
-            firstSanitizedProfileField(
-                cachedAvatarUrl,
-                cached?.picture,
-                discovered?.picture,
-                sanitize = ProfileSanitizer::protocolImageUrl,
-            ),
-        bannerUrl =
-            firstSanitizedProfileField(
-                cached?.banner,
-                discovered?.banner,
-                sanitize = ProfileSanitizer::protocolImageUrl,
-            ),
-        about =
-            firstSanitizedProfileField(
-                cached?.about,
-                discovered?.about,
-                sanitize = ProfileSanitizer::about,
-            ),
-        nip05 =
-            firstSanitizedProfileField(
-                cached?.nip05,
-                discovered?.nip05,
-                sanitize = ::sanitizedProfileNip05,
-            ),
-        lightningAddress =
-            firstSanitizedProfileField(
-                cached?.lud16,
-                discovered?.lud16,
-                sanitize = ::sanitizedProfileLightningAddress,
-            ),
-    )
-
 internal enum class ProfileSheetPage {
     PROFILE,
     GROUPS_IN_COMMON,
@@ -282,7 +206,7 @@ internal fun ProfileSheet(
         ) -> Unit
     )? = null,
 ) {
-    val clipboard = LocalClipboardManager.current
+    val clipboard = rememberClipboardCopier()
     val context = LocalContext.current
     val currentDismiss by rememberUpdatedState(onDismiss)
     val accountAtOpen = remember(appState, npub) { appState.activeAccountRef }
@@ -325,6 +249,7 @@ internal fun ProfileSheet(
     var blocked by remember(npub) { mutableStateOf<Boolean?>(null) }
     var blockBusy by remember(npub) { mutableStateOf(false) }
     var feedback by remember(npub) { mutableStateOf<ToastMessage?>(null) }
+    var promotionNotice by remember(owner) { mutableStateOf<TransientNotice?>(null) }
     val teamReport = remember(npub) { ProfileTeamReportState() }
     LaunchedEffect(copied) {
         if (copied) {
@@ -376,6 +301,7 @@ internal fun ProfileSheet(
     // the "name from profile" section and the nickname dialog deliberately keep
     // the real profile name (`title`) so the user sees what they're renaming.
     val displayTitle = contactNickname ?: title
+    val inviteName = contactNickname ?: personName
     val pictureUrl = hex?.let { appState.contactAvatarSource(it) } ?: profile.pictureUrl
     val bannerUrl = profile.bannerUrl
     val avatarImageAvailable = rememberAvatarImageAvailable(pictureUrl, AvatarImageLoader.publicProfiles())
@@ -449,8 +375,7 @@ internal fun ProfileSheet(
             busy = followBusy,
             creatingChat = creatingChat,
         )
-    val inviteTitle = stringResource(R.string.invite_to_white_noise)
-    val inviteMessage = stringResource(R.string.invite_message)
+    val invite = activeAccountInvite(appState)
     val groupPickerRevision = appState.profileGroupPickerRevision
     val liveGroupsRevision = appState.forwardTargetsRevision
     // Chats beyond the retained chat-list window, so groups in common and both pickers see every chat (#2983).
@@ -547,6 +472,9 @@ internal fun ProfileSheet(
                                     appState.loadCreatedChatListItem(id)
                                 },
                                 displayName = appState::displayName,
+                                invitationRecipientName = {
+                                    appState.contactDisplayNameCachedOrNull(it) ?: inviteName
+                                },
                                 markCreateOpenStage = appState::markChatCreateOpenStage,
                                 abandonCreateOpenTiming = appState::abandonChatCreateOpenTiming,
                                 diagnosticAttempt = diagnosticAttempt,
@@ -607,10 +535,13 @@ internal fun ProfileSheet(
             try {
                 owner.requireCurrent()
                 val previousToast = appState.toast
-                val promoted = appState.promoteProfileInGroup(targetHex, group.group.groupIdHex)
+                val confirmation = appState.promoteProfileInGroup(targetHex, group.group.groupIdHex)
                 if (owner.canAct()) {
                     feedback = personProfileFeedback(previousToast, appState.toast)
-                    if (promoted) page = ProfileSheetPage.PROFILE
+                    if (confirmation != null) {
+                        promotionNotice = confirmation
+                        page = ProfileSheetPage.PROFILE
+                    }
                 }
             } finally {
                 promotingAdmin = false
@@ -792,13 +723,12 @@ internal fun ProfileSheet(
             onPromote = { if (owner.canAct()) page = ProfileSheetPage.MAKE_ADMIN },
             onCopy = {
                 if (owner.canAct()) {
-                    clipboard.setText(AnnotatedString(presentationNpub))
-                    copied = true
+                    if (clipboard.copy(presentationNpub)) copied = true
                 }
             },
             onAvatar = { if (owner.canAct()) fullPictureOpen = true },
             onBanner = { if (owner.canAct()) fullBannerOpen = true },
-            onCopyLightning = { if (owner.canAct()) lightningAddress?.let { clipboard.setText(AnnotatedString(it)) } },
+            onCopyLightning = { if (owner.canAct()) lightningAddress?.let { clipboard.copy(it) } },
             sharedAvatars = {
                 PreparedGroupAvatarContent(
                     appState,
@@ -821,11 +751,10 @@ internal fun ProfileSheet(
                         onRetry = { openOrCreateProfileChat(error.retryGroupIdHex) },
                         onInvite = {
                             if (owner.canAct()) {
-                                launchInviteShare(context, inviteMessage, inviteTitle)
-                                    .onFailure { appState.presentOutboundShareFailure("PROFILE_INVITE_SHARE", it) }
+                                appState.shareAppInviteText(context, invite, "PROFILE_INVITE_SHARE")
                             }
                         },
-                        onCopy = { clipboard.setText(AnnotatedString(it)) },
+                        onCopy = { clipboard.copy(it) },
                     )
                 }
             },
@@ -843,8 +772,11 @@ internal fun ProfileSheet(
         )
     }
 
+    // A profile opened from Contacts can show its own promotion without adopting other group notices.
+    val promotionScope = appState.transientNotice?.takeIf { it === promotionNotice }?.conversation
     MeasuredPlaybackDialog(
         origin = appState.pendingProfileOrigin,
+        noticeScope = promotionScope ?: LocalTopNoticeScope.current,
         sourceContour = appState.pendingProfileContour,
         ownerKey = owner to appState.pendingProfilePresentationId,
         dismissEnabled = { !creatingChat && !addingToGroups && !promotingAdmin },
@@ -939,7 +871,16 @@ internal fun ProfileSheet(
                                 personName = displayTitle,
                                 groups = shared.groups,
                                 ownerIsCurrent = { owner.canAct() && page == ProfileSheetPage.GROUPS_IN_COMMON },
-                                onFeedback = { if (owner.canAct()) feedback = it },
+                                onFeedback = { result ->
+                                    if (owner.canAct()) {
+                                        if (result?.tier == NoticeTier.Confirmation) {
+                                            feedback = null
+                                            appState.presentTransient(result.title, result.detail)
+                                        } else {
+                                            feedback = result
+                                        }
+                                    }
+                                },
                                 onMembershipChanged = {
                                     if (owner.canAct()) accountWideGroups.refreshAfterMembershipChange()
                                 },

@@ -40,15 +40,20 @@ suspend fun ConversationController.inviteMembers(
             diagnostic.record(DmCreationPhase.ROSTER, DmCreationOutcome.SUCCESS)
             val account = conversationAccountRef ?: return@withMutationLockResult false
             diagnostic.record(DmCreationPhase.RECIPIENTS, DmCreationOutcome.START)
+            // The admin selection normally repeats references already resolved for this invitation.
+            val resolved = mutableMapOf<String, String?>()
+            val resolve: suspend (String) -> String? = { ref ->
+                resolved.getOrPut(ref) { appState.resolveAccountIdHex(ref) }
+            }
             val refs =
-                resolveCanonicalInviteRefs(memberRefs, diagnostic) ?: return@withMutationLockResult false
+                resolveCanonicalInviteRefs(memberRefs, diagnostic, resolve) ?: return@withMutationLockResult false
             if (refs.isEmpty()) {
                 diagnostic.record(DmCreationPhase.RECIPIENTS, DmCreationOutcome.SUCCESS)
                 return@withMutationLockResult false
             }
             optimisticGroupRosterMutation.track(OptimisticGroupRosterMutation.Invite(refs)) {
                 val adminTargets =
-                    resolveCanonicalInviteRefs(initialAdminRefs, diagnostic) ?: return@track false
+                    resolveCanonicalInviteRefs(initialAdminRefs, diagnostic, resolve) ?: return@track false
                 diagnostic.record(DmCreationPhase.RECIPIENTS, DmCreationOutcome.SUCCESS)
                 val activityId = pendingMembershipActivity?.id
                 var nativeInvoked = false

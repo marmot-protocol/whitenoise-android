@@ -1,0 +1,158 @@
+package dev.ipf.whitenoise.android.ui.conversation.media
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+/** The in-memory transcript cache: automatic default, explicit overrides, account scoping and bounded size. */
+class ReceivedVoiceTranscriptsTest {
+    private val complete = AudioTranscriptUi(AudioTranscriptPhase.COMPLETE, "On my way")
+
+    /** With no explicit choice a message follows the automatic setting; an explicit choice wins either way. */
+    @Test
+    fun explicitChoiceOverridesAutomaticSetting() {
+        val transcripts = ReceivedVoiceTranscripts()
+        val automatic = VoiceTranscriptionScope(transcripts, "alice", automatic = true)
+        val manual = VoiceTranscriptionScope(transcripts, "alice", automatic = false)
+
+        assertTrue(automatic.shown("m1"))
+        assertFalse(automatic.requestedExplicitly("m1"))
+        assertFalse(manual.shown("m1"))
+
+        automatic.setShown("m1", false)
+        assertFalse(automatic.shown("m1"))
+        assertFalse(automatic.requestedExplicitly("m1"))
+
+        manual.setShown("m2", true)
+        assertTrue(manual.shown("m2"))
+        assertTrue(manual.requestedExplicitly("m2"))
+    }
+
+    /** Two accounts in the same group never see each other's transcript or choice. */
+    @Test
+    fun accountsDoNotShareTranscriptsOrChoices() {
+        val transcripts = ReceivedVoiceTranscripts()
+        val alice = VoiceTranscriptionScope(transcripts, "alice", automatic = false)
+        val bob = VoiceTranscriptionScope(transcripts, "bob", automatic = false)
+
+        alice.storeResult("m1:0:1", complete)
+        alice.setShown("m1", true)
+
+        assertEquals(complete, alice.result("m1:0:1"))
+        assertNull(bob.result("m1:0:1"))
+        assertFalse(bob.shown("m1"))
+    }
+
+    @Test
+    fun removedAccountRejectsWritesFromOldScope() {
+        val transcripts = ReceivedVoiceTranscripts()
+        val old = VoiceTranscriptionScope(transcripts, "alice", automatic = false)
+        val other = VoiceTranscriptionScope(transcripts, "bob", automatic = false)
+        old.storeResult("attachment", complete)
+        old.setShown("message", true)
+
+        transcripts.forgetAccount("alice")
+        old.storeResult("attachment", complete)
+        old.setShown("message", true)
+        other.storeResult("attachment", complete)
+
+        val current = VoiceTranscriptionScope(transcripts, "alice", automatic = false)
+        assertNull(current.result("attachment"))
+        assertFalse(current.shown("message"))
+        assertEquals(complete, other.result("attachment"))
+        current.storeResult("attachment", complete)
+        assertEquals(complete, current.result("attachment"))
+    }
+
+    @Test
+    fun removingAChatKeepsOtherResultsAndRejectsLateWrites() {
+        val transcripts = ReceivedVoiceTranscripts()
+        val removed = VoiceTranscriptionScope(transcripts, "alice", automatic = false, group = "removed")
+        val other = VoiceTranscriptionScope(transcripts, "alice", automatic = false, group = "other")
+        removed.storeResult("attachment", complete)
+        removed.setShown("message", true)
+        assertNull(other.result("attachment"))
+        other.storeResult("attachment", complete)
+
+        transcripts.forgetGroup("alice", "removed")
+        removed.storeResult("attachment", complete)
+        removed.setShown("message", true)
+
+        assertNull(removed.result("attachment"))
+        assertFalse(removed.shown("message"))
+        val reopened = VoiceTranscriptionScope(transcripts, "alice", automatic = false, group = "removed")
+        assertNull(reopened.result("attachment"))
+        assertFalse(reopened.shown("message"))
+        assertEquals(complete, other.result("attachment"))
+    }
+
+    @Test
+    fun evictingOneGroupLeavesOtherRecognitionInFlight() {
+        val transcripts = ReceivedVoiceTranscripts()
+        val departing = VoiceTranscriptionScope(transcripts, "alice", automatic = true, group = "departing")
+        val other = VoiceTranscriptionScope(transcripts, "alice", automatic = true, group = "playing")
+        val otherAccount = VoiceTranscriptionScope(transcripts, "bob", automatic = true, group = "departing")
+
+        transcripts.forgetGroup("alice", "departing")
+        departing.storeResult("recording", complete)
+        other.storeResult("recording", complete)
+        otherAccount.storeResult("recording", complete)
+
+        assertFalse(departing.active)
+        assertNull(departing.result("recording"))
+        assertTrue(other.active)
+        assertEquals(complete, other.result("recording"))
+        assertTrue(otherAccount.active)
+        assertEquals(complete, otherAccount.result("recording"))
+    }
+
+    @Test
+    fun removedHistoryCannotRestartAutomaticTranscriptionWithAFreshScope() {
+        val transcripts = ReceivedVoiceTranscripts()
+        var member = true
+        val existing = VoiceTranscriptionScope(transcripts, "alice", automatic = true, group = "chat") { member }
+        assertTrue(existing.shown("message"))
+        member = false
+        assertFalse(existing.active)
+        transcripts.forgetGroup("alice", "chat")
+        val history = VoiceTranscriptionScope(transcripts, "alice", automatic = true, group = "chat") { member }
+        history.setShown("message", true)
+        history.storeResult("attachment", complete)
+        assertFalse(history.shown("message"))
+        assertNull(history.result("attachment"))
+    }
+
+    @Test
+    fun clearingForegroundStateDropsResultsAndChoicesAndRejectsLateWrites() {
+        val transcripts = ReceivedVoiceTranscripts()
+        val old = VoiceTranscriptionScope(transcripts, "alice", automatic = false)
+        old.storeResult("attachment", complete)
+        old.setShown("message", true)
+
+        transcripts.clear()
+        old.storeResult("attachment", complete)
+        old.setShown("message", true)
+
+        val current = VoiceTranscriptionScope(transcripts, "alice", automatic = false)
+        assertNull(current.result("attachment"))
+        assertFalse(current.shown("message"))
+        current.storeResult("attachment", complete)
+        assertEquals(complete, current.result("attachment"))
+    }
+
+    /** The oldest entries leave first once the cache is full, and a re-stored entry counts as new. */
+    @Test
+    fun evictsOldestPastCapacity() {
+        val transcripts = ReceivedVoiceTranscripts(capacity = 2)
+        transcripts.storeResult("a", complete)
+        transcripts.storeResult("b", complete)
+        transcripts.storeResult("a", complete)
+        transcripts.storeResult("c", complete)
+
+        assertEquals(complete, transcripts.result("a"))
+        assertNull(transcripts.result("b"))
+        assertEquals(complete, transcripts.result("c"))
+    }
+}

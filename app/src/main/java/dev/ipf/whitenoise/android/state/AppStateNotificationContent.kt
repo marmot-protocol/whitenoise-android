@@ -27,19 +27,24 @@ import dev.ipf.whitenoise.android.notifications.LocalNotificationContent
 import dev.ipf.whitenoise.android.notifications.LocalNotificationFormatter
 import dev.ipf.whitenoise.android.notifications.PushWakeDiagnostics
 import dev.ipf.whitenoise.android.notifications.PushWakeEvent
+import dev.ipf.whitenoise.android.notifications.notificationEmojiLabelFormatter
 import dev.ipf.whitenoise.android.state.GroupInviteNotificationIdentityRefreshStore.RefreshCandidate
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.plus
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
@@ -1029,6 +1034,7 @@ private suspend fun WhiteNoiseAppState.showInitialNotificationUpdate(
             useDirectLayout = useDirectLayout,
             redactContent = redactContent,
             directShareEligible = !redactContent && candidate.accountRef == activeAccountRef,
+            emojiLabel = firstPost.emojiLabel,
             shortNpub = ::cachedShortNpubOrUnknown,
             onNotificationWritten = onNotificationWritten,
             isPostStillAllowed = {
@@ -1179,8 +1185,8 @@ internal fun WhiteNoiseAppState.launchNotificationListenerLoop(): Job =
  * as supervised children of this loop, so they end with it, and a failing one is logged without cancelling the
  * loop or the notification listener above it. The same stream carries MDK's accepted deletions, so each event
  * also retracts removed notification content, and each open reconciles the cards already shown (#3323). It also
- * tells the active account when MDK drops a queued group change for size, which nothing else surfaces, and tells
- * any signed-in account once when a chat could not return to its latest state and needs a restart.
+ * tells the active account about a group change MDK could not make, while the stream that reported it stays open,
+ * and tells any signed-in account once when a chat could not return to its latest state and needs a restart.
  */
 internal suspend fun WhiteNoiseAppState.runMutedChatReceiptLoop(
     marmot: MarmotInterface,
@@ -1206,6 +1212,9 @@ internal suspend fun WhiteNoiseAppState.runMutedChatReceiptLoop(
         // A failed open is retried with the capped backoff for as long as the listener runs: muted chats and
         // notifications-off accounts get no notification update, so this loop is their only receipt source.
         if (subscription != null) {
+            // Group-change notices belong to the stream that reported them: its end withdraws any not yet seen, and
+            // the next open raises a retained one again.
+            val streamNotices = this + SupervisorJob(coroutineContext.job)
             try {
                 // Each open requests cleanup for cards left while the process or stream was down. It shares
                 // read-state workers: a newer open marks a blocked pass dirty and retains its latest follow-up.
@@ -1217,12 +1226,18 @@ internal suspend fun WhiteNoiseAppState.runMutedChatReceiptLoop(
                         launch(Dispatchers.Main) { presentRewindRestoreFailure(failure) }
                     }
                 }
+                // A sign-in MDK found while no stream listened is still announced.
+                launch { runCatchingCancellable { refreshAllSignInAlerts() } }
+                launch(Dispatchers.Main) { refreshAllMissedDeviceLinkAttempts() }
+                // A group change MDK gave up while no stream listened still tells the user, once.
+                streamNotices.launch { runCatchingCancellable { presentRetainedGroupChange(marmot) } }
                 runCatchingCancellable {
                     var event = subscription.next()
                     while (event != null) {
                         backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
                         handleNotificationContentEvent(event, readReconciliations, scope = this)
-                        presentEventNotices(event, scope = this)
+                        checkCaptureEvictionOnRuntimeEvent(event, marmot, scope = this)
+                        presentEventNotices(event, marmot, scope = this, streamScope = streamNotices)
                         val received = (event as? MarmotEventFfi.MessageReceived)?.received
                         // Only the cheap kind and sender check runs here; the suppression reads run with the
                         // lookup, as a child of this loop, so they never delay the next event.
@@ -1238,7 +1253,10 @@ internal suspend fun WhiteNoiseAppState.runMutedChatReceiptLoop(
                     }
                 }.onFailure { Log.w(INCOMING_ATTACHMENT_TAG, "muted_receipt_stream_failed") }
             } finally {
-                withContext(NonCancellable) { runCatching { subscription.destroy() } }
+                withContext(NonCancellable) {
+                    streamNotices.coroutineContext.job.cancelAndJoin()
+                    runCatching { subscription.destroy() }
+                }
             }
         }
         delay(backoffMillis)
@@ -1515,13 +1533,16 @@ private suspend fun WhiteNoiseAppState.resolveNotificationFirstPost(
             is NotificationFirstPostContentResult.Resolved -> result.value
             else -> null
         }
+    val emojiLabel = appContext.notificationEmojiLabelFormatter()
     return NotificationFirstPost(
         epoch = postEpoch,
         accountCacheEpoch = accountCacheEpoch,
         engineMuted = engineMuted,
         shouldPost = shouldPost,
         content = content,
-        presentation = notificationContentPresentation(appContext, update, content, ::cachedShortNpubOrUnknown),
+        presentation =
+            notificationContentPresentation(appContext, update, content, emojiLabel, ::cachedShortNpubOrUnknown),
+        emojiLabel = emojiLabel,
         avatars = readyNotificationAvatars(update),
     )
 }

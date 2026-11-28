@@ -497,8 +497,7 @@ private val GLOBAL_SEARCH_INERT_TRIGGERS =
         TimelineUpdateTriggerFfi.REACTION_REMOVED,
         TimelineUpdateTriggerFfi.RECEIPT_CHANGED,
         TimelineUpdateTriggerFfi.REPLY_PREVIEW_CHANGED,
-        TimelineUpdateTriggerFfi.AGENT_ACTIVITY,
-        TimelineUpdateTriggerFfi.AGENT_OPERATION,
+        TimelineUpdateTriggerFfi.AGENT_ITEM,
     )
 
 /** Triggers through which a message not yet listed can become a match. */
@@ -506,7 +505,6 @@ private val GLOBAL_SEARCH_MATCHING_TRIGGERS =
     setOf(
         TimelineUpdateTriggerFfi.NEW_MESSAGE,
         TimelineUpdateTriggerFfi.MESSAGE_EDITED_OR_REPROJECTED,
-        TimelineUpdateTriggerFfi.AGENT_STREAM_FINISHED,
         TimelineUpdateTriggerFfi.SNAPSHOT_REFRESH,
     )
 
@@ -557,14 +555,14 @@ internal fun GlobalSearchResultsController.isTouchedBy(update: TimelineProjectio
 }
 
 /**
- * A deletion, edit or snapshot reprojection of an existing row of a searchable kind, or a send-state change that
- * invalidated one — the only rows a read in flight can be holding.
+ * A deletion, edit or snapshot reprojection of an existing row of a searchable kind or a thread message, or a
+ * send-state change that invalidated one — the only rows a read in flight can be holding.
  */
 private fun TimelineMessageChangeFfi.Upsert.rewritesExistingRow(): Boolean {
     val invalidated =
         trigger == TimelineUpdateTriggerFfi.DELIVERY_OR_SEND_STATE_CHANGED && message.invalidationStatus != null
     val rewrite = trigger in GLOBAL_SEARCH_EXISTING_ROW_TRIGGERS || invalidated
-    return rewrite && ChatListMessageSearch.isSearchableKind(message.kind)
+    return rewrite && ChatListMessageSearch.isSearchableKind(message.kind, inThread = message.thread != null)
 }
 
 /**

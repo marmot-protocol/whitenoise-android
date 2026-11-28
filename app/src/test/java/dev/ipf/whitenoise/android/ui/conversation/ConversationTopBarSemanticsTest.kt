@@ -11,8 +11,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
@@ -27,11 +25,15 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTouchHeightIsEqualTo
 import androidx.compose.ui.test.assertWidthIsEqualTo
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
@@ -40,20 +42,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
-import dev.ipf.marmotkit.AccountSummaryFfi
-import dev.ipf.marmotkit.AppBlobEndpointFfi
-import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
-import dev.ipf.marmotkit.AppGroupRecordFfi
-import dev.ipf.marmotkit.AppProtocolProfileFfi
-import dev.ipf.marmotkit.EncryptedMediaVersionFfi
-import dev.ipf.marmotkit.SelfMembershipFfi
-import dev.ipf.whitenoise.android.core.GroupTitleCopy
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.state.ChatNotifyMode
 import dev.ipf.whitenoise.android.state.ConversationController
-import dev.ipf.whitenoise.android.state.DraftPersistence
-import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.HeaderShortcut
 import dev.ipf.whitenoise.android.state.MarmotWindowTestFakes
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -141,6 +133,47 @@ class ConversationTopBarSemanticsTest {
         composeRule
             .onNodeWithTag(CONVERSATION_TOP_BAR_TAG)
             .captureRoboImage("src/test/snapshots/conversation_header_compact_timer_light.png")
+    }
+
+    /** A timer too long for a crowded 320dp header ends in an ellipsis instead of silently losing digits. */
+    @Test
+    @Config(qualifiers = SMALL_PHONE)
+    fun overlongHeaderTimerEllipsizesInsteadOfClipping() {
+        val appState = appState()
+        appState.markDisappearingTooltipShown()
+        val retention = 9_000_000_000_000_000_001uL
+        val controller = ConversationController(appState, group().copy(disappearingMessageSecs = retention))
+        render(appState, controller, actions = {
+            ConversationHeaderShortcuts(
+                HeaderShortcut.entries.toList(),
+                capacity = it,
+                muteControl = muteControl(appState),
+                onSearch = {},
+                readAloudOn = false,
+                onMembers = {},
+                onAddMembers = {},
+            )
+        })
+        val layouts = mutableListOf<TextLayoutResult>()
+        composeRule
+            .onNodeWithText("$retention seconds", useUnmergedTree = true)
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+
+        assertTrue("the shortened timer must end in an ellipsis", layouts.single().isLineEllipsized(0))
+    }
+
+    /** The header timer's tooltip spells out a duration too long for the header, so anyone can read it in full. */
+    @Test
+    @Config(qualifiers = SMALL_PHONE)
+    fun overlongHeaderTimerReadsInFullInItsTooltip() {
+        val appState = appState()
+        val retention = 9_000_000_000_000_000_001uL
+        val controller = ConversationController(appState, group().copy(disappearingMessageSecs = retention))
+        render(appState, controller)
+
+        composeRule
+            .onNode(hasText("$retention seconds") and hasAnyAncestor(hasTestTag("conversation.timer.tooltip")))
+            .assertExists()
     }
 
     /** Keeps the automatic-timer explanation inside the available window. */
@@ -255,7 +288,7 @@ class ConversationTopBarSemanticsTest {
     @Config(qualifiers = PHONE)
     fun headerWithReadAloudDark() = shortcutHeader("read_aloud_dark", READ_ALOUD_SHORTCUTS, dark = true)
 
-    /** With every shortcut chosen, a typical phone shows the first four and the chat name keeps half the bar. */
+    /** A typical phone keeps room for the title when more shortcuts are configured than fit. */
     @Test
     @Config(qualifiers = PHONE)
     fun headerWithAllShortcutsLight() = shortcutHeader("all_light", HeaderShortcut.entries.toList())
@@ -265,7 +298,7 @@ class ConversationTopBarSemanticsTest {
     @Config(qualifiers = PHONE)
     fun headerWithAllShortcutsDark() = shortcutHeader("all_dark", HeaderShortcut.entries.toList(), dark = true)
 
-    /** Every shortcut chosen on a small phone at double font: only two fit, with the members line and timer badge. */
+    /** Every shortcut chosen on a small phone at double font, with the members line and timer badge. */
     @Test
     @Config(qualifiers = SMALL_PHONE)
     fun crowdedHeaderLargeFont() = crowdedHeader("crowded_large_font", rtl = false)
@@ -287,13 +320,13 @@ class ConversationTopBarSemanticsTest {
                 muteControl = muteControl(appState),
                 onSearch = {},
                 readAloudOn = true,
-                onTimer = {},
                 onMembers = {},
                 onAddMembers = {},
             )
         })
-        // 360dp at normal font fits three: the reversed list starts with Add members, Members and Timer.
-        for (tag in GROUP_SHORTCUT_TAGS) composeRule.onNodeWithTag(tag).assertExists()
+        // At 360 dp, only the first two full-size targets fit without crowding the title.
+        composeRule.onNodeWithTag(CONVERSATION_HEADER_ADD_MEMBERS_TAG).assertExists()
+        composeRule.onNodeWithTag(CONVERSATION_HEADER_MEMBERS_TAG).assertExists()
         composeRule.onNodeWithTag(CONVERSATION_HEADER_READ_ALOUD_TAG).assertDoesNotExist()
         composeRule.onNodeWithTag(CONVERSATION_HEADER_MUTE_TAG).assertDoesNotExist()
         composeRule.onNodeWithTag(CONVERSATION_HEADER_SEARCH_TAG).assertDoesNotExist()
@@ -302,16 +335,17 @@ class ConversationTopBarSemanticsTest {
     /** Capacity keeps the chat name at least as wide as the buttons and readable at large font sizes. */
     @Test
     fun shortcutCapacityLeavesTheChatNameRoom() {
-        assertEquals(3, headerShortcutCapacity(360.dp, 1f))
-        assertEquals(4, headerShortcutCapacity(411.dp, 1f))
-        assertEquals(2, headerShortcutCapacity(320.dp, 2f))
-        assertEquals(6, headerShortcutCapacity(600.dp, 1f))
+        assertEquals(2, headerShortcutCapacity(360.dp, 1f))
+        assertEquals(3, headerShortcutCapacity(411.dp, 1f))
+        assertEquals(1, headerShortcutCapacity(320.dp, 2f))
+        assertEquals(5, headerShortcutCapacity(600.dp, 1f))
         assertEquals(0, headerShortcutCapacity(120.dp, 1f))
         assertEquals(Int.MAX_VALUE, headerShortcutCapacity(Dp.Infinity, 1f))
     }
 
-    /** Timer, Members and Add members run their handlers and stay hidden when their handler is absent. */
+    /** Members and Add members run their handlers and stay hidden when their handler is absent. */
     @Test
+    @Config(qualifiers = "en-w600dp-h780dp-mdpi")
     fun groupShortcutsRunHandlersAndHideWithoutOne() {
         val appState = appState()
         val controller = ConversationController(appState, group())
@@ -321,19 +355,22 @@ class ConversationTopBarSemanticsTest {
             val on = available.value
             ConversationHeaderShortcuts(
                 capacity = it,
-                shortcuts = listOf(HeaderShortcut.DisappearingTimer, HeaderShortcut.Members, HeaderShortcut.AddMembers),
+                shortcuts = listOf(HeaderShortcut.Members, HeaderShortcut.AddMembers),
                 muteControl = null,
                 onSearch = {},
-                onTimer = if (on) ({ taps += "timer" }) else null,
                 onMembers = if (on) ({ taps += "members" }) else null,
                 onAddMembers = if (on) ({ taps += "add" }) else null,
             )
         })
         for (tag in GROUP_SHORTCUT_TAGS) {
-            composeRule.onNodeWithTag(tag).assertTouchHeightIsEqualTo(48.dp).performClick()
+            composeRule
+                .onNodeWithTag(tag)
+                .assertWidthIsEqualTo(48.dp)
+                .assertTouchHeightIsEqualTo(48.dp)
+                .performClick()
         }
         composeRule.runOnIdle {
-            assertEquals(listOf("timer", "members", "add"), taps)
+            assertEquals(listOf("members", "add"), taps)
             available.value = false
         }
         for (tag in GROUP_SHORTCUT_TAGS) composeRule.onNodeWithTag(tag).assertDoesNotExist()
@@ -422,42 +459,40 @@ class ConversationTopBarSemanticsTest {
         assertEquals(modesBefore, appState.chatMutePreferences.state.value.notificationModes)
     }
 
-    /** With a change handler the timer badge opens the picker instead of details; without one it stays inert. */
+    /** The timer badge stays read-only inside the header target; tapping it opens details whether on or off. */
     @Test
-    fun timerBadgeOpensPickerOnlyWhenEditable() {
+    fun headerTimerIsReadOnlyAndHeaderOpensDetailsWithTimerOnAndOff() {
         val appState = appState()
         appState.markDisappearingTooltipShown()
         val controller = ConversationController(appState, group().copy(disappearingMessageSecs = 60uL))
-        val editable = mutableStateOf(true)
-        var timerClicks = 0
         var detailsClicks = 0
-        composeRule.setContent {
-            WhiteNoiseTheme {
-                Surface {
-                    TopBar(
-                        appState,
-                        controller,
-                        onOpenDetails = { detailsClicks += 1 },
-                        onTimerClick = if (editable.value) ({ timerClicks += 1 }) else null,
-                    )
-                }
-            }
-        }
+        render(appState, controller, onOpenDetails = { detailsClicks += 1 })
+        val detailsAncestor = hasAnyAncestor(hasTestTag(PerformanceTestTags.OPEN_GROUP_DETAILS))
         composeRule
-            .onNodeWithTag(CONVERSATION_HEADER_TIMER_BUTTON_TAG)
-            .assertHasClickAction()
-            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+            .onNodeWithTag("conversation.header.timer", useUnmergedTree = true)
+            .assertExists()
+            .assert(detailsAncestor)
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Role))
+            .performClick()
+        composeRule
+            .onNodeWithText("1 minute", useUnmergedTree = true)
+            .assertExists()
+            .assert(detailsAncestor)
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Role))
             .performClick()
         composeRule.runOnIdle {
-            assertEquals(1, timerClicks)
-            assertEquals(0, detailsClicks)
-            editable.value = false
+            assertEquals(2, detailsClicks)
+            controller.applyGroupStateForTest(group().copy(disappearingMessageSecs = 0uL))
         }
-        composeRule.onNodeWithTag(CONVERSATION_HEADER_TIMER_BUTTON_TAG).assertDoesNotExist()
-        composeRule.onNodeWithTag("conversation.header.timer", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithTag("conversation.header.timer", useUnmergedTree = true).assertDoesNotExist()
+        composeRule.onNodeWithText("1 minute", useUnmergedTree = true).assertDoesNotExist()
+        composeRule.onNodeWithTag(PerformanceTestTags.OPEN_GROUP_DETAILS).performClick()
+        composeRule.runOnIdle { assertEquals(3, detailsClicks) }
     }
 
-    /** Only an admin member whose group mutations are not blocked may open the timer picker from the header. */
+    /** Only an admin member whose group mutations are not blocked may edit the timer in Chat Info. */
     @Test
     fun timerEditabilityCoversEditorBlockedEditorAndNonEditor() {
         val appState = appState()
@@ -500,55 +535,25 @@ class ConversationTopBarSemanticsTest {
         dark: Boolean = false,
         actions: @Composable RowScope.(capacity: Int) -> Unit = {},
         rtl: Boolean = false,
-        onTimerClick: (() -> Unit)? = null,
     ) {
         composeRule.setContent {
             val direction = if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr
             CompositionLocalProvider(LocalLayoutDirection provides direction) {
                 WhiteNoiseTheme(darkTheme = dark, fontScale = fontScale) {
                     Surface {
-                        TopBar(appState, controller, compactHeight, frozen.value, onOpenDetails, actions, onTimerClick)
+                        TopBarUnderTest(
+                            appState,
+                            controller,
+                            OPEN_DETAILS_DESCRIPTION,
+                            compactHeight,
+                            frozen.value,
+                            onOpenDetails,
+                            actions,
+                        )
                     }
                 }
             }
         }
-    }
-
-    @Composable
-    @Suppress("LongParameterList")
-    private fun TopBar(
-        appState: WhiteNoiseAppState,
-        controller: ConversationController,
-        compactHeight: Boolean = false,
-        frozen: Boolean = false,
-        onOpenDetails: () -> Unit = {},
-        actions: @Composable RowScope.(capacity: Int) -> Unit = {},
-        onTimerClick: (() -> Unit)? = null,
-    ) {
-        ConversationTopBar(
-            selectionMode = false,
-            selectedCount = 0,
-            onCloseSelection = {},
-            searchOpen = false,
-            searchQuery = "",
-            onSearchQueryChange = {},
-            onClearSearch = {},
-            onCloseSearch = {},
-            onSearchAction = {},
-            searchFocusRequester = remember { FocusRequester() },
-            appState = appState,
-            controller = controller,
-            groupTitleCopy = GroupTitleCopy.Default,
-            openedAsDmHint = false,
-            freezeRoutePresentation = frozen,
-            openDetailsDescription = OPEN_DETAILS_DESCRIPTION,
-            onOpenDetails = onOpenDetails,
-            onBack = {},
-            compactHeight = compactHeight,
-            performanceSelectorsEnabled = true,
-            actions = actions,
-            onTimerClick = onTimerClick,
-        )
     }
 
     /** Records the header with [shortcuts] chosen, using an unmuted conversation's mute control. */
@@ -566,7 +571,6 @@ class ConversationTopBarSemanticsTest {
                 muteControl = muteControl(appState),
                 onSearch = {},
                 readAloudOn = true,
-                onTimer = {},
                 onMembers = {},
                 onAddMembers = {},
             )
@@ -586,19 +590,18 @@ class ConversationTopBarSemanticsTest {
         val controller = ConversationController(appState, group().copy(disappearingMessageSecs = 86_400uL))
         controller.members = (1..3).map { AppGroupMemberRecordFfi("0$it" + "00".repeat(31), ACCOUNT_REF, it == 1) }
         controller.membersLoaded = true
-        render(appState, controller, fontScale = 2f, rtl = rtl, onTimerClick = {}, actions = {
+        render(appState, controller, fontScale = 2f, rtl = rtl, actions = {
             ConversationHeaderShortcuts(
                 HeaderShortcut.entries.toList(),
                 capacity = it,
                 muteControl = muteControl(appState),
                 onSearch = {},
                 readAloudOn = false,
-                onTimer = {},
                 onMembers = {},
                 onAddMembers = {},
             )
         })
-        composeRule.onNodeWithTag(CONVERSATION_HEADER_TIMER_BUTTON_TAG).assertHasClickAction()
+        composeRule.onNodeWithTag("conversation.header.timer", useUnmergedTree = true).assertExists()
         composeRule
             .onNodeWithTag(CONVERSATION_TOP_BAR_TAG)
             .captureRoboImage("src/test/snapshots/conversation_header_shortcuts_$name.png")
@@ -621,80 +624,10 @@ class ConversationTopBarSemanticsTest {
     )
 
     /** Builds an app state with the test account active. */
-    private fun appState() =
-        WhiteNoiseAppState(
-            context = context,
-            draftStore = DraftStore(EmptyDraftPersistence()),
-            accountIdHexResolver = { ACCOUNT_ID },
-            accounts =
-                listOf(
-                    AccountSummaryFfi(
-                        label = ACCOUNT_REF,
-                        accountIdHex = ACCOUNT_ID,
-                        localSigning = true,
-                        externalSigning = false,
-                        signedOut = false,
-                        running = true,
-                        unlinked = false,
-                    ),
-                ),
-            activeAccountRef = ACCOUNT_REF,
-        )
+    private fun appState() = topBarTestAppState(context, ACCOUNT_REF, ACCOUNT_ID)
 
-    private fun group() =
-        AppGroupRecordFfi(
-            groupIdHex = GROUP_ID,
-            protocolProfile = AppProtocolProfileFfi.LEGACY,
-            endpoint = "wss://relay.example",
-            profilePresent = true,
-            name = "Benchmark group",
-            description = "",
-            admins = listOf(ACCOUNT_ID),
-            relays = emptyList(),
-            nostrGroupIdHex = "03".repeat(32),
-            avatarUrl = null,
-            avatarDim = null,
-            avatarThumbhash = null,
-            imageHashHex = null,
-            encryptedMedia =
-                AppGroupEncryptedMediaComponentFfi(
-                    componentId = 0x8008u,
-                    component = "marmot.group.encrypted-media.v1",
-                    required = true,
-                    version = EncryptedMediaVersionFfi.V1,
-                    mediaFormat = "encrypted-media-v1",
-                    allowedLocatorKinds = listOf("blossom-v1"),
-                    defaultBlobEndpoints =
-                        listOf(
-                            AppBlobEndpointFfi(
-                                locatorKind = "blossom-v1",
-                                baseUrl = "https://blossom.example",
-                            ),
-                        ),
-                ),
-            disappearingMessageSecs = 0uL,
-            archived = false,
-            pendingConfirmation = false,
-            unrecoverable = false,
-            selfMembership = SelfMembershipFfi.MEMBER,
-            leaveRequestPending = false,
-            leaveRequestedAtMs = null,
-            leaveBlocked = false,
-            disbanding = false,
-            disbandRequest = null,
-            disbanded = false,
-            welcomerAccountIdHex = null,
-            viaWelcomeMessageIdHex = null,
-        )
-
-    private class EmptyDraftPersistence : DraftPersistence {
-        override fun read(): Map<String, String> = emptyMap()
-
-        override fun write(
-            key: String,
-            value: String?,
-        ) = Unit
-    }
+    /** Builds the test group with the test account as its admin. */
+    private fun group() = topBarTestGroup(GROUP_ID, adminId = ACCOUNT_ID)
 
     private companion object {
         const val ACCOUNT_REF = "personal"
@@ -705,7 +638,6 @@ class ConversationTopBarSemanticsTest {
         val READ_ALOUD_SHORTCUTS = listOf(HeaderShortcut.Search, HeaderShortcut.ReadAloud)
         const val PHONE = "en-w411dp-h891dp-xxhdpi"
         const val SMALL_PHONE = "en-w320dp-h780dp-xxhdpi"
-        val GROUP_SHORTCUT_TAGS =
-            listOf(CONVERSATION_HEADER_TIMER_TAG, CONVERSATION_HEADER_MEMBERS_TAG, CONVERSATION_HEADER_ADD_MEMBERS_TAG)
+        val GROUP_SHORTCUT_TAGS = listOf(CONVERSATION_HEADER_MEMBERS_TAG, CONVERSATION_HEADER_ADD_MEMBERS_TAG)
     }
 }

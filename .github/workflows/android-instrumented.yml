@@ -20,7 +20,7 @@ on:
   workflow_dispatch:
     inputs:
       mdk_qualification:
-        description: Populated current-master runtime upgrade, cold restart and both recovery modes
+        description: Populated MarmotKit 0.18.0 upgrade, cold restart and both recovery modes
         required: false
         type: boolean
         default: false
@@ -152,6 +152,10 @@ on:
       - 'scripts/select_instrumented_lanes.py'
       - 'scripts/media-latency.init.gradle'
       - 'app/build.gradle.kts'
+      # Avatar loaders feed cached profile and cold-start direct-chat presentation.
+      - 'app/src/main/java/dev/ipf/whitenoise/android/core/AvatarImageLoader.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/core/GroupAvatarImageLoader.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/core/PrivateContactAvatarLoader.kt'
       - 'app/src/androidTest/AndroidManifest.xml'
       # Every @PullRequestDeviceSmoke test starts this run when it changes (scripts/test_select_instrumented_lanes.py).
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/audio/AttachmentPcmDecoderDeviceTest.kt'
@@ -172,7 +176,16 @@ on:
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReplyConstraintSafetyAndroidTest.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/medialibrary/AccountAttachmentLibraryFfiIntegrationTest.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/profile/ContactPrivateDetailsImeTest.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysAccessibilityAndroidTest.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/settings/ProfileKeyWipeConfirmationAndroidTest.kt'
+      # The wipe confirmation's 200% RTL keyboard geometry depends on its own layout, its action labels and the
+      # shared dialog width and renderers; Robolectric gives dialog windows the full screen, so only the emulator
+      # sees the narrowed window.
+      - 'app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountWipeAndSignOut.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/ui/common/DialogWidthBounds.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/ui/common/AnimatedAlertDialog.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseDialogs.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/chats/ChatListContinuityAndroidTest.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderFadeFrameProbe.kt'
       - 'app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt'
@@ -409,7 +422,7 @@ jobs:
         distribution: ${{ fromJSON(github.event_name == 'pull_request' && '["Zapstore"]' || '["Play", "Zapstore"]') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: '17'
@@ -516,7 +529,7 @@ jobs:
 
       # AGP 9.x / Gradle 9.4.1 require JDK 17 (matches android-ci.yml).
       - name: Set up JDK 17
-        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: '17'
@@ -756,7 +769,7 @@ jobs:
           [[ "$min_sdk" =~ ^[0-9]+$ && "$min_sdk" -le 34 ]]
 
       - name: Set up Java for Maestro
-        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: '17'
@@ -842,7 +855,7 @@ jobs:
           python3 scripts/maestro_environment.py validate --api "$ANDROID_API" --navigation "$NAVIGATION"
           python3 -m scripts.maestro_runtime_selection "$SELECTED" "$ANDROID_API" >> "$GITHUB_OUTPUT"
           python3 -m unittest scripts/test_maestro_runtime.py scripts/test_maestro_screen_coverage.py scripts/test_maestro_suite.py scripts/test_maestro_apk.py scripts/test_maestro_environment.py scripts/test_maestro_host_pressure.py
-      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: '17'
@@ -899,7 +912,7 @@ jobs:
           path: build/maestro-runtime-pair
       - name: Verify the matching app and instrumentation pair
         run: python3 scripts/maestro_runtime_pair.py verify build/maestro-runtime-pair
-      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: '17'
@@ -1043,8 +1056,14 @@ jobs:
 
   mdk-qualification:
     needs: changes
-    name: Populated MarmotKit upgrade and recovery (emulator)
+    name: Populated MarmotKit upgrade and recovery (audit ${{ matrix.audit-choice }})
     if: ${{ !cancelled() && needs.changes.outputs.media_trace_allowed == 'true' && (github.event_name == 'workflow_dispatch' && inputs.mdk_qualification && !inputs.mdk_preview_qualification) }}
+    strategy:
+      fail-fast: false
+      matrix:
+        audit-choice: [enabled, declined]
+    env:
+      QUALIFICATION_AUDIT_CHOICE: ${{ matrix.audit-choice }}
     runs-on: ubuntu-latest
     timeout-minutes: 75
     steps:
@@ -1057,7 +1076,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Set up JDK 17
-        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: '17'
@@ -1089,7 +1108,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: mdk-qualification-${{ github.sha }}
+          name: mdk-qualification-${{ github.sha }}-${{ matrix.audit-choice }}
           path: build/mdk-qualification/
           if-no-files-found: error
           retention-days: 30
@@ -1097,7 +1116,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: mdk-qualification-apks-${{ github.sha }}
+          name: mdk-qualification-apks-${{ github.sha }}-${{ matrix.audit-choice }}
           path: build/mdk-pair/
           if-no-files-found: warn
           retention-days: 30
@@ -1124,7 +1143,7 @@ jobs:
       - name: Verify qualification and emulator observer contracts
         run: python3 -m unittest scripts.test_mdk_qualification scripts.test_maestro_apk
       - name: Set up JDK 17
-        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: '17'

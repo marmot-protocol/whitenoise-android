@@ -27,7 +27,8 @@ class DictationDiagnosticStoreTest {
             requireNotNull(
                 DictationDiagnosticSchema.parse(
                     "event=finish_timing action=send tap_to_capture_closed_ms=12 tap_to_last_result_ms=640 " +
-                        "tap_to_delivered_ms=700 generations_after_tap=2 retries_after_tap=1 settle_wait_ms=50 " +
+                        "tap_to_transcript_ready_ms=700 generations_after_tap=2 " +
+                        "retries_after_tap=1 settle_wait_ms=50 " +
                         "audio_ms=4300 session=3",
                 ),
             )
@@ -37,7 +38,7 @@ class DictationDiagnosticStoreTest {
                 "action" to "send",
                 "tap_to_capture_closed_ms" to 12L,
                 "tap_to_last_result_ms" to 640L,
-                "tap_to_delivered_ms" to 700L,
+                "tap_to_transcript_ready_ms" to 700L,
                 "generations_after_tap" to 2L,
                 "retries_after_tap" to 1L,
                 "settle_wait_ms" to 50L,
@@ -48,6 +49,7 @@ class DictationDiagnosticStoreTest {
         )
         assertEquals(0L, parsed.filteredFields)
         assertEquals("paste", event("event=finish_timing action=paste")["action"])
+        assertEquals(700L, event("event=finish_timing tap_to_delivered_ms=700")["tap_to_delivered_ms"])
         val dropped =
             requireNotNull(
                 DictationDiagnosticSchema.parse(
@@ -77,6 +79,15 @@ class DictationDiagnosticStoreTest {
             requireNotNull(DictationDiagnosticSchema.fields("event=caller_audio_closed reason=read=-3"))
         assertEquals("read_failed", captureFailure["reason"])
         assertEquals(-3, captureFailure["read_code"])
+    }
+
+    @Test
+    fun sendOutcomesKeepTheOriginalSession() {
+        for (outcome in listOf("durably_accepted", "terminal_failure")) {
+            val fields = event("event=send_outcome outcome=$outcome session=7 active_session=8")
+            assertEquals(outcome, fields["outcome"])
+            assertEquals(7L, fields["session"])
+        }
     }
 
     @Test

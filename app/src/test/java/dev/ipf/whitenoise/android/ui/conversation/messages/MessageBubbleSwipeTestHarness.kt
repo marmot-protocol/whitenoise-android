@@ -142,6 +142,8 @@ internal fun swipeTestProjectedRecord(
             thumbhash = null,
         )
     return TimelineMessageRecordFfi(
+        agentItem = null,
+        agentItemFirstEventMissing = false,
         clientToken = null,
         messageIdHex = SWIPE_TEST_MESSAGE_ID,
         sourceMessageIdHex = SWIPE_TEST_MESSAGE_ID,
@@ -163,7 +165,7 @@ internal fun swipeTestProjectedRecord(
         replyPreview = null,
         mediaJson = null,
         media = MessageAttachments.acceptedOutcomes(if (media) listOf(reference) else emptyList()),
-        agentTextStreamJson = null,
+        thread = null,
         poll = null,
         groupSystem = null,
         reactions = swipeTestReactions(reacted),

@@ -76,8 +76,6 @@ object DiagnosticFormatter {
                 // interpolates a relay URL, token, key, or decrypted content
                 // can't leak it in full through this screen-capturable surface.
                 "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] error: ${redactError(event.message)}"
-            is MarmotEventFfi.AgentStreamActivity ->
-                "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] agent stream activity"
             is MarmotEventFfi.EpochStallEscalated ->
                 // hex group id only — epoch and arm count carry no content.
                 "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] epoch stall escalated in ${IdentityFormatter.short(
@@ -88,6 +86,8 @@ object DiagnosticFormatter {
                 "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] welcome pending for ${identity.publicIdentity(
                     event.recipientHex,
                 )} in group ${IdentityFormatter.short(event.groupIdHex)}"
+            is MarmotEventFfi.InviteDeliveryChanged ->
+                "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] invite delivery changed"
             is MarmotEventFfi.HistoryNoticesChanged ->
                 // Notices carry no relay, message or key identities; the list
                 // itself is re-read from the runtime, never copied here.
@@ -110,6 +110,8 @@ object DiagnosticFormatter {
                 "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] chat history imports changed"
             is MarmotEventFfi.RecoveryStatusChanged ->
                 "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] recovery status changed"
+            is MarmotEventFfi.RelayHealthChanged ->
+                "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] relay health changed"
             is MarmotEventFfi.DeviceUnlinked ->
                 "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] device unlinked"
         }

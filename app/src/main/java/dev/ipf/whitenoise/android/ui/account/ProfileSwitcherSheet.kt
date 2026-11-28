@@ -47,6 +47,8 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
+import dev.ipf.whitenoise.android.ui.common.motionBoundsOnScreen
+import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.settings.LocalSettingsCardMorph
 import dev.ipf.whitenoise.android.ui.settings.SettingsAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsCardMorph
@@ -55,8 +57,6 @@ import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.settings.SettingsRowContext
 import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredContourClick
-import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
-import dev.ipf.whitenoise.android.ui.settings.settingsMorphBounds
 import dev.ipf.whitenoise.android.ui.settings.settingsRowBorder
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 
@@ -149,6 +149,8 @@ internal fun ProfileSwitcherSheet(
                                     Text(stringResource(R.string.device_unlinked_title))
                                 } else if (account.isSignedOut) {
                                     Text(stringResource(R.string.signed_out))
+                                } else if (account.signerNeedsAttention) {
+                                    Text(stringResource(R.string.remote_signer_switcher_attention))
                                 }
                             }
                         },
@@ -207,7 +209,7 @@ internal fun ProfileSwitcherSheet(
                 SettingsGroup(
                     Modifier
                         .padding(vertical = PROFILE_SWITCHER_CONTENT_INSET)
-                        .onGloballyPositioned { sourceMorph.placeHost(it.settingsMorphBounds(view)) },
+                        .onGloballyPositioned { sourceMorph.placeHost(it.motionBoundsOnScreen(view)) },
                 ) {
                     row("add_profile") { context ->
                         val launch =

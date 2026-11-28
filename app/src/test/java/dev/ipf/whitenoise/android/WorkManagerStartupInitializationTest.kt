@@ -31,16 +31,6 @@ import java.util.concurrent.atomic.AtomicInteger
 @OptIn(ExperimentalCoroutinesApi::class)
 class WorkManagerStartupInitializationTest {
     @Test
-    fun applicationProvidesOnDemandWorkManagerConfiguration() {
-        assertTrue(Configuration.Provider::class.java.isAssignableFrom(WhiteNoiseApplication::class.java))
-
-        val manifest = appModuleSource("src/main/AndroidManifest.xml")
-        assertTrue(manifest.contains("androidx.startup.InitializationProvider"))
-        assertTrue(manifest.contains("androidx.work.WorkManagerInitializer"))
-        assertTrue(manifest.contains("tools:node=\"remove\""))
-    }
-
-    @Test
     fun mergedManifestDoesNotRegisterWorkManagerInitializer() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val provider =
@@ -100,8 +90,9 @@ class WorkManagerStartupInitializationTest {
         assertEquals(2, invocations.get())
     }
 
+    /** Checks that cold startup schedules backups, even before an account opens History backups. */
     @Test
-    fun periodicWorkInitializationRegistersBothUniqueWorks() {
+    fun periodicWorkInitializationRegistersExpectedUniqueWork() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         WorkManagerTestInitHelper.initializeTestWorkManager(
             context,
@@ -115,6 +106,7 @@ class WorkManagerStartupInitializationTest {
         scope.advanceUntilIdle()
 
         val workManager = WorkManager.getInstance(context)
+        assertEquals(1, workManager.getWorkInfosForUniqueWork("history_backup").get().size)
         assertEquals(1, workManager.getWorkInfosForUniqueWork("disappearing_message_sweep").get().size)
         assertEquals(
             if (BuildConfig.SELF_UPDATE_ENABLED) 1 else 0,

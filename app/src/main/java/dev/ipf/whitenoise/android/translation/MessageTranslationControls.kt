@@ -2,7 +2,13 @@
 
 package dev.ipf.whitenoise.android.translation
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
@@ -16,11 +22,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -31,10 +40,14 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
+import dev.ipf.whitenoise.android.ui.theme.InteractionStateOpacity
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.filterIsInstance
 
 /**
  * The message's translation identity for its current text and target, or null when it cannot be translated.
@@ -50,6 +63,7 @@ internal fun rememberMessageTranslationSource(
     automaticEligible: Boolean,
     selectedTarget: String? = null,
     sourceRevision: String = "",
+    incomingRecordedAt: ULong? = null,
 ): TranslationSource? {
     val session = LocalConversationTranslation.current
     val preferences = LocalTranslationPreferences.current
@@ -57,14 +71,15 @@ internal fun rememberMessageTranslationSource(
     val choice = account?.let { preferences?.effective(it, group) }
     val target = selectedTarget ?: choice?.target
     val source =
-        remember(messageId, text, target, sourceRevision, account, group, choice != null) {
+        remember(messageId, text, target, sourceRevision, account, group, choice != null, incomingRecordedAt) {
             choice
                 ?.takeIf { text.isNotBlank() && text.length <= MAX_TRANSLATION_TEXT }
-                ?.let { TranslationSource(messageId, text, target.orEmpty(), sourceRevision) }
+                ?.let { TranslationSource(messageId, text, target.orEmpty(), sourceRevision, incomingRecordedAt) }
         }
     // Session epoch, failure and capacity are watched inside the effect rather than keyed in composition: every
     // bubble reads this, and one source's removal would otherwise recompose every visible message.
     LaunchedEffect(source, session, revision, automaticEligible) {
+        session?.replyLanguage?.sourceChanged(messageId, source)
         val enabled = automaticEligible && choice?.enabled == true
         if (source == null || session == null || !enabled) return@LaunchedEffect
         if (!OfflineTranslatorLanguageCatalog.supportsTarget(source.target)) return@LaunchedEffect
@@ -118,6 +133,7 @@ internal fun MessageTranslationToggle(
 
 /**
  * One gutter switch shared by translation and transcription: a filled disc when on, an outlined disc when off.
+ * The gutter receives taps, while feedback draws inside the centered circular surface.
  * [stateDescription] lets a disc announce in-flight work while staying tappable to cancel it.
  */
 @Composable
@@ -128,23 +144,34 @@ internal fun MessageSideDisc(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     stateDescription: String? = null,
+    discSize: Dp = MessageSideDiscSize,
     content: @Composable () -> Unit,
 ) {
     val outline = amoledOutlineBorder()
     val colors = MaterialTheme.colorScheme
     val contentColor = if (on) colors.onPrimary else colors.onSurfaceVariant
+    val interactions = remember { MutableInteractionSource() }
+    val pressAlpha by rememberMessageSideDiscPressAlpha(interactions)
+    val focused by interactions.collectIsFocusedAsState()
+    val hovered by interactions.collectIsHoveredAsState()
     Box(
         modifier =
             modifier
-                .toggleable(value = on, enabled = enabled, role = Role.Switch, onValueChange = onToggle)
-                .semantics {
+                .toggleable(
+                    value = on,
+                    interactionSource = interactions,
+                    indication = null,
+                    enabled = enabled,
+                    role = Role.Switch,
+                    onValueChange = onToggle,
+                ).semantics {
                     contentDescription = description
                     stateDescription?.let { this.stateDescription = it }
                 },
         contentAlignment = Alignment.Center,
     ) {
         Surface(
-            modifier = Modifier.size(MessageSideDiscSize),
+            modifier = Modifier.size(discSize),
             shape = CircleShape,
             color =
                 when {
@@ -155,9 +182,47 @@ internal fun MessageSideDisc(
             contentColor = if (enabled) contentColor else contentColor.copy(alpha = DISABLED_ALPHA),
             border = if (on) null else outline ?: BorderStroke(1.dp, colors.outline),
         ) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { content() }
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .drawBehind {
+                        val stateAlpha =
+                            when {
+                                focused -> InteractionStateOpacity.PRESSED_OR_FOCUSED
+                                hovered -> InteractionStateOpacity.HOVERED
+                                else -> 0f
+                            }
+                        val alpha = maxOf(pressAlpha, stateAlpha)
+                        if (alpha > 0f) drawCircle(contentColor.copy(alpha = alpha))
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                content()
+            }
         }
     }
+}
+
+/** Keeps quick taps visible when the scrollable timeline emits press and release in the same frame. */
+@Composable
+private fun rememberMessageSideDiscPressAlpha(interactions: MutableInteractionSource): State<Float> {
+    val pressAlpha = remember(interactions) { Animatable(0f) }
+    LaunchedEffect(interactions) {
+        interactions.interactions
+            .filterIsInstance<PressInteraction>()
+            .collectLatest { interaction ->
+                when (interaction) {
+                    is PressInteraction.Press -> pressAlpha.snapTo(InteractionStateOpacity.PRESSED_OR_FOCUSED)
+                    is PressInteraction.Release -> {
+                        pressAlpha.snapTo(InteractionStateOpacity.PRESSED_OR_FOCUSED)
+                        pressAlpha.animateTo(0f, tween(durationMillis = 150))
+                    }
+                    is PressInteraction.Cancel -> pressAlpha.snapTo(0f)
+                    else -> Unit
+                }
+            }
+    }
+    return pressAlpha.asState()
 }
 
 @Composable

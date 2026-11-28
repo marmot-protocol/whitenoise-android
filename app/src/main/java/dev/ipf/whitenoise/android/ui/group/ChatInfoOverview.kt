@@ -3,13 +3,15 @@ package dev.ipf.whitenoise.android.ui.group
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
@@ -21,26 +23,32 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.chats.chatsExplanation
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
+import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.settings.SettingsRowContext
-import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.settings.rememberSettingsNativeRow
 import dev.ipf.whitenoise.android.ui.theme.ConnectedRowShape
+import dev.ipf.whitenoise.android.ui.theme.Typography
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import dev.ipf.whitenoise.android.ui.theme.connectedRowBorder
+import kotlin.math.ceil
 
-/** Equal-width overview action with one accessible tonal target and an optional visual caption. */
+/** Equal-width overview action with one accessible tonal target and a visual caption. */
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable
 internal fun QuickInfoAction(
@@ -52,7 +60,6 @@ internal fun QuickInfoAction(
     enabled: Boolean = true,
     buttonModifier: Modifier = Modifier,
     explanation: Explanation? = null,
-    showCaption: Boolean = true,
 ) {
     Column(
         modifier = modifier,
@@ -71,22 +78,18 @@ internal fun QuickInfoAction(
         ) {
             Icon(painterResource(icon), contentDescription = label, modifier = Modifier.size(24.dp))
         }
-        if (showCaption) {
-            Text(
-                text = label,
-                modifier = Modifier.clearAndSetSemantics {},
-                textAlign = TextAlign.Center,
-                style = MaterialTheme.typography.labelLarge,
-            )
-        }
+        Text(
+            text = label,
+            modifier = Modifier.clearAndSetSemantics {},
+            color = if (enabled) Color.Unspecified else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+            textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.labelLarge,
+        )
     }
 }
 
-/**
- * Overview action row under the chat header. Adding the group Add Members action makes four
- * targets, so that row drops its captions; long-press and accessibility labels still name each action.
- */
-@Suppress("FunctionNaming", "LongParameterList")
+/** Overview actions wrap as available width and caption size require. */
+@Suppress("FunctionNaming", "LongMethod", "LongParameterList")
 @Composable
 internal fun ChatInfoQuickActions(
     onOpenProfile: ((Rect?) -> Unit)?,
@@ -98,60 +101,94 @@ internal fun ChatInfoQuickActions(
     onOpenDisappearing: () -> Unit,
     onOpenSearch: (() -> Unit)?,
 ) {
-    val showCaptions = onAddMembers == null
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    val gap = WhiteNoiseSpacing.Related
+    val profileLabel = stringResource(R.string.about)
+    val addMembersLabel = stringResource(R.string.add_member)
+    val muteLabel = stringResource(muteControl.labelRes)
+    val disappearingLabel = stringResource(R.string.disappearing)
+    val searchLabel = stringResource(R.string.quick_action_search)
+    val labels =
+        listOfNotNull(
+            profileLabel.takeIf { onOpenProfile != null },
+            addMembersLabel.takeIf { onAddMembers != null },
+            muteLabel,
+            disappearingLabel,
+            searchLabel.takeIf { onOpenSearch != null },
+        )
+    BoxWithConstraints(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin, vertical = gap),
     ) {
-        if (onOpenProfile != null) {
-            val profileLaunch = rememberMeasuredControlClick(onOpenProfile)
+        val actionModifier = Modifier.width(quickActionWidth(maxWidth, gap, labels))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(gap), verticalArrangement = Arrangement.spacedBy(gap)) {
+            if (onOpenProfile != null) {
+                val profileLaunch = rememberMeasuredControlClick(onOpenProfile)
+                QuickInfoAction(
+                    label = profileLabel,
+                    icon = R.drawable.ic_person,
+                    onClick = profileLaunch.second,
+                    modifier = actionModifier,
+                    buttonModifier = profileLaunch.first,
+                )
+            }
+            if (onAddMembers != null) {
+                QuickInfoAction(
+                    label = addMembersLabel,
+                    icon = R.drawable.ic_group_add,
+                    onClick = onAddMembers,
+                    enabled = addMembersEnabled,
+                    explanation = chatsExplanation(R.string.add_member, R.string.explanation_chat_info_add_members),
+                    modifier = actionModifier,
+                )
+            }
             QuickInfoAction(
-                label = stringResource(R.string.about),
-                icon = R.drawable.ic_person,
-                onClick = profileLaunch.second,
-                modifier = Modifier.weight(1f),
-                buttonModifier = profileLaunch.first,
+                label = muteLabel,
+                icon = muteControl.iconRes,
+                enabled = !muteControl.pending,
+                explanation = chatsExplanation(muteControl.labelRes, muteControl.explanationRes),
+                onClick = muteControl::toggle,
+                modifier = actionModifier,
             )
-        }
-        if (onAddMembers != null) {
             QuickInfoAction(
-                label = stringResource(R.string.add_member),
-                icon = R.drawable.ic_group_add,
-                onClick = onAddMembers,
-                enabled = addMembersEnabled,
-                explanation = chatsExplanation(R.string.add_member, R.string.explanation_chat_info_add_members),
-                showCaption = showCaptions,
-                modifier = Modifier.weight(1f),
+                label = disappearingLabel,
+                icon = R.drawable.ic_timer,
+                state = disappearingState,
+                enabled = disappearingEnabled,
+                explanation = chatsExplanation(R.string.disappearing, R.string.explanation_chat_info_disappearing),
+                onClick = onOpenDisappearing,
+                modifier = actionModifier,
             )
+            if (onOpenSearch != null) {
+                QuickInfoAction(
+                    label = searchLabel,
+                    icon = R.drawable.ic_search,
+                    onClick = onOpenSearch,
+                    modifier = actionModifier,
+                )
+            }
         }
-        QuickInfoAction(
-            label = stringResource(muteControl.labelRes),
-            icon = muteControl.iconRes,
-            enabled = !muteControl.pending,
-            explanation = chatsExplanation(muteControl.labelRes, muteControl.explanationRes),
-            onClick = muteControl::toggle,
-            showCaption = showCaptions,
-            modifier = Modifier.weight(1f),
-        )
-        QuickInfoAction(
-            label = stringResource(R.string.disappearing),
-            icon = R.drawable.ic_timer,
-            state = disappearingState,
-            enabled = disappearingEnabled,
-            explanation = chatsExplanation(R.string.disappearing, R.string.explanation_chat_info_disappearing),
-            onClick = onOpenDisappearing,
-            showCaption = showCaptions,
-            modifier = Modifier.weight(1f),
-        )
-        if (onOpenSearch != null) {
-            QuickInfoAction(
-                label = stringResource(R.string.quick_action_search),
-                icon = R.drawable.ic_search,
-                onClick = onOpenSearch,
-                showCaption = showCaptions,
-                modifier = Modifier.weight(1f),
-            )
-        }
+    }
+}
+
+/** Fits unbreakable caption runs and balances the actions across the rows that fit. */
+@Composable
+private fun quickActionWidth(
+    availableWidth: Dp,
+    gap: Dp,
+    labels: List<String>,
+): Dp {
+    val captionStyle = MaterialTheme.typography.labelLarge
+    val measurer = rememberTextMeasurer()
+    val captionWidthPx = labels.maxOf { measurer.measure(it, captionStyle).multiParagraph.minIntrinsicWidth }
+    return with(LocalDensity.current) {
+        val captionScale = captionStyle.fontSize.toDp().value / Typography.labelLarge.fontSize.value
+        val minimumWidthPx = ceil(maxOf((72.dp * captionScale.coerceAtLeast(1f)).toPx(), captionWidthPx)).toInt()
+        val availableWidthPx = availableWidth.roundToPx()
+        // FlowRow rounds spacing up when deciding whether another action fits.
+        val gapPx = ceil(gap.toPx()).toInt()
+        val maxColumns = ((availableWidthPx + gapPx) / (minimumWidthPx + gapPx)).coerceIn(1, labels.size)
+        val rows = (labels.size + maxColumns - 1) / maxColumns
+        val columns = (labels.size + rows - 1) / rows
+        ((availableWidthPx - gapPx * (columns - 1)) / columns).toDp()
     }
 }
 

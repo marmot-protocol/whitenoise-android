@@ -177,6 +177,7 @@ class MessageInfoFormatTest {
 
     // ---- labelFor -----------------------------------------------------------
 
+    /** Every status maps to its own label. */
     @Test
     fun labelFor_mapsEveryEnumVariant() {
         val labels =
@@ -185,13 +186,11 @@ class MessageInfoFormatTest {
                 sent = "s",
                 received = "r",
                 failed = "f",
-                streaming = "stream",
             )
         assertEquals("p", labelFor(MessageStatus.Pending, labels))
         assertEquals("s", labelFor(MessageStatus.Sent, labels))
         assertEquals("r", labelFor(MessageStatus.Received, labels))
         assertEquals("f", labelFor(MessageStatus.Failed, labels))
-        assertEquals("stream", labelFor(MessageStatus.Streaming, labels))
     }
 
     @Test

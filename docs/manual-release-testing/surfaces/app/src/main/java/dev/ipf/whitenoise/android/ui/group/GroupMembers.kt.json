@@ -1,0 +1,81 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupMembers.kt",
+  "legacy_sha256": "391b5840515e02549af79589fb33c0f5bd5662d4f3b4c9c31efc15efb70bab34",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Custom emoji authored labels: GroupMembers",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupMembers.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "GroupMemberIdentityRows",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupMembers.kt",
+        "anchor": "fun GroupMemberIdentityRows(",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "SoleAdminDeletePicker",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupMembers.kt",
+        "anchor": "fun SoleAdminDeletePicker(",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "TransferAdminSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupMembers.kt",
+        "anchor": "fun TransferAdminSheet(",
+        "test_ids": [
+          "GRP-001",
+          "GRP-008"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Scroll boundaries: GroupMembers",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupMembers.kt",
+        "anchor": ".fadingVerticalScroll(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "Transfer admin search",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupMembers.kt",
+        "anchor": "R.string.conversation_search_open",
+        "test_ids": [
+          "GRP-008"
+        ]
+      },
+      {
+        "surface": "Transfer admin with no search results",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupMembers.kt",
+        "anchor": "R.string.no_matches",
+        "test_ids": [
+          "GRP-008"
+        ]
+      },
+      {
+        "surface": "string:transfer_admin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupMembers.kt",
+        "anchor": "R.string.transfer_admin",
+        "test_ids": [
+          "GRP-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

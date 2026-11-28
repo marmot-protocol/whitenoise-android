@@ -256,24 +256,6 @@ class VideoAttachmentCacheStateTest {
     }
 
     @Test
-    fun videoMaterializationUsesSharedSingleFlight() {
-        val source = mediaVideoCacheSource().readText()
-
-        assertTrue(
-            "video materialization should use the shared single-flight utility",
-            Regex(
-                """private\s+val\s+videoMaterializations\s*=\s*SingleFlight<String,\s*java\.io\.File>\(\)""",
-            ).containsMatchIn(source),
-        )
-        assertTrue(
-            "the flight must begin before the materializer checks the cache fast path",
-            Regex(
-                """videoMaterializations\.run\(file\.absolutePath\)\s*\{\s*materializeVideoAttachmentOnce\(""",
-            ).containsMatchIn(source),
-        )
-    }
-
-    @Test
     fun samePathWaiterAwaitsActiveMaterializationDespitePartialCacheFile() {
         runBlocking {
             withTimeout(TEST_HANG_GUARD_MS) {
@@ -342,6 +324,7 @@ class VideoAttachmentCacheStateTest {
         }
     }
 
+    /** A video bubble that already has a cached poster reads only duration metadata and extracts no poster frame. */
     @Test
     fun cachedPosterSkipsPosterFrameExtraction() {
         val source =
@@ -351,7 +334,7 @@ class VideoAttachmentCacheStateTest {
             ).firstOrNull { it.exists() }?.readText()
                 ?: error("Missing MediaVideo.kt source file")
         val bubbleStart = source.indexOf("internal fun MediaVideoBubble(")
-        val bubbleEnd = source.indexOf("internal fun VideoUploadIndicator(", bubbleStart)
+        val bubbleEnd = source.indexOf("internal val VIDEO_PLAY_DISC_SIZE", bubbleStart)
         check(bubbleStart >= 0 && bubbleEnd > bubbleStart) {
             "Could not locate MediaVideoBubble boundaries in MediaVideo.kt; update this regression test"
         }

@@ -44,8 +44,8 @@ class MessageMultiSelectCoverageTest {
         assertTrue(screenSource.contains("batchSelectionActionAvailability("))
         // Selection hides the jump controls one by one through their exit motion; pagination never adds an overlay.
         assertTrue(screenSource.contains("if (transcriptReadyToReveal)"))
-        assertTrue(screenSource.contains("visible = !selectionMode && ttsFollowHandle.showResumeAction"))
-        assertTrue(screenSource.contains("visible = !selectionMode && mentionCount > 0"))
+        assertTrue(screenSource.contains("visible = !selectionMode && readAloudFollow.showResumeAction"))
+        assertTrue(screenSource.contains("val showMentionJump = !selectionMode && unreadMentionCount > 0"))
         assertTrue(screenSource.contains("visible = !selectionMode && !nearBottom"))
     }
 
@@ -162,7 +162,7 @@ class MessageMultiSelectCoverageTest {
             source.contains(
                 "if (!selectionMode && !textSelectionMode) { " +
                     "pressState.longPressWindowPosition = null pressState.selectionSeedVisibleOffset = null " +
-                    "longPressWindowY = null pressState.actionMenuAnchorBounds = pressState.messageBoundsInWindow[0] " +
+                    "pressState.actionMenuAnchorBounds = pressState.messageBoundsInWindow[0] " +
                     "onActionMenuOpenChange(true)",
             ),
         )
@@ -170,7 +170,7 @@ class MessageMultiSelectCoverageTest {
             source.contains(
                 "if (!deleted && !selectionMode && !textSelectionMode) { " +
                     "pressState.longPressWindowPosition = null pressState.selectionSeedVisibleOffset = null " +
-                    "longPressWindowY = null pressState.actionMenuAnchorBounds = pressState.messageBoundsInWindow[0] " +
+                    "pressState.actionMenuAnchorBounds = pressState.messageBoundsInWindow[0] " +
                     "onActionMenuOpenChange(true)",
             ),
         )
@@ -181,7 +181,7 @@ class MessageMultiSelectCoverageTest {
     fun messageBubbleUsesOneGuardForBothDeleteMutations() {
         val state = source("messages/MessageBubbleState.kt")
         val source =
-            source("messages/MessageBubble.kt")
+            source("messages/MessageBubbleActions.kt")
                 .substringAfter("fun requestDelete()")
                 .substringBefore("fun reactWithEmoji")
 

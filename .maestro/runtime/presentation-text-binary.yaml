@@ -4,6 +4,6 @@ name: presentation-text-binary
 - runFlow: ../fixtures/emulator-interruption.yaml
 - assertVisible: Maestro complete filename.txt
 - assertVisible: This file doesn’t appear to contain safe text. Open it in another app.
-- tapOn: Back
+- tapOn: Close
 - assertVisible:
     id: presentation.complete

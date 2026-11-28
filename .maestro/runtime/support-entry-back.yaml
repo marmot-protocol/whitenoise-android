@@ -14,9 +14,9 @@ name: support-entry-back
     id: "settings.help_support.group"
 - scrollUntilVisible:
     element:
-      text: "Chat with support"
+      text: "Talk to the White Noise team"
     direction: DOWN
-- tapOn: "Chat with support"
+- tapOn: "Talk to the White Noise team"
 - assertVisible: "White Noise Support"
 - assertVisible:
     id: "support.start"

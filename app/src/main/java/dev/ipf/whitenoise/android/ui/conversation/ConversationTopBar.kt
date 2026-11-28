@@ -39,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
@@ -68,16 +69,20 @@ import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.chats.ConversationSearchTopBar
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.GroupAvatar
+import dev.ipf.whitenoise.android.ui.common.HoldClaim
 import dev.ipf.whitenoise.android.ui.common.LocalSearchCollapse
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
 import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
+import dev.ipf.whitenoise.android.ui.common.claimsHold
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberSearchCollapse
 import dev.ipf.whitenoise.android.ui.common.searchCollapseHost
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
+import dev.ipf.whitenoise.android.ui.navigation.conversationRouteHeaderMotion
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
+import dev.ipf.whitenoise.android.ui.theme.Radii
 
 internal const val CONVERSATION_TOP_BAR_TAG = "conversation-top-bar"
 
@@ -88,7 +93,7 @@ internal fun ConversationHeaderFrame(
     header: @Composable () -> Unit,
     playbackTransport: @Composable () -> Unit,
 ) {
-    Column {
+    Column(Modifier.conversationRouteHeaderMotion()) {
         header()
         playbackTransport()
     }
@@ -128,8 +133,6 @@ internal fun ConversationTopBar(
     // Optional header shortcuts chosen in Chat header settings; empty keeps the plain header. The slot
     // receives how many buttons fit beside the chat name at this width and font size.
     actions: @Composable RowScope.(capacity: Int) -> Unit = {},
-    // Set only when this person may change the timer now; otherwise a tap on it opens details.
-    onTimerClick: (() -> Unit)? = null,
 ) {
     // MDK 0.10.0 prepares the conversation title inside the live window; fall back to the app's own
     // projection until the first replacement arrives or when the seam has no window. A DM peer's
@@ -261,6 +264,7 @@ internal fun ConversationTopBar(
                                 TopAppBarDefaults.TopAppBarExpandedHeight
                             },
                         title = {
+                            val timerClaim = remember { HoldClaim() }
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -268,13 +272,15 @@ internal fun ConversationTopBar(
                                     Modifier
                                         .fillMaxWidth()
                                         .heightIn(min = 48.dp)
-                                        .clip(RoundedCornerShape(12.dp))
+                                        .clip(RoundedCornerShape(Radii.md))
                                         // The reader speaks the chat name and member line, then offers Details.
                                         .explainOnLongPress(
                                             Explanation(
                                                 openDetailsDescription,
                                                 stringResource(R.string.explanation_conversation_header_details),
                                             ),
+                                            // A hold that reaches the timer line belongs to its tooltip alone.
+                                            holdClaim = timerClaim,
                                         ).clickable(
                                             onClickLabel = openDetailsDescription,
                                             role = Role.Button,
@@ -302,6 +308,7 @@ internal fun ConversationTopBar(
                                         durableAvatarIsPersonPicture =
                                             selectedAssetIsPersonPicture ||
                                                 avatarSource?.avatarSource?.isPeerSourced() == true,
+                                        followedAccount = presentedAvatarAccount?.takeIf { controller.isDm },
                                     )
                                 }
                                 Column(
@@ -312,6 +319,7 @@ internal fun ConversationTopBar(
                                         style = MaterialTheme.typography.titleMedium,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.testTag("conversation.header.name").directHitTarget(),
                                     )
                                     val membersSubtitle =
                                         if (
@@ -331,8 +339,9 @@ internal fun ConversationTopBar(
                                         } else {
                                             null
                                         }
-                                    val disappearingSecs = presentedGroup.disappearingMessageSecs.toLong()
-                                    val showTimer = disappearingSecs > 0L
+                                    val disappearingSecs = presentedGroup.disappearingMessageSecs
+                                    val showTimer = disappearingSecs > 0uL
+                                    val timerLabel = disappearingMessagesLabel(disappearingSecs)
                                     if (membersSubtitle != null || showTimer) {
                                         val labelStyle = MaterialTheme.typography.labelSmall
                                         val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
@@ -357,10 +366,9 @@ internal fun ConversationTopBar(
                                                         Text("·", style = labelStyle, color = labelColor)
                                                     }
                                                     HeaderTimerBadge(
-                                                        label = disappearingMessagesLabel(disappearingSecs),
+                                                        label = timerLabel,
                                                         labelStyle = labelStyle,
                                                         labelColor = labelColor,
-                                                        onClick = onTimerClick,
                                                     )
                                                 }
                                             }
@@ -396,16 +404,20 @@ internal fun ConversationTopBar(
                                                                 .testTag("conversation.timer.tooltip")
                                                                 .heightIn(max = tooltipMaxHeight),
                                                     ) {
-                                                        Text(
-                                                            timerTooltipText,
+                                                        // Repeats the full duration the header may shorten.
+                                                        Column(
                                                             modifier =
                                                                 Modifier
                                                                     .testTag("conversation.timer.tooltip.text")
                                                                     .fadingVerticalScroll(rememberScrollState()),
-                                                        )
+                                                        ) {
+                                                            Text(timerTooltipText)
+                                                            Text(timerLabel)
+                                                        }
                                                     }
                                                 },
                                                 state = timerTooltipState,
+                                                modifier = Modifier.claimsHold(timerClaim),
                                                 content = subtitleRow,
                                             )
                                         } else {
@@ -442,29 +454,21 @@ private const val CONVERSATION_TITLE_LINE_SPACING_DP = -2
 // Material's titleMedium size at 100% text size.
 private val BASE_TITLE_SIZE = 16.dp
 
-/** The timer badge; with [onClick] it opens the disappearing-messages picker instead of chat details. */
+/**
+ * Gives this element its own pointer target. Compose prefers a direct hit to a neighbour's widened touch area, so a
+ * press on the chat name stays the title's rather than reaching the timer line just below.
+ */
+private fun Modifier.directHitTarget(): Modifier = pointerInput(Unit) {}
+
+/** Read-only disappearing-messages indicator inside the header's chat-details tap target. */
 @Composable
 @Suppress("FunctionNaming")
 private fun HeaderTimerBadge(
     label: String,
     labelStyle: TextStyle,
     labelColor: Color,
-    onClick: (() -> Unit)?,
 ) {
-    val clickModifier =
-        if (onClick == null) {
-            Modifier
-        } else {
-            Modifier
-                .clip(RoundedCornerShape(6.dp))
-                .clickable(
-                    onClickLabel = stringResource(R.string.conversation_header_timer_change),
-                    role = Role.Button,
-                    onClick = onClick,
-                ).testTag(CONVERSATION_HEADER_TIMER_BUTTON_TAG)
-        }
     Row(
-        modifier = clickModifier,
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
@@ -474,7 +478,7 @@ private fun HeaderTimerBadge(
             modifier = Modifier.size(12.dp).testTag("conversation.header.timer"),
             tint = labelColor,
         )
-        // A new timer rolls in under the old one, so a change made from the sheet is visible where it lives.
+        // A new timer rolls in under the old one when the duration changes.
         AnimatedContent(
             targetState = label,
             transitionSpec = {
@@ -482,9 +486,15 @@ private fun HeaderTimerBadge(
             },
             label = "header-timer-label",
         ) { shown ->
-            Text(shown, style = labelStyle, color = labelColor, maxLines = 1, softWrap = false)
+            // A timer too long for the header ends in an ellipsis — its tooltip shows the full duration.
+            Text(
+                shown,
+                style = labelStyle,
+                color = labelColor,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
-
-internal const val CONVERSATION_HEADER_TIMER_BUTTON_TAG = "conversation.header.timer.button"

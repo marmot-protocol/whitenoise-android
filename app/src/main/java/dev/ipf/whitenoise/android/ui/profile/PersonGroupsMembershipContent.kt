@@ -18,6 +18,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.NoticeTier
 import dev.ipf.whitenoise.android.state.ToastMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.profileMembershipController
@@ -368,7 +369,7 @@ internal suspend fun completeMembershipRemoval(
     if (state.owner.canAct()) {
         val feedback =
             if (removed) {
-                ToastMessage(AppText.Resource(R.string.toast_member_removed))
+                ToastMessage(AppText.Resource(R.string.toast_member_removed), tier = NoticeTier.Confirmation)
             } else {
                 personProfileFeedback(previousToast, appState.toast)
             }

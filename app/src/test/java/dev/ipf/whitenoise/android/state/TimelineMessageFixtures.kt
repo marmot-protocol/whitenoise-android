@@ -12,7 +12,7 @@ internal fun projectedTimelineMessage(record: AppMessageRecordFfi): TimelineMess
     return localTimelineMessage(record).copy(projected = projected)
 }
 
-/** An optimistic send or stream-debug row: local only, synthetic id. */
+/** An optimistic send: local only, synthetic id. */
 internal fun localTimelineMessage(record: AppMessageRecordFfi): TimelineMessage =
     TimelineMessage(
         id = "msg:${record.messageIdHex}",
@@ -47,6 +47,8 @@ internal fun timelineAppMessage(
 /** Projects an app message record into the equivalent timeline message record. */
 private fun projectedRecordFor(record: AppMessageRecordFfi): TimelineMessageRecordFfi =
     TimelineMessageRecordFfi(
+        agentItem = null,
+        agentItemFirstEventMissing = false,
         clientToken = null,
         messageIdHex = record.messageIdHex,
         sourceMessageIdHex = record.messageIdHex,
@@ -63,7 +65,7 @@ private fun projectedRecordFor(record: AppMessageRecordFfi): TimelineMessageReco
         replyPreview = null,
         mediaJson = null,
         media = emptyList(),
-        agentTextStreamJson = null,
+        thread = null,
         poll = null,
         groupSystem = null,
         hasReports = false,

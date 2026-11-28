@@ -35,6 +35,7 @@ import androidx.compose.ui.window.PopupPositionProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.isSignedInSigningAccount
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.account.AccountAvatarButton
 import dev.ipf.whitenoise.android.ui.design.KeyboardSafePopup
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
@@ -122,7 +123,7 @@ internal fun ComposerSendingIdentity(
                             .testTag("composer-sending-identity-popup"),
                     ) {
                         Text(sendingAs, style = MaterialTheme.typography.labelMedium)
-                        Text(title, style = MaterialTheme.typography.titleSmall)
+                        EmojiLabel(title, style = MaterialTheme.typography.titleSmall)
                     }
                 }
             }

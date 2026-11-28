@@ -195,6 +195,8 @@ internal object GlobalSearchTestFixtures {
         expiresAt: ULong? = null,
         invalidation: String? = null,
     ) = TimelineMessageRecordFfi(
+        agentItem = null,
+        agentItemFirstEventMissing = false,
         clientToken = null,
         hasReports = false,
         poll = null,
@@ -217,7 +219,7 @@ internal object GlobalSearchTestFixtures {
         replyPreview = null,
         mediaJson = null,
         media = emptyList(),
-        agentTextStreamJson = null,
+        thread = null,
         groupSystem = null,
         reactions = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),
         edit = null,

@@ -773,6 +773,7 @@ internal abstract class ConversationDictationNotificationTestFixture {
         var revision = 0L
         var acceptSend = true
         val sent = mutableListOf<String>()
+        override var notificationSendAllowed = true
         override val conversationDictation =
             ConversationDictationController(
                 platform = platform,

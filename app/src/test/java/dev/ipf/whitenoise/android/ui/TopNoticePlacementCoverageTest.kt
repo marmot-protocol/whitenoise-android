@@ -65,6 +65,21 @@ class TopNoticePlacementCoverageTest {
         assertTrue("the root fallback must claim before any screen composes", fallback in 0 until lockBranch)
     }
 
+    @Test
+    fun deviceLinkWindowsUseTheRootHostForReportFeedback() {
+        val root = mainSource("ui/WhiteNoiseApp.kt").functionBody("WhiteNoiseApp")
+        assertTrue("AppQuestionHosts(appState, topNoticeHost)" in root)
+        val questions = mainSource("ui/AppQuestionHosts.kt").functionBody("AppQuestionHosts")
+        val provider = "CompositionLocalProvider(LocalTopNoticeHost provides topNoticeHost)"
+        val linkScope =
+            questions.kotlinBlockFrom(
+                openDelimiter = questions.indexOf(provider) + provider.length,
+                description = provider,
+                searchForOpening = true,
+            )
+        assertTrue("DeviceLinkRequestHost(" in linkScope)
+    }
+
     /** The shell's slot follows its persistent top strips and precedes the destination and durable bottom controls. */
     @Test
     fun theShellSlotSitsBetweenItsTopStripsAndTheDestination() {
@@ -117,8 +132,16 @@ class TopNoticePlacementCoverageTest {
 
         val startup = mainSource("ui/common/StartupScreens.kt")
         assertTrue("a bar-less startup surface relies on the root slot", "topNoticeSlot = false" in startup)
+
+        val sharePicker = mainSource("ui/share/ShareChatPickerFullScreen.kt").functionBody("ShareChatPickerScaffold")
+        assertTrue("topNoticeSlot = false" in sharePicker)
+        val shareBar = sharePicker.indexOf("WhiteNoiseTopBar(")
+        val shareSlot = sharePicker.indexOf("TopNoticeSlot()")
+        val shareSnackbars = sharePicker.indexOf("WhiteNoiseSnackbarHost(")
+        assertTrue("the share picker's slot sits under its bar, above its snackbars", shareBar in 0 until shareSlot)
+        assertTrue("the share picker's snackbars follow its slot", shareSlot < shareSnackbars)
         val optOuts = mainSources().count { (_, source) -> "topNoticeSlot = false" in source }
-        assertEquals("a new opt-out needs a reviewed replacement slot", 3, optOuts)
+        assertEquals("a new opt-out needs a reviewed replacement slot", 4, optOuts)
     }
 
     /**
@@ -184,6 +207,19 @@ class TopNoticePlacementCoverageTest {
         assertTrue("presentationAllowed() && claims.lastOrNull() === claim" in owns)
     }
 
+    /** The confirmation's own height and insets never contribute to the destination constraints. */
+    @Test
+    fun successUsesAZeroHeightOverlayIndependentOfActionableFeedback() {
+        val overlay = mainSource("ui/common/ConfirmationBubble.kt").functionBody("AnchoredConfirmationBubble")
+        assertTrue("a shown confirmation must report zero layout height", "layout(width, 0)" in overlay)
+        val region = mainSource("ui/common/TopNotice.kt").functionBody("TopNoticeRegion")
+        assertTrue(
+            "the overlay follows actionable feedback so it never covers its controls",
+            region.indexOf("WhiteNoiseSnackbarHost(") in 0 until region.indexOf("AnchoredConfirmationBubble("),
+        )
+        assertTrue("the owning slot must present the confirmation overlay", "AnchoredConfirmationBubble(" in region)
+    }
+
     /** Material `Scaffold(` calls in one source, as their balanced argument lists, skipping the app's own scaffold. */
     private fun plainScaffoldCalls(source: String): List<String> {
         if (SCAFFOLD_ALIAS in source) return emptyList()
@@ -237,7 +273,10 @@ class TopNoticePlacementCoverageTest {
         /** The reviewed opt-out: a reason is required, so a bare marker never passes. */
         val PLAIN_SCAFFOLD_OPT_OUT = Regex("""// top-notice-slot opt-out: \S.*""")
 
-        /** The plain scaffolds with a top bar known at the time of writing, so a broken search cannot pass. */
-        const val MIN_PLAIN_SCAFFOLD_TOP_BARS = 11
+        /**
+         * The plain scaffolds with a top bar known at the time of writing, so a broken search cannot pass. Ordinary
+         * pages moved onto WhiteNoiseScaffold in #4054, so lower this when another one moves.
+         */
+        const val MIN_PLAIN_SCAFFOLD_TOP_BARS = 5
     }
 }

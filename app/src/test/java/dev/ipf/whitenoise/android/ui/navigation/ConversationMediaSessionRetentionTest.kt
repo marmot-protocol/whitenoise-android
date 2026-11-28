@@ -59,7 +59,7 @@ class ConversationMediaSessionRetentionTest {
                         memberCount = 1,
                         memberSnapshot = null,
                     )
-                holder.selectedChat.value = selected
+                holder.openForTest(selected)
                 val scrollKey = conversationScrollKey(ACCOUNT_REF, selected.group.groupIdHex)
                 val scroll =
                     ConversationScrollSnapshot(

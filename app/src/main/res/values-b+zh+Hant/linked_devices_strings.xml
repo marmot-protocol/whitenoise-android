@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="linked_devices">已連結裝置</string>
+    <string name="linked_devices">裝置</string>
+    <string name="settings_search_alias_linked_devices">已連結裝置|連結裝置</string>
+    <string name="group_account_devices_title">已連結裝置</string>
     <string name="linked_devices_detail">從連結裝置傳送的訊息，在你所有的連結裝置上都會顯示為你傳送的訊息。</string>
     <string name="linked_devices_this_device">此裝置</string>
     <string name="linked_devices_other_devices">其他裝置</string>
@@ -36,9 +38,9 @@
     <string name="error_account_unlinked">此裝置已被取消與此帳號的連結，因此無法在此登入。請將該帳號從此裝置移除，然後重新登入以重新連結此裝置。</string>
     <string name="wipe_report_left_to_other_devices">交由你的其他裝置完成的聊天：%1$d</string>
     <string name="wipe_report_other_devices_not_reached">無法請你的其他裝置完成此裝置的登出。在你從其中一部裝置移除它之前，它們可能仍會列出此裝置。</string>
-    <string name="history_imported_from_device">從 %1$s 匯入</string>
-    <string name="history_imported_from_another_device">從另一部裝置匯入</string>
-    <string name="history_restored_from_backup">從備份還原</string>
+    <string name="history_imported_from_device">以上訊息來自 %1$s</string>
+    <string name="history_imported_from_another_device">以上訊息來自另一部裝置</string>
+    <string name="history_restored_from_backup">以上訊息從備份還原</string>
     <string name="history_receiving">正在從你的另一部裝置接收之前的訊息…</string>
     <string name="history_retrying">無法載入先前的訊息。我們會自動再試一次。</string>
     <string name="link_device_this_title">連結此裝置</string>
@@ -75,7 +77,7 @@
     <string name="link_request_review">檢視</string>
     <string name="link_request_not_now">暫時不要</string>
     <string name="link_request_preparing">正在檢查新裝置…</string>
-    <string name="link_request_compare_detail">確認兩部裝置顯示相同的表情符號，而且順序一致。如果不同，請點選「暫時不要」。</string>
+    <string name="link_request_compare_detail">確認手邊的裝置以相同順序顯示相同的表情符號。不要念給任何人聽，也不要傳送螢幕截圖。</string>
     <string name="link_request_label">裝置名稱</string>
     <string name="link_request_label_too_long">名稱過長。</string>
     <string name="link_request_add_to_chats">加入我的所有聊天</string>
@@ -91,6 +93,14 @@
     <string name="link_request_linked">新裝置已連結。</string>
     <string name="link_request_added_elsewhere">%1$s 已由 %2$s 新增。</string>
     <string name="link_request_added_elsewhere_unnamed">該裝置已由你的另一部裝置新增。</string>
+    <string name="link_request_notice">有新裝置要求連結到你的帳號。</string>
+    <string name="link_request_notice_other_profile">有新裝置要求連結到 %1$s。</string>
+    <string name="link_request_repeated_notice">重複的連結要求：可能有人持有你的金鑰。</string>
+    <string name="link_request_repeated_notice_other_profile">%1$s 收到重複的連結要求：可能有人持有你的金鑰。</string>
+    <string name="link_request_repeated_title">重複的連結要求</string>
+    <string name="link_request_repeated_detail">一小時內有裝置多次要求連結到此帳號。可能有人持有你的私密金鑰，因此不提供連結。如果這些要求是你自己發出的，請稍後從一部裝置重試。</string>
+    <string name="link_request_dont_link">不要連結</string>
+    <string name="link_request_review_devices">檢查裝置</string>
     <string name="device_detail_rename">重新命名</string>
     <string name="device_detail_rename_detail">此裝置在你所有裝置上顯示的名稱。</string>
     <string name="device_detail_keep">不活躍時保留</string>
@@ -109,7 +119,7 @@
     <string name="devices_leftover_chats_detail">這些聊天無法接受來自你裝置的移除操作。聊天管理員可以在那裡移除該裝置。</string>
     <string name="devices_key_refresh_overdue">此裝置無法更新其邀請金鑰。30 天後，可能無法再將它加入新聊天。請在你的裝置上保持應用程式開啟，以便它們同步。</string>
     <string name="devices_stalled">此裝置已無法與你的其他裝置保持同步。請修復其連結以繼續。</string>
-    <string name="device_repair_confirm_again">請在設定中打開「已連結的裝置」，再次確認修復後再連結此裝置。</string>
+    <string name="device_repair_confirm_again">請在設定中打開「裝置」，再次確認修復後再連結此裝置。</string>
     <string name="device_repair_try_link_again">連結已重設。請嘗試重新連結裝置以完成修復。</string>
     <string name="devices_repair">修復此裝置的連結</string>
     <string name="devices_repair_confirm">這會移除目前的連結，讓你重新連結這部裝置。聊天、訊息、草稿和設定都會保留。即使取消重新連結，也無法恢復原本的連結。</string>
@@ -123,8 +133,8 @@
     <string name="sign_in_signed_out">已不再登入</string>
     <string name="sign_in_question_new">這是你本人嗎？</string>
     <string name="sign_in_question_before">你還持有這部裝置嗎？</string>
-    <string name="sign_in_detail_new">有人在另一部裝置登入了這個帳號。如果是你本人，可以連結那部裝置。否則，請點選「不是我本人」。</string>
-    <string name="sign_in_detail_before">這部裝置在目前裝置之前就已登入此帳號。如果你還持有它，請從它那裡連結目前裝置。如果沒有，你可以重新開始。</string>
+    <string name="sign_in_detail_new">有人在另一部裝置登入了這個帳號。如果是你本人，可以連結那部裝置。如果是你不想連結的自己的應用程式，請點選「是我的，不連結」。如果不是你，請點選「不是我本人」。</string>
+    <string name="sign_in_detail_before">這部裝置在目前裝置之前就已登入此帳號。如果你還持有它，請從它那裡連結目前裝置，或者重新開始。如果你不認得它，請點選「我不認得這部裝置」。</string>
     <string name="sign_in_previously_linked">先前在此連結的一部裝置不在此裝置目前的清單中。請開啟兩部裝置以檢查連結。</string>
     <string name="sign_in_reject">不是我本人</string>
     <string name="sign_in_reject_confirm">你的所有裝置都會將這次登入標示為不是你本人所為，並顯示安全警告。那部裝置仍會保持登入，你的金鑰也不會改變。</string>
@@ -136,10 +146,10 @@
     <string name="start_fresh_title">沒有，重新開始</string>
     <string name="start_fresh_detail">暫時單獨使用這部裝置。稍後仍可從先前登入過的裝置連結它。</string>
     <string name="started_fresh_note">此裝置已重新開始。這裡只會顯示你今後受邀加入的聊天。</string>
-    <string name="compromise_warning_title">安全警告</string>
-    <string name="compromise_warning_rejected">此帳號的一次登入已被標記為非本人操作。可能有其他人持有此帳號的金鑰或與其簽署器的工作階段。</string>
-    <string name="compromise_warning_foreign_key">此裝置在自己的插槽中發現了並非由它建立的邀請金鑰，並已替換。可能有其他人持有此帳號的金鑰或與其簽署器的工作階段。</string>
-    <string name="compromise_warning_dismiss">標記為已檢視</string>
+    <string name="compromise_warning_title">可能有其他人持有你的私密金鑰</string>
+    <string name="compromise_warning_rejected">這個帳號的一次登入已被標記為不是你本人。</string>
+    <string name="compromise_warning_foreign_key">這部裝置在自己的欄位中發現了不是它產生的邀請金鑰。</string>
+    <string name="compromise_warning_dismiss">在這部裝置上隱藏</string>
     <string name="compromise_warning_dismiss_detail">僅在此裝置上隱藏此警告。不會移除裝置、拒絕登入或保護你的金鑰。</string>
     <string name="device_move_section">正在移動此裝置</string>
     <string name="device_move_waiting">正在等待其他裝置新增</string>
@@ -158,8 +168,8 @@
     <string name="link_offer_reminder">連結此裝置，即可看到你其他裝置上的聊天。</string>
     <string name="link_request_default_label">新裝置</string>
     <string name="link_request_options">選項</string>
-    <string name="link_request_options_detail">選擇裝置名稱，並決定是否分享聊天及其歷史訊息。</string>
-    <string name="explanation_link_request_options">開啟新裝置的名稱及其接收的內容。</string>
+    <string name="link_request_options_detail">選擇是否分享聊天及其歷史訊息。</string>
+    <string name="explanation_link_request_options">開啟新裝置接收的內容。</string>
     <string name="device_move_advanced">進階</string>
     <string name="setup_device_link_next">登入後，你可以連結這部裝置，接收其他裝置上的聊天。</string>
     <string name="unlinked_account_remove_for">從此裝置移除 %1$s</string>
@@ -177,4 +187,40 @@
     <string name="unlinked_remove_sign_in_detail">這部裝置已解除連結。要從這部裝置刪除此個人檔案的聊天和資料，再用剛輸入的金鑰登入嗎？其他裝置的資料會保留。</string>
     <string name="invite_decline_wait_for_sync">等候此聊天同步後，再次點選「拒絕」。</string>
     <string name="invite_decline_check_delivery">你上次對群組的變更尚未送達所有中繼站。請先查看聊天中是否有傳送警告，再重試。</string>
+    <string name="sign_in_claim">自稱：%1$s</string>
+    <string name="sign_in_mine">是我的，不連結</string>
+    <string name="sign_in_mine_state">你的，未連結</string>
+    <string name="sign_in_dont_recognize">我不認得這部裝置</string>
+    <string name="compromise_warning_explainer">你的金鑰可以在任何地方登入，且無法變更或撤銷。White Noise 會把未知裝置擋在你的已連結裝置之外，但無法將它們拒於門外。</string>
+    <string name="compromise_warning_steps_title">該怎麼做</string>
+    <string name="compromise_warning_step_remove">1. 移除任何你不認得的裝置。</string>
+    <string name="compromise_warning_step_signer">2. 如果你使用簽署應用程式，請開啟其中的「已連線應用程式」，移除不認得的應用程式。</string>
+    <string name="compromise_warning_step_move">3. 改用新帳號。你的聯絡人需要重新加入它。</string>
+    <string name="compromise_alert_review">查看裝置</string>
+    <string name="compromise_warning_hide_failed">無法隱藏警告。請再試一次。</string>
+    <string name="sign_in_alert_review_banner">一部你未連結的裝置登入了你的帳號。請確認它是否屬於你。</string>
+    <string name="sign_in_alert_review_action">查看</string>
+    <string name="sign_in_alert_badge_review">有待查看的登入</string>
+    <string name="sign_in_alert_badge_compromise">安全警告</string>
+    <string name="sign_in_alert_review_body">一部你未連結的裝置登入了你的帳號。開啟 White Noise 確認它是否屬於你。</string>
+    <string name="sign_in_alert_review_public">有待查看的登入</string>
+    <string name="sign_in_alert_compromise_body">開啟 White Noise 查看發生了什麼以及該怎麼做。</string>
+    <string name="sign_in_alert_compromise_public">需要進行安全檢查</string>
+    <string name="device_detail_remove_stolen">如果這部裝置遺失或遭竊，持有它的人可能仍有你的金鑰。</string>
+    <plurals name="sign_in_alert_review_title">
+        <item quantity="other">%d 個新登入待查看</item>
+    </plurals>
+    <string name="link_request_expired_attempt">%1$s 有裝置嘗試連結。</string>
+    <string name="link_consent_requested_at">要求時間：%1$s</string>
+    <string name="link_consent_access">已連結的裝置可以讀取你的聊天、取得聊天記錄，也能以你的名義傳送訊息。</string>
+    <string name="link_consent_have_device">只有你親自在眼前的裝置上開始設定 White Noise，才繼續操作。</string>
+    <string name="link_consent_scam">White Noise 不會聯絡你要求連結裝置或核對表情符號。如果有人要求你這麼做，那是詐騙。</string>
+    <string name="link_consent_on_call">你正在通話。詐騙者常在電話中指導受害者連結裝置。</string>
+    <string name="link_consent_with_me">新裝置就在我手邊</string>
+    <string name="link_consent_did_not_start">這不是我發起的</string>
+    <string name="link_consent_someone_asked">有人要求我這麼做</string>
+    <string name="link_consent_unlock">解鎖這部手機以核對表情符號</string>
+    <string name="link_consent_lock_required">請先在這部手機上設定螢幕鎖定，再連結裝置。</string>
+    <string name="link_consent_report_guidance">已拒絕連結。請在「裝置」中開啟該登入記錄以回報。</string>
+    <string name="link_touch_blocked">另一個應用程式遮住了 White Noise。請關閉它的視窗後再試一次。</string>
 </resources>

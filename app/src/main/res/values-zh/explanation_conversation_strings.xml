@@ -44,6 +44,7 @@
     <string name="explanation_poll_multiple_choice">成员可以投多个选项。</string>
 
     <!-- Focused message menu explanations, shown when a message action is held. -->
+    <string name="explanation_message_action_transcribe">在此设备上将这段录音转换为文字。</string>
     <string name="explanation_message_action_reply">在输入框中引用这条消息，让你的回复与之关联。</string>
     <string name="explanation_message_action_edit">在输入框中打开你的消息，以便你修改。</string>
     <string name="explanation_message_action_select">开启选择模式，一次选中多条消息。</string>

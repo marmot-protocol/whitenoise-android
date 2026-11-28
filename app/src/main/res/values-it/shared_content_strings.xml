@@ -14,4 +14,17 @@
     <string name="shared_content_partial">Nessun allegato corrispondente ancora caricato</string>
     <string name="shared_content_page_failed">Impossibile caricare i contenuti condivisi. Riprova.</string>
     <string name="shared_content_history_end">Fine della cronologia locale degli allegati</string>
+    <plurals name="shared_media_photos_selected_count">
+        <item quantity="one">%1$d foto selezionata</item>
+        <item quantity="other">%1$d foto selezionate</item>
+    </plurals>
+    <string name="shared_media_select_photo">Seleziona foto</string>
+    <string name="shared_media_cancel_selection">Annulla selezione</string>
+    <string name="shared_media_share_selected_photos">Condividi le foto selezionate</string>
+    <string name="shared_media_photo_from">Foto di %1$s</string>
+    <string name="shared_media_video_not_selectable">Video, non selezionabile</string>
+    <string name="shared_media_share_photos_failed">Impossibile condividere le foto</string>
+    <string name="shared_media_share_photos_unavailable">Alcune foto selezionate non sono più disponibili, quindi non è stato condiviso nulla. Sono state deselezionate. Riprova.</string>
+    <string name="shared_media_share_photos_too_large">Queste foto sono troppo grandi per condividerle insieme. Selezionane meno e riprova.</string>
+    <string name="shared_media_jump_to_date">Vai a una data</string>
 </resources>

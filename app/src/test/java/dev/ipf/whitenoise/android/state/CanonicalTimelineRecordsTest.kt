@@ -14,7 +14,7 @@ class CanonicalTimelineRecordsTest {
             listOf(
                 projectedTimelineMessage(timelineAppMessage("m1", recordedAt = 1uL)),
                 projectedTimelineMessage(timelineAppMessage("m2", recordedAt = 2uL)),
-                // An in-flight send and a stream-debug row, both at the tail.
+                // Two in-flight local rows, both at the tail.
                 localTimelineMessage(timelineAppMessage("temp1", recordedAt = 3uL)),
                 localTimelineMessage(timelineAppMessage("dbg1", recordedAt = 4uL)),
             )

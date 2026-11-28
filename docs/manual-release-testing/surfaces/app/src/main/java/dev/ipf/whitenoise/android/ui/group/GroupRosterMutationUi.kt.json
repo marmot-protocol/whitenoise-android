@@ -1,0 +1,29 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupRosterMutationUi.kt",
+  "legacy_sha256": "55078a7d1266489550ba727e179bba2771320c0209236b7d33398660b1a5fd06",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "GroupMemberMutationStatus",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupRosterMutationUi.kt",
+        "anchor": "fun GroupMemberMutationStatus(",
+        "test_ids": [
+          "GRP-005",
+          "GRP-006",
+          "GRP-007"
+        ]
+      },
+      {
+        "surface": "PendingGroupInviteRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupRosterMutationUi.kt",
+        "anchor": "fun PendingGroupInviteRow(",
+        "test_ids": [
+          "GRP-011",
+          "GRP-012",
+          "GRP-013"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

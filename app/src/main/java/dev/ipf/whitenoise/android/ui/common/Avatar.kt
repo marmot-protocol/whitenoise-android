@@ -7,11 +7,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,23 +32,20 @@ import androidx.compose.ui.unit.sp
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader
+import dev.ipf.whitenoise.android.core.formatIdentityMonogram
+import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.EmojiShortcodes
+import dev.ipf.whitenoise.android.ui.LocalCustomEmoji
 import dev.ipf.whitenoise.android.ui.icons.filled.Image
-
-private val AvatarPalette =
-    listOf(
-        Color(0xFF006A6A),
-        Color(0xFF8C4A00),
-        Color(0xFF5B5FC7),
-        Color(0xFF006D3B),
-        Color(0xFF9A4055),
-    )
+import dev.ipf.whitenoise.android.ui.theme.AvatarPalette
 
 /**
  * Shows identity-scoped cached pixels or initials, recovering missing URL images while visible. A URL
  * picture whose cached bytes are a GIF animates over its first frame under the shared profile policy; a
  * supplied [picture] animates only when the caller names its stored person-picture [animationKey]. A URL
  * this starts decoding runs in [pictureDomain]'s worker, single-use unless the caller names one, such as
- * [AvatarImageLoader.publicProfiles] for a person's published picture.
+ * [AvatarImageLoader.publicProfiles] for a person's published picture. [followedAccount] names the person this avatar
+ * shows, as public-key hex, so it carries the followed-person badge while the active account follows them.
  */
 @Composable
 internal fun Avatar(
@@ -63,8 +60,9 @@ internal fun Avatar(
         dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
     initialUrlImage: ImageBitmap? = null,
     onUrlImageDisplayed: ((ImageBitmap?) -> Unit)? = null,
+    followedAccount: String? = null,
 ) {
-    val color = AvatarPalette[avatarPaletteIndex(seed.hashCode(), AvatarPalette.size)]
+    val color = AvatarPalette.colors[avatarPaletteIndex(seed.hashCode(), AvatarPalette.colors.size)]
     // Seed from the in-memory cache so re-entering a screen shows an
     // already-loaded avatar immediately, with no placeholder flash and no
     // re-fetch. key(seed, pictureUrl) re-creates the state holder when either
@@ -97,6 +95,34 @@ internal fun Avatar(
     if (onUrlImageDisplayed != null) {
         SideEffect { onUrlImageDisplayed(loadedUrlImage.takeIf { image === loadedUrlImage }) }
     }
+    val animatedKey =
+        if (privateSource) {
+            null
+        } else if (picture == null) {
+            pictureUrl
+        } else {
+            animationKey
+        }
+    if (followedAccount != null) {
+        FollowedPersonAvatarFrame(followedAccount, size) {
+            AvatarCircle(title, size, color, image, animatedKey, groupAnimation)
+        }
+    } else {
+        AvatarCircle(title, size, color, image, animatedKey, groupAnimation)
+    }
+}
+
+/** The clipped picture or monogram; [Avatar] decides which pixels and who they show. */
+@Composable
+@Suppress("FunctionNaming")
+private fun AvatarCircle(
+    title: String,
+    size: Dp,
+    color: Color,
+    image: ImageBitmap?,
+    animatedKey: String?,
+    groupAnimation: GroupAvatarAnimation?,
+) {
     Box(
         modifier = Modifier.size(size).clip(CircleShape).background(color),
         contentAlignment = Alignment.Center,
@@ -108,14 +134,6 @@ internal fun Avatar(
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
             )
-            val animatedKey =
-                if (privateSource) {
-                    null
-                } else if (picture == null) {
-                    pictureUrl
-                } else {
-                    animationKey
-                }
             AvatarAnimationLayers(animatedKey, image, groupAnimation, size)
         } else {
             AvatarMonogram(title, size)
@@ -133,14 +151,34 @@ private fun AvatarMonogram(
     val fontScale = LocalDensity.current.fontScale
     val headlineSp = MaterialTheme.typography.headlineMedium.fontSize
     val fittedFontSize = minOf(size.value * MONOGRAM_DIAMETER_RATIO, headlineSp.value * fontScale).sp / fontScale
-    Text(
-        IdentityFormatter.initials(title),
+    IdentityMonogram(
+        title,
+        style =
+            avatarMonogramStyle(MaterialTheme.typography.titleMedium, fittedFontSize)
+                .merge(TextStyle(fontSize = fittedFontSize, fontWeight = FontWeight.SemiBold)),
         color = Color.White,
-        fontWeight = FontWeight.SemiBold,
-        style = avatarMonogramStyle(MaterialTheme.typography.titleMedium, fittedFontSize),
-        fontSize = fittedFontSize,
-        maxLines = 1,
     )
+}
+
+/**
+ * The one-glyph monogram for [title] (see [IdentityFormatter.initials]). A custom emoji the device can draw is
+ * picked like a Unicode emoji and drawn as artwork; a blank title shows [blank] when one is given.
+ */
+@Composable
+@Suppress("FunctionNaming")
+internal fun IdentityMonogram(
+    title: String,
+    style: TextStyle,
+    color: Color = Color.Unspecified,
+    blank: String? = null,
+) {
+    val custom = LocalCustomEmoji.current
+    val monogram =
+        remember(title, custom, blank) {
+            blank?.takeIf { title.isBlank() }
+                ?: formatIdentityMonogram(title) { code -> EmojiShortcodes.art(code, custom, emptyMap()) != null }
+        }
+    EmojiLabel(monogram, color = color, style = style, maxLines = 1)
 }
 
 /**
@@ -155,8 +193,16 @@ internal fun PersonAvatar(
     seed: String,
     size: Dp,
     pictureUrl: String?,
+    followedAccount: String? = null,
 ) {
-    Avatar(title, seed, size, pictureUrl, pictureDomain = AvatarImageLoader.publicProfiles())
+    Avatar(
+        title,
+        seed,
+        size,
+        pictureUrl,
+        pictureDomain = AvatarImageLoader.publicProfiles(),
+        followedAccount = followedAccount,
+    )
 }
 
 /** Keeps group admission and person-picture intent separate while sharing the avatar's pixels. */

@@ -1237,8 +1237,7 @@ object MediaPipeline {
      * in place with [VideoMetadataScrubber] (#3376). Extracts dimensions
      * and a thumbhash from the poster frame so receivers paint a blurred
      * preview before the full payload downloads. Returns a typed result so
-     * callers can surface "too large" vs "decode failed" as distinct
-     * toasts: [VideoReadResult.TooLarge] fires when the source exceeds
+     * callers can surface "too large" vs "decode failed": [VideoReadResult.TooLarge] fires when the source exceeds
      * [VIDEO_MAX_BYTES] OR the caller's remaining album budget,
      * [VideoReadResult.MetadataNotRemovable] when the container is unsupported
      * or malformed (the original bytes are never returned instead), and
@@ -1248,10 +1247,11 @@ object MediaPipeline {
         context: android.content.Context,
         uri: Uri,
         remainingBytes: Long = VIDEO_MAX_BYTES,
+        resolvedMime: String? = null,
     ): VideoReadResult {
         val resolver = context.contentResolver
         val mime =
-            resolver.getType(uri)?.takeIf { it.startsWith("video/", ignoreCase = true) }
+            (resolvedMime ?: resolver.getType(uri))?.takeIf { it.startsWith("video/", ignoreCase = true) }
                 ?: return VideoReadResult.Failed
         val displayName = queryDisplayNameFromResolver(resolver, uri) ?: "video.mp4"
 

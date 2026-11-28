@@ -57,7 +57,7 @@ internal data class ConnectedRowShape(
 internal fun Modifier.connectedRowBorder(
     shape: ConnectedRowShape,
     color: Color,
-    seamColor: Color = color,
+    seamColor: Color = amoledRowSeamColor(color),
     suppressChrome: () -> Boolean = { false },
     suppressSeam: () -> Boolean = suppressChrome,
 ): Modifier =

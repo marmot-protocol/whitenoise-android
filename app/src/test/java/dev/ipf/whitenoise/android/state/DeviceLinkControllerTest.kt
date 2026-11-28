@@ -242,6 +242,28 @@ class DeviceLinkControllerTest {
             assertTrue(controller.linkReadFailed)
         }
 
+    @Test
+    fun readOnlyDevicesRefreshesRosterWithoutDrivingPairing() =
+        runTest {
+            val native = Native()
+            val controller = DeviceLinkController(ACCOUNT, native, canLink = false)
+            val events = Channel<MarmotEventFfi?>(Channel.UNLIMITED)
+            val observing = launch { controller.observe { events.receive() } }
+            runCurrent()
+            events.send(MarmotEventFfi.DeviceLinkChanged("id", ACCOUNT))
+            runCurrent()
+            events.send(null)
+            observing.join()
+            controller.refreshLink()
+            controller.start()
+
+            assertTrue(native.commands.isEmpty())
+            assertEquals(1, native.rosterReads)
+            assertEquals(0, native.linkReads)
+            assertNull(controller.link)
+            assertFalse(controller.linkReadFailed)
+        }
+
     /** Observing reads both once, then only what this account's events make stale. */
     @Test
     fun observingRereadsOnlyWhatThisAccountsEventsMakeStale() =

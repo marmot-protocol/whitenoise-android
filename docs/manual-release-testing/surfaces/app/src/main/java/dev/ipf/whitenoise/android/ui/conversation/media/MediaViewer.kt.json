@@ -145,6 +145,15 @@
         "test_ids": [
           "MED-044"
         ]
+      },
+      {
+        "surface": "Shared viewer chrome: image and video viewer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
+        "anchor": "AttachmentViewerChrome(",
+        "test_ids": [
+          "MED-015",
+          "MED-033"
+        ]
       }
     ],
     "string_resources": [

@@ -16,16 +16,17 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -43,8 +44,10 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.attachmentCollections
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
+import dev.ipf.whitenoise.android.ui.conversation.media.ComposerPdfMetadataDialog
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.isActive
 
 private val ITEM_LIST_MAX_HEIGHT = 240.dp
 private val SHOW_ITEMS = R.string.attachment_collection_show_items
@@ -68,7 +71,6 @@ internal fun rememberAttachmentCollectionPanels(
     controller: ConversationController,
     mediaSender: ConversationMediaSender,
 ): (@Composable () -> Unit)? {
-    val context = LocalContext.current
     val account = controller.boundAccountRef
     val groupIdHex = controller.group.groupIdHex
     val gone = controller.group.disbanded || controller.group.unrecoverable
@@ -76,8 +78,6 @@ internal fun rememberAttachmentCollectionPanels(
         if (account == null) return@LaunchedEffect
         if (gone) {
             appState.attachmentCollections.invalidateConversation(account, groupIdHex)
-        } else {
-            appState.restoreCollectionOperations(account, groupIdHex, readable = { canReadCollectionUri(context, it) })
         }
     }
     // The caller only learns whether a panel exists, so a progress change recomposes just the panels.
@@ -94,6 +94,9 @@ internal fun rememberAttachmentCollectionPanels(
     val anyShown by presence.first.collectAsState(initial = presence.second)
     if (!anyShown) return null
     return {
+        val promptScope = rememberCoroutineScope()
+        ComposerPdfMetadataDialog(mediaSender.collectionResumePdfChoices)
+        DisposableEffect(mediaSender) { onDispose { mediaSender.collectionResumePdfChoices.cancel() } }
         val current by operations.collectAsState()
         visible(current).forEach { operation ->
             AttachmentCollectionProgress(
@@ -105,8 +108,10 @@ internal fun rememberAttachmentCollectionPanels(
                         },
                         onSkipChunk = { appState.launchMutation { controller.skipCollectionChunk(operation.id, it) } },
                         onCancel = { appState.launchMutation { controller.cancelCollection(operation.id) } },
-                        onResume = { mediaSender.resumeCollection(operation.id) },
-                        onDiscard = { appState.attachmentCollections.discard(operation.id) },
+                        onResume = {
+                            mediaSender.resumeCollection(operation.id, canAskForPdfConsent = { promptScope.isActive })
+                        },
+                        onDiscard = { appState.discardCollection(operation.id) },
                     ),
                 modifier = Modifier.padding(8.dp),
             )
@@ -125,7 +130,9 @@ internal fun canReadCollectionUri(
 
 /** Whether an operation deserves a panel: several chunks, or any state the user must act on. */
 internal fun AttachmentCollectionOperation.needsPanel(): Boolean =
-    chunks.size > 1 || phase == CollectionOperationPhase.BLOCKED || phase == CollectionOperationPhase.PAUSED
+    !cleanupOnly &&
+        phase != CollectionOperationPhase.FINISHED &&
+        (chunks.size > 1 || phase == CollectionOperationPhase.BLOCKED || phase == CollectionOperationPhase.PAUSED)
 
 /**
  * The composer-side progress panel for one collection send: aggregate `sent / total` with a monotonic bar,
@@ -200,7 +207,9 @@ private fun AttachmentCollectionActionRow(
         when {
             operation.phase == CollectionOperationPhase.PAUSED -> {
                 TextButton(onClick = actions.onResume) { Text(stringResource(R.string.attachment_collection_resume)) }
-                TextButton(onClick = actions.onDiscard) { Text(stringResource(R.string.discard)) }
+                if (operation.canDiscard) {
+                    TextButton(onClick = actions.onDiscard) { Text(stringResource(R.string.discard)) }
+                }
             }
             blocked != null -> {
                 TextButton(onClick = { actions.onRetryChunk(blocked.id) }) { Text(stringResource(R.string.retry)) }

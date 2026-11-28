@@ -58,5 +58,6 @@
     <string name="explanation_appearance_action_color_save">Сохраняет этот цвет действий для активного профиля и текущей темы на этом устройстве. Доступно, когда цвет допустим и отличается от сохранённого.</string>
     <string name="explanation_appearance_action_color_reset">Удаляет ваш собственный цвет действий для текущей темы и возвращает цвет по умолчанию. Действует для активного профиля на этом устройстве.</string>
     <string name="explanation_appearance_bubble_colors_save">Сохраняет выбранные цвета пузырей. Они действуют для активного профиля на этом устройстве или только для этого чата, если вы открыли экран из чата.</string>
-    <string name="explanation_appearance_bubble_colors_menu">Открывает меню с действием сброса, которое удаляет здесь ваши собственные цвета пузырей и возвращает цвета по умолчанию.</string>
+    <string name="explanation_appearance_bubble_colors_reset">Удаляет здесь ваши собственные цвета пузырей и возвращает цвета по умолчанию, а в чате — ваши общие цвета. Ничего не изменится, пока вы не сохраните.</string>
+    <string name="explanation_appearance_dictation_transcribe_voice_messages">Offline Speech to Text выполняет расшифровку на этом устройстве. Чтобы скрыть текст, нажмите кнопку рядом с сообщением.</string>
 </resources>

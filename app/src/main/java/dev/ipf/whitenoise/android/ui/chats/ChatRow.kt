@@ -1,14 +1,11 @@
 package dev.ipf.whitenoise.android.ui.chats
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.material3.Badge
@@ -22,9 +19,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -34,8 +29,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.onLongClick
@@ -57,20 +50,19 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationActivity
 import dev.ipf.whitenoise.android.core.GroupSystemPreviewNames
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.ChatListItem
+import dev.ipf.whitenoise.android.state.WarmResumeInputTrace
+import dev.ipf.whitenoise.android.state.WarmResumeRenderedSurface
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.isPeerSourced
 import dev.ipf.whitenoise.android.state.messagePreviewForRetention
-import dev.ipf.whitenoise.android.state.privateContactAvatarSource
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.MarkdownTimestampText
-import dev.ipf.whitenoise.android.ui.common.GroupAvatar
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.common.longPressOrVerticalDrag
+import dev.ipf.whitenoise.android.ui.common.motionBoundsOnScreen
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
 import dev.ipf.whitenoise.android.ui.rememberMarkdownPreviewText
-import dev.ipf.whitenoise.android.ui.settings.settingsMorphBounds
 
 @OptIn(ExperimentalFoundationApi::class)
 internal fun Modifier.chatListSelectionRowClickable(
@@ -105,7 +97,7 @@ internal fun ChatListRow(
     selected: Boolean,
     onOpen: () -> Unit,
     onOpenProfile: (String) -> Unit,
-    onOpenActions: () -> Unit,
+    onOpenActions: (Float?) -> Unit,
     onDragSelectionStart: (Float) -> Unit,
     onDragSelection: (Float) -> Boolean,
     onDragSelectionEnd: () -> Unit,
@@ -124,12 +116,10 @@ internal fun ChatListRow(
         selected = selected,
         menuHighlighted = menuHighlighted,
         onActionsHeldChange = onActionsHeldChange,
-        onClick =
-            if (selectionMode) {
-                onToggleSelection
-            } else {
-                onOpen
-            },
+        onClick = {
+            WarmResumeInputTrace.firstAcceptedInput(WarmResumeRenderedSurface.ChatList)
+            if (selectionMode) onToggleSelection() else onOpen()
+        },
         onLongClick =
             if (selectionMode && !rangeDragActive) {
                 null
@@ -159,7 +149,7 @@ internal fun ChatRow(
     dictationActivity: ConversationDictationActivity? = appState.chatListDictationActivity(accountRef, item),
     onClick: () -> Unit,
     onOpenProfile: (String) -> Unit,
-    onLongClick: (() -> Unit)? = null,
+    onLongClick: ((Float?) -> Unit)? = null,
     onDragSelectionStart: ((Float) -> Unit)? = null,
     onDragSelection: ((Float) -> Boolean)? = null,
     onDragSelectionEnd: (() -> Unit)? = null,
@@ -220,10 +210,10 @@ internal fun ChatRow(
                         if (interactionsEnabled) {
                             Modifier
                                 .longPressOrVerticalDrag(
-                                    onLongPressStart = {
+                                    onLongPressStart = { position ->
                                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                         onActionsHeldChange(true)
-                                        onLongClick()
+                                        onLongClick(rowCoordinates[0]?.localToWindow(position)?.x)
                                     },
                                     // The nonfocusable menu is visible at the threshold; this gesture
                                     // still owns movement until release transfers popup focus.
@@ -243,7 +233,7 @@ internal fun ChatRow(
                                 ).semantics {
                                     onLongClick(label = actionsLabel) {
                                         onActionsHeldChange(false)
-                                        onLongClick()
+                                        onLongClick(null)
                                         true
                                     }
                                 }.onGloballyPositioned { rowCoordinates[0] = it }
@@ -279,7 +269,7 @@ internal fun ChatRow(
                 .fillMaxWidth()
                 .padding(horizontal = 8.dp)
                 .testTag("chat.row.${item.id}")
-                .onGloballyPositioned { activatingBounds[0] = it.settingsMorphBounds(view) },
+                .onGloballyPositioned { activatingBounds[0] = it.motionBoundsOnScreen(view) },
         onClick = {
             if (!selectionMode && routeOrigin != null) {
                 routeOrigin.activate(item.group.groupIdHex, activatingBounds[0], onClick)
@@ -291,15 +281,12 @@ internal fun ChatRow(
         consumeSelectionLongPress = selectionMode && !rangeDragActive,
         titleMetadata = {
             dictationActivity?.let { ChatRowDictationStatus(it) }
+            ChatRowVoiceStatus(appState.chatListVoiceActivity(accountRef, item))
             if (isMuted) {
                 ChatRowTitleStatus(R.drawable.ic_notifications_off, stringResource(R.string.chat_muted_badge))
             }
             if (item.group.disappearingMessageSecs > 0uL) {
-                val seconds =
-                    item.group.disappearingMessageSecs
-                        .coerceAtMost(Long.MAX_VALUE.toULong())
-                        .toLong()
-                val duration = disappearingMessagesLabel(seconds)
+                val duration = disappearingMessagesLabel(item.group.disappearingMessageSecs)
                 ChatRowTitleStatus(R.drawable.ic_timer, "${stringResource(R.string.disappearing_messages)}: $duration")
             }
             if (!item.group.pendingConfirmation) {
@@ -315,53 +302,17 @@ internal fun ChatRow(
         selected = selected,
         menuHighlighted = menuHighlighted,
         leadingContent = {
-            Box(
-                modifier =
-                    if (!selectionMode && openableDmAvatarAccount != null) {
-                        // The row offers Open profile to the screen reader; a separate unlabelled stop would not.
-                        Modifier
-                            .clip(CircleShape)
-                            .clearAndSetSemantics {}
-                            .clickable(enabled = interactionsEnabled, role = Role.Button) {
-                                onOpenProfile(appState.npub(openableDmAvatarAccount))
-                            }
-                    } else {
-                        Modifier
-                    },
-            ) {
-                GroupAvatar(
-                    appState = appState,
-                    group = item.group,
-                    title = title,
-                    seed = item.selectedAvatarSeed ?: avatarAccount ?: item.group.groupIdHex,
-                    size = 52.dp,
-                    // A group without its own image shows its monogram, never a
-                    // member's photo; only direct chats borrow the peer's picture.
-                    // Only the account the projector names (the peer of an unnamed pair, an inviter)
-                    // lends its picture; MDK's selected avatar for a named group is ignored, as the
-                    // conversation header does.
-                    accountRef = accountRef,
-                    fallbackPictureUrl =
-                        avatarAccount?.let {
-                            appState.privateContactAvatarSource(it, accountRef)
-                                ?: item.selectedAvatarUrl
-                                ?: appState.avatarUrl(it)
-                        },
-                    firstFrameAvatar = item.firstFrameAvatar,
-                    durableAvatar = item.selectedAvatarAsset,
-                    durableAvatarIsPersonPicture = item.selectedPresentation?.avatarSource?.isPeerSourced() == true,
-                    retainCompatibility = true,
-                )
-                if (pinned) {
-                    Surface(
-                        modifier = Modifier.align(Alignment.BottomEnd).size(20.dp),
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.surface,
-                    ) {
-                        Box(contentAlignment = Alignment.Center) { PinnedBadge() }
-                    }
-                }
-            }
+            ChatRowAvatar(
+                appState = appState,
+                item = item,
+                title = title,
+                accountRef = accountRef,
+                openableDmAvatarAccount = openableDmAvatarAccount,
+                profileTapEnabled = !selectionMode,
+                interactionsEnabled = interactionsEnabled,
+                pinned = pinned,
+                onOpenProfile = onOpenProfile,
+            )
         },
         supportingContent = supportingContent@{
             val draft =

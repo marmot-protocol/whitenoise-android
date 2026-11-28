@@ -42,6 +42,11 @@ class DonateScreenScreenshotTest {
     @Config(qualifiers = "de-w360dp-h900dp-mdpi")
     fun donateGermanLarge() = capture("donate_german_large", darkTheme = false, fontScale = 2f)
 
+    /** RTL mirrors the shared top bar: the Back arrow and start-aligned title sit on the right. */
+    @Test
+    @Config(qualifiers = "ar-ldrtl-w360dp-h900dp-mdpi")
+    fun donateRtl() = capture("donate_rtl", darkTheme = false)
+
     /** A refused browser hand-off keeps the call to action and reports a recoverable error. */
     @Test
     fun donateOpenFailed() = capture("donate_open_failed", darkTheme = false, openFailed = true)

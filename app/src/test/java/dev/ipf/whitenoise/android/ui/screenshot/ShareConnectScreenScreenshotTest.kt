@@ -1,17 +1,22 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
+import android.content.Context
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.isPopup
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.github.takahirom.roborazzi.captureScreenRoboImage
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.settings.ShareConnectContent
 import dev.ipf.whitenoise.android.ui.settings.shareConnectFixture
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -62,7 +67,7 @@ class ShareConnectScreenScreenshotTest {
         capture("amoled")
     }
 
-    /** RTL at a 200 % font scale keeps the column centered and the capsule within its 240 dp visual. */
+    /** RTL at a 200 % font scale keeps the abbreviated key readable. */
     @Test
     fun shareConnectRtlLargeFont() {
         render(darkTheme = false, fontScale = 2f, layoutDirection = LayoutDirection.Rtl)
@@ -73,7 +78,22 @@ class ShareConnectScreenScreenshotTest {
     @Test
     fun shareConnectCopiedWithInvalidScan() {
         render(darkTheme = false, copied = true, scanInvalid = true)
+        composeRule.onNodeWithTag("share_connect.copy_public_key").performClick()
+        assertInvalidScanAndRetryVisible()
         capture("copied_invalid_scan")
+    }
+
+    @Test
+    fun shareConnectInvalidScanRtlLargeFont() {
+        render(darkTheme = true, fontScale = 2f, layoutDirection = LayoutDirection.Rtl, scanInvalid = true)
+        assertInvalidScanAndRetryVisible()
+        capture("invalid_scan_rtl_large_font")
+    }
+
+    private fun assertInvalidScanAndRetryVisible() {
+        val app = ApplicationProvider.getApplicationContext<Context>()
+        composeRule.onNodeWithText(app.getString(R.string.error_not_white_noise_profile_qr)).assertIsDisplayed()
+        composeRule.onNodeWithTag("share_connect.open_scanner").assertIsDisplayed()
     }
 
     /** The share menu makes the URL, picture and Save to Gallery paths explicit. */

@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
+import dev.ipf.whitenoise.android.ui.keyboard.HardwareShortcutBlocker
 
 // focusable = false keeps the soft keyboard up while this overlay is open.
 // A focusable popup window steals window focus from the conversation's host
@@ -125,6 +126,7 @@ internal typealias KeyboardSafePopupBackRegistration = (priority: Int, callback:
  * Shows [content] in a non-focusable popup above a full-window scrim that consumes outside taps as a
  * pure dismissal. [modifier] sizes the zero-content anchor the position provider receives, and
  * [backRegistration] replaces the platform dispatcher as the single Back owner where [platformBackCallbacksEnabled].
+ * [consumeBack] runs first on Back and returns true when it handled Back itself, keeping the overlay open.
  */
 @Composable
 internal fun KeyboardSafePopup(
@@ -135,22 +137,27 @@ internal fun KeyboardSafePopup(
     scrimModifier: Modifier = Modifier,
     backRegistration: KeyboardSafePopupBackRegistration? = null,
     animateWindowContent: Boolean = true,
+    consumeBack: () -> Boolean = { false },
     content: @Composable PopupSurfaceMotion.() -> Unit,
 ) {
     val surface = rememberPopupSurfaceMotion(expanded = expanded, onDismiss = onDismissRequest)
     val requestDismiss = surface.dismiss
     val currentRequestDismiss by rememberUpdatedState(requestDismiss)
+    val currentConsumeBack by rememberUpdatedState(consumeBack)
+    val onBack = { if (!currentConsumeBack()) requestDismiss() }
     Box(modifier) {
         // Keep both nonfocusable windows and the scrim until the exit is drawn.
         if (!surface.visible) return@Box
+        // Keys still reach the activity beneath a nonfocusable popup, so its shortcuts wait for it.
+        HardwareShortcutBlocker()
         if (platformBackCallbacksEnabled()) {
             KeyboardSafePopupPlatformBackHandler(
                 priority = OnBackInvokedDispatcher.PRIORITY_OVERLAY,
                 backRegistration = backRegistration,
-                onBack = requestDismiss,
+                onBack = onBack,
             )
         } else {
-            BackHandler(enabled = true) { requestDismiss() }
+            BackHandler(enabled = true, onBack = onBack)
         }
         // Scrim popup: composed before the content popup so content renders on top.
         // Fills the window and swallows any tap as a pure dismissal.

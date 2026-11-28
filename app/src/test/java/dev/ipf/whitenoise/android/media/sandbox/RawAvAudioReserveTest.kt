@@ -77,6 +77,27 @@ class RawAvAudioReserveTest {
             assertTrue("Soft refill held due video for $firstSpacing us", firstSpacing <= 45_000)
         }
 
+    /** Native lookahead pressure yields to video while the stream and subsequent PCM stay live. */
+    @Test fun deferredReserveReadDoesNotHoldDueVideoOrSignalEof() =
+        runTest {
+            val fixture =
+                Fixture(testScheduler).apply {
+                    deferReserve = true
+                    chunkBytes = 160
+                    sink.mixerLeadUs = 60_000
+                }
+            fixture.owner.onFrame = {
+                if (fixture.deferReserve && fixture.deferredReads > 0) {
+                    assertEquals(1, fixture.deferredReads)
+                    fixture.deferReserve = false
+                }
+            }
+            fixture.run()
+            assertEquals(1, fixture.deferredReads)
+            assertEquals(0, fixture.sink.underruns)
+            fixture.assertCompleted()
+        }
+
     /** A rate transition may refuse new credit while old output drains; the latest rate still completes. */
     @Test fun rateChangeWithTemporaryBackpressureDoesNotChaseReserve() =
         runTest {
@@ -149,6 +170,7 @@ class RawAvAudioReserveTest {
             private set
         var maximumWriteFrames = Int.MAX_VALUE
         var blockUntilUs = 0L
+        var mixerLeadUs = 0L
         var maximumQueuedWallUs = 0L
             private set
         var underruns = 0
@@ -219,6 +241,8 @@ class RawAvAudioReserveTest {
         override fun bufferedPositionUs(): Long = writtenPositionUs()
 
         override fun writtenPositionUs(): Long = writtenFrames.toLong() * 1_000_000 / sampleRate
+
+        override val mixerPositionUs: Long get() = minOf(positionUs() + mixerLeadUs, writtenPositionUs())
 
         /** Requires declared input exhaustion and actual elapsed-time consumption of every accepted frame. */
         override fun drained(): Boolean {
@@ -393,7 +417,11 @@ class RawAvAudioReserveTest {
             }
         val bitmaps = mutableListOf<Bitmap>()
         val pcm = ByteArray((audioUs * 8000 / 1_000_000).toInt() * 2) { (it % 127).toByte() }
+        var chunkBytes = pcm.size
+        private var audioOffset = 0
         var audioReads = 0
+        var deferReserve = false
+        var deferredReads = 0
         var videoReads = 0
         var onAudioRead: () -> Unit = {}
         var onSeek: () -> Unit = {}
@@ -413,11 +441,20 @@ class RawAvAudioReserveTest {
                         bitmaps += bitmap
                         AvStreamFrame.Video(bitmap, nextVideoUs).also { nextVideoUs += 40_000 }
                     }
+                } else if (track == AvStreamProtocol.AUDIO_RESERVE_TRACK && deferReserve) {
+                    deferredReads++
+                    AvStreamFrame.AudioDeferred
                 } else {
-                    check(track == AvStreamProtocol.AUDIO_TRACK)
+                    check(track == AvStreamProtocol.AUDIO_TRACK || track == AvStreamProtocol.AUDIO_RESERVE_TRACK)
                     audioReads++
                     onAudioRead()
-                    if (audioReads == 1) AvStreamFrame.Audio(pcm, 8000, 1, 0) else AvStreamFrame.AudioEnd
+                    val offset = audioOffset
+                    audioOffset = minOf(offset + chunkBytes, pcm.size)
+                    if (offset < pcm.size) {
+                        AvStreamFrame.Audio(pcm.copyOfRange(offset, audioOffset), 8000, 1, offset * 1_000_000L / 16_000)
+                    } else {
+                        AvStreamFrame.AudioEnd
+                    }
                 }
             }, { onSeek() })
         }

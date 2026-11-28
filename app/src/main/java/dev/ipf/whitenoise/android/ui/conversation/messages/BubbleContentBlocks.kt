@@ -48,9 +48,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AppMessageRecordFfi
-import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
-import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.TtsMentionPresentation
 import dev.ipf.whitenoise.android.core.RemoteGiphyMedia
@@ -70,8 +68,10 @@ import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
 import dev.ipf.whitenoise.android.ui.TtsLeafHighlightResolver
 import dev.ipf.whitenoise.android.ui.TtsSentenceActions
 import dev.ipf.whitenoise.android.ui.TtsSentenceLayoutReporter
+import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.common.rememberedMessageBubbleTime
 import dev.ipf.whitenoise.android.ui.conversation.ConversationUiTrace
+import dev.ipf.whitenoise.android.ui.conversation.media.AudioTranscriptWithFooter
 import dev.ipf.whitenoise.android.ui.conversation.media.AudioTranscriptionToggleState
 import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerOpenRequest
 import dev.ipf.whitenoise.android.ui.conversation.media.GiphyMessageFooter
@@ -98,7 +98,6 @@ import dev.ipf.whitenoise.android.ui.conversation.share.UserMessageBubble
 import dev.ipf.whitenoise.android.ui.conversation.share.VCARD_MIME_TYPE
 import dev.ipf.whitenoise.android.ui.conversation.share.formatCoordinate
 import dev.ipf.whitenoise.android.ui.conversation.traceConversationUiSection
-import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 import dev.ipf.whitenoise.android.ui.ttsSentenceAccessibilityActions
 
@@ -159,6 +158,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
     hasCaption: Boolean = false,
     expandNarrowVisualToStandardWidth: Boolean = false,
     audioTranscription: AudioTranscriptionToggleState? = null,
+    transcriptFooterAttachment: Int? = null,
 ) {
     if (sharedLocation != null) {
         val shareContext = LocalContext.current
@@ -209,6 +209,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
             onOpen = { appState.presentProfile(sharedUser.npub) },
             displayName = sharedUserAccountIdHex?.let { appState.displayName(it) },
             pictureUrl = sharedUserAccountIdHex?.let { appState.contactAvatarSource(it) },
+            followedAccount = sharedUserAccountIdHex,
         )
     }
     if (remoteGiphyMedia != null) {
@@ -309,6 +310,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
                     presentationOwner = presentationOwner,
                     onLongPress = onMediaLongPress,
                     audioTranscription = audioTranscription,
+                    completedTranscriptInFooter = entry.index == transcriptFooterAttachment,
                 )
             }
         }
@@ -349,37 +351,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
         }
     }
     if (!deleted && !bubbleMedia.hasConfirmedMedia && bubbleMedia.pendingAudio.isNotEmpty()) {
-        bubbleMedia.pendingAudio.forEach { (index, pending) ->
-            val presentationOwner = rememberVoicePresentationOwner(controller, appState)
-            val attachmentKey = VoicePresentationAttachmentKey(record.messageIdHex, index, 0uL)
-            key(presentationOwner, attachmentKey) {
-                MediaVoiceBubble(
-                    messageIdHex = record.messageIdHex,
-                    attachmentIndex = index,
-                    reference =
-                        remember(record.messageIdHex, index, pending) {
-                            MediaAttachmentReferenceFfi(
-                                locators = emptyList(),
-                                ciphertextSha256 = "",
-                                plaintextSha256 = "",
-                                nonceHex = "",
-                                fileName = pending.fileName,
-                                mediaType = pending.mediaType,
-                                version = EncryptedMediaVersionFfi.V1,
-                                sourceEpoch = 0uL,
-                                dim = null,
-                                thumbhash = null,
-                            )
-                        },
-                    mine = true,
-                    focusPlaybackMessage = false,
-                    controller = controller,
-                    appState = appState,
-                    presentationOwner = presentationOwner,
-                    onLongPress = onMediaLongPress,
-                )
-            }
-        }
+        PendingVoiceAttachments(item, bubbleMedia.pendingAudio, controller, appState, onMediaLongPress)
     }
     if (!deleted && !bubbleMedia.hasConfirmedMedia && bubbleMedia.pendingVisuals.isNotEmpty()) {
         val uploadFailed = item.status == MessageStatus.Failed
@@ -535,6 +507,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
     onExpand: () -> Unit,
     onExpandAt: ((Rect?) -> Unit)? = null,
     statusContainerColor: Color? = null,
+    completedTranscript: String? = null,
 ) {
     val showOuterMetadata = bodyText != null || (!footerOnVisualMedia && !footerOnPendingVisual)
     val recoveryInFooter = showTimestamp && showOuterMetadata
@@ -925,6 +898,8 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                 selectableMessageBody()
             }
         }
+    } else if (completedTranscript != null) {
+        AudioTranscriptWithFooter(completedTranscript, inlineFooter)
     } else if (hasInlineFooter && (showOuterMetadata || invalidationWarning != null)) {
         Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
             inlineFooter()

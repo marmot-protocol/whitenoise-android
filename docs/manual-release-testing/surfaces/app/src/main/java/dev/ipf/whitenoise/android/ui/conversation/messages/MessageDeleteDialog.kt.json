@@ -14,9 +14,19 @@
         ]
       },
       {
-        "surface": "BatchMessageDeleteDialogContent",
+        "surface": "DeleteScopeButton",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDeleteDialog.kt",
-        "anchor": "fun BatchMessageDeleteDialogContent(",
+        "anchor": "fun DeleteScopeButton(",
+        "test_ids": [
+          "MSG-001",
+          "MSG-004",
+          "MSG-008"
+        ]
+      },
+      {
+        "surface": "MessageDeleteConfirmationDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDeleteDialog.kt",
+        "anchor": "fun MessageDeleteConfirmationDialog(",
         "test_ids": [
           "MSG-001",
           "MSG-004",
@@ -31,13 +41,106 @@
           "MSG-001",
           "MSG-008"
         ]
-      },
+      }
+    ],
+    "settings_controls": [
       {
-        "surface": "MessageDeleteDialogContent",
+        "surface": "R.plurals.batch_delete_local_only",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDeleteDialog.kt",
-        "anchor": "fun MessageDeleteDialogContent(",
+        "anchor": "R.plurals.batch_delete_local_only",
         "test_ids": [
           "MSG-001",
+          "MSG-004",
+          "MSG-008"
+        ]
+      },
+      {
+        "surface": "R.plurals.batch_delete_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDeleteDialog.kt",
+        "anchor": "R.plurals.batch_delete_title",
+        "test_ids": [
+          "MSG-001",
+          "MSG-004",
+          "MSG-008"
+        ]
+      },
+      {
+        "surface": "R.string.batch_delete_scope_choice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDeleteDialog.kt",
+        "anchor": "R.string.batch_delete_scope_choice",
+        "test_ids": [
+          "MSG-001",
+          "MSG-004",
+          "MSG-008"
+        ]
+      },
+      {
+        "surface": "R.string.cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDeleteDialog.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "MSG-001",
+          "MSG-004",
+          "MSG-008"
+        ]
+      },
+      {
+        "surface": "R.string.confirm_delete_member_message_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDeleteDialog.kt",
+        "anchor": "R.string.confirm_delete_member_message_message",
+        "test_ids": [
+          "MSG-008"
+        ]
+      },
+      {
+        "surface": "R.string.confirm_delete_member_message_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDeleteDialog.kt",
+        "anchor": "R.string.confirm_delete_member_message_title",
+        "test_ids": [
+          "MSG-008"
+        ]
+      },
+      {
+        "surface": "R.string.delete_for_everyone",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDeleteDialog.kt",
+        "anchor": "R.string.delete_for_everyone",
+        "test_ids": [
+          "MSG-001",
+          "MSG-004",
+          "MSG-008"
+        ]
+      },
+      {
+        "surface": "R.string.delete_for_me",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDeleteDialog.kt",
+        "anchor": "R.string.delete_for_me",
+        "test_ids": [
+          "MSG-001",
+          "MSG-004",
+          "MSG-008"
+        ]
+      },
+      {
+        "surface": "R.string.delete_message_local_only",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDeleteDialog.kt",
+        "anchor": "R.string.delete_message_local_only",
+        "test_ids": [
+          "MSG-008"
+        ]
+      },
+      {
+        "surface": "R.string.delete_message_scope_choice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDeleteDialog.kt",
+        "anchor": "R.string.delete_message_scope_choice",
+        "test_ids": [
+          "MSG-008"
+        ]
+      },
+      {
+        "surface": "R.string.delete_message_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDeleteDialog.kt",
+        "anchor": "R.string.delete_message_title",
+        "test_ids": [
           "MSG-008"
         ]
       }

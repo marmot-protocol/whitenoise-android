@@ -51,15 +51,34 @@ internal class WhiteNoiseJourneys {
     private var surfaceLogMarker: String? = null
 
     /** Initializes the real fixture before Macrobenchmark resets compilation and starts tracing. */
-    fun prepareAuthenticatedChatList() {
+    fun prepareAuthenticatedChatList(requireAvatarPack: Boolean = false) {
+        val marker =
+            if (requireAvatarPack) {
+                device.executeShellCommand("am force-stop ${BenchmarkConfig.TARGET_PACKAGE}")
+                "group-pixel-fixture-${SystemClock.elapsedRealtimeNanos()}".also {
+                    device.executeShellCommand("log -t $SURFACE_MARKER_TAG -p i $it")
+                }
+            } else {
+                null
+            }
         val component = "${BenchmarkConfig.TARGET_PACKAGE}/dev.ipf.whitenoise.android.MainActivity"
         val launchOutput = device.executeShellCommand("am start -W -n $component")
         check(launchOutput.lineSequence().any { it.trim() == "Status: ok" }) {
             "Benchmark target preflight launch failed: $launchOutput"
         }
         waitForTag(PerformanceTags.NEW_MESSAGE, STARTUP_TIMEOUT_MS)
+        if (marker != null) requireStartupAvatarPack(marker)
         check(device.pressHome()) { "Failed to return home after benchmark fixture preflight." }
         device.waitForIdle()
+    }
+
+    private fun requireStartupAvatarPack(marker: String) {
+        val lines = device.executeShellCommand("logcat -d -s WNStartupAvatars:I $SURFACE_MARKER_TAG:I").lines()
+        val markerLine = lines.indexOfLast { it.contains(marker) }
+        val restored = lines.drop(markerLine + 1).any { it.contains("group pixels restored from startup pack") }
+        check(markerLine >= 0 && restored) {
+            "Open the fixture chat list with a stored group picture among its first rows before collecting startup."
+        }
     }
 
     fun MacrobenchmarkScope.launchToChatList() {
@@ -73,8 +92,7 @@ internal class WhiteNoiseJourneys {
      * has already validated the fixture outside the measured trace.
      *
      * Macrobenchmark's cold-start wrapper force-stops the target between setup
-     * and measurement. Waiting for a test selector here would make that
-     * selector part of the measured journey and can outlive the startup metric.
+     * and measurement. The caller separately checks the useful local surface.
      */
     fun MacrobenchmarkScope.launchForStartupMeasurement() {
         startActivityAndWait()
@@ -195,9 +213,16 @@ internal class WhiteNoiseJourneys {
         waitForVisibleTag(PerformanceTags.OPEN_GROUP_DETAILS)
     }
 
-    /** Requires a known persisted row on the useful list, excluding loading, recovery and false-empty checkpoints. */
+    /** Observes the measured launch without restarting an interrupted target. */
+    fun requireStartupChatList() {
+        checkNotNull(findVisibleTag(PerformanceTags.NEW_MESSAGE, STARTUP_TIMEOUT_MS)) {
+            "The chat list did not become visible after the measured launch."
+        }
+    }
+
+    /** Requires a known persisted row on the useful list, excluding loading and false-empty checkpoints. */
     fun requirePopulatedLocalList(groupName: String) {
-        waitForUsefulSurface(BenchmarkUsefulSurface.ChatList)
+        requireStartupChatList()
         checkNotNull(
             device.onElementOrNull(timeoutMs = STARTUP_TIMEOUT_MS) {
                 textAsString() == groupName && isVisibleOnDisplay()

@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.marmotkit.MessageDraftAttachmentInputFfi
 import dev.ipf.marmotkit.MessageDraftRevisionFfi
 import dev.ipf.marmotkit.SelectedMessageDraftContentFfi
 import dev.ipf.marmotkit.SelectedMessageDraftFfi
@@ -37,7 +38,7 @@ internal suspend fun MarmotInterface.sendComposerText(
         sendText(accountRef, groupIdHex, text)
     }
 
-/** Publishes a completed non-reply dictation after its conversation UI controller has detached. */
+/** Publishes a detached dictation only when the native draft has no staged attachments. */
 internal suspend fun WhiteNoiseAppState.sendDetachedDictationText(request: ConversationDictationSendRequest): Boolean {
     val pendingClear = captureDraftForSend(request.accountRef, request.groupIdHex)
     val summary =
@@ -45,16 +46,40 @@ internal suspend fun WhiteNoiseAppState.sendDetachedDictationText(request: Conve
             retryPendingConversationSend(validatedConnectivityRecoveryGeneration) {
                 withGroupCommitLock(request.accountRef, request.groupIdHex) {
                     marmotIo(MarmotTraceSection.TEXT_SEND) {
-                        sendComposerText(request.accountRef, request.groupIdHex, null, request.payload)
+                        val selected = selectedDraftOrNull(request.accountRef, request.groupIdHex)
+                        if (selected != null && selected.draft?.mediaAttachments.isNullOrEmpty()) {
+                            sendComposerText(request.accountRef, request.groupIdHex, null, request.payload)
+                        } else {
+                            null
+                        }
                     }
                 }
             }
         }
+    return if (summary == null) {
+        request.onDispatchRejectedBeforeTransport()
+        false
+    } else {
+        settleDetachedDictationSend(request, summary, pendingClear)
+    }
+}
+
+/** Keeps unprojected native ownership recoverable and clears only accepted text for this send. */
+private fun WhiteNoiseAppState.settleDetachedDictationSend(
+    request: ConversationDictationSendRequest,
+    summary: SendSummaryFfi,
+    pendingClear: DraftSendClearToken?,
+): Boolean {
     // Without a projected message, retained native ownership still needs dictation recovery.
     // False keeps delivery unknown and the existing claim; it never authorizes another send.
     if (summary.messageIds.isEmpty() && summary.acceptDisposition != SendAcceptDispositionFfi.PUBLISHED) return false
-    pendingClear?.let(::clearDraftAfterSuccessfulSend)
+    pendingClear?.let { clearDraftAfterSuccessfulSend(it, textOnly = true) }
     runCatching(request.onPendingShown)
+    if (summary.acceptDisposition == SendAcceptDispositionFfi.PUBLISHED ||
+        summary.acceptDisposition == SendAcceptDispositionFfi.ACCEPTED_PENDING
+    ) {
+        request.onTextSendSettled(true)
+    }
     return true
 }
 
@@ -119,7 +144,7 @@ internal fun draftDescribesUpload(
             descriptor.fileName == upload.first && descriptor.mediaType == upload.second
         }
 
-@Suppress("SwallowedException") // A draft read failure only means the direct send path is used.
+@Suppress("SwallowedException") // Each caller handles an unavailable selected draft at its send boundary.
 internal fun MarmotInterface.selectedDraftOrNull(
     accountRef: String,
     groupIdHex: String,
@@ -131,10 +156,11 @@ internal fun MarmotInterface.selectedDraftOrNull(
     }
 
 /**
- * Makes the selected draft say exactly what is being sent, keeping attachments MDK already holds.
+ * Makes the selected draft say exactly what is being sent, keeping attachments MDK already holds, file-backed
+ * ones included.
  * Returns the revision to submit, or null when there is no draft or it moved underneath the send.
  */
-private fun MarmotInterface.saveDraftForSend(
+internal fun MarmotInterface.saveDraftForSend(
     accountRef: String,
     selected: SelectedMessageDraftFfi,
     content: String,
@@ -144,6 +170,7 @@ private fun MarmotInterface.saveDraftForSend(
     return saveRevisionOrNull(accountRef, selected, draft, content, replyToMessageIdHex)
 }
 
+/** Saves the send's caption and reply against [selected], or returns null when another writer moved it. */
 @Suppress("SwallowedException") // A revision conflict means another writer won; the caller falls back to a direct send.
 private fun MarmotInterface.saveRevisionOrNull(
     accountRef: String,
@@ -153,9 +180,11 @@ private fun MarmotInterface.saveRevisionOrNull(
     replyToMessageIdHex: String?,
 ): MessageDraftRevisionFfi? {
     if (draft.content == content && draft.replyToMessageIdHex == replyToMessageIdHex) return selected.revision
-    val attachments = messageDraft(accountRef, draft.groupIdHex)?.mediaAttachments.orEmpty()
+    // Keep every attachment by id: MDK copies no body again and unlinks no file the draft holds.
+    val attachments = draft.mediaAttachments.map { MessageDraftAttachmentInputFfi.Retained(it.id) }
     return try {
-        saveMessageDraftIfRevision(accountRef, selected.revision, content, replyToMessageIdHex, attachments).revision
+        saveMessageDraftInputsIfRevision(accountRef, selected.revision, content, replyToMessageIdHex, attachments)
+            .revision
     } catch (conflict: MarmotKitException.MessageDraftRevisionConflict) {
         null
     }

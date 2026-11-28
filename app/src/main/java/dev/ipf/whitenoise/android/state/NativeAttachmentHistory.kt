@@ -16,6 +16,9 @@ internal data class NativeAttachmentHistoryMatch(
     val reference: MediaAttachmentReferenceFfi,
     /** MDK's parser category, the same one its automatic permission is checked against. */
     val category: AttachmentCategoryFfi,
+    /** The message's sender and timeline time, so a viewer opened from outside the chat can label the page. */
+    val sender: String = "",
+    val timelineAt: ULong = 0u,
 )
 
 /** Returns an accepted history row only when its display, source, and original index agree. */
@@ -36,6 +39,8 @@ internal fun AttachmentEntryFfi.matchingAttachment(
         target = NativeAttachmentTarget(messageIdHex, sourceMessageIdHex, accepted.attachmentIndex.toInt()),
         reference = accepted.reference,
         category = category,
+        sender = sender,
+        timelineAt = timelineAt,
     )
 }
 

@@ -17,10 +17,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -78,15 +76,18 @@ import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.randomProfilePseudonym
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.AnimatedProfileAvatarOverlay
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.IdentityImageCropFlow
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.rememberAvatarPreparationRecovery
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.group.ImagePreviewPresentation
 import dev.ipf.whitenoise.android.ui.group.ImageSearchSheet
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseElevation
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -289,14 +290,12 @@ internal fun ProfileHeroHeader(
                             .offset(y = 58.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.surface,
-                        shadowElevation = 4.dp,
-                        modifier =
+                    // Clicks inside the Surface, whose own clip shapes the highlight without cutting its shadow away.
+                    Surface(shape = CircleShape, shadowElevation = WhiteNoiseElevation.ProfileAvatar) {
+                        Box(
                             Modifier
-                                .clip(CircleShape)
                                 .testTag(PROFILE_HEADER_AVATAR_TAG)
+                                .clip(CircleShape)
                                 .clickable(
                                     enabled = contentReady,
                                     onClickLabel =
@@ -309,9 +308,8 @@ internal fun ProfileHeroHeader(
                                         ),
                                     role = Role.Button,
                                     onClick = onOpenPicture,
-                                ),
-                    ) {
-                        Box(Modifier.padding(4.dp)) {
+                                ).padding(4.dp),
+                        ) {
                             Box {
                                 Avatar(
                                     title = if (avatarLoadFinished && avatarImage == null) title else "",
@@ -365,7 +363,7 @@ internal fun ProfileHeroHeader(
                 }
             }
             Spacer(Modifier.size(66.dp))
-            Text(
+            EmojiLabel(
                 title,
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.SemiBold,
@@ -418,27 +416,26 @@ internal fun ProfileHeroHeader(
     }
 }
 
+/**
+ * The profile's primary Save action. Progress replaces the label with [busyLabel] inside the shared task button, so
+ * the relay-publish mechanics stay out of the copy and only the failure surface names them (#834).
+ */
 @Suppress("FunctionNaming")
 @Composable
 internal fun ProfileSaveButton(
     enabled: Boolean,
     busy: Boolean,
     onSave: () -> Unit,
+    modifier: Modifier = Modifier,
+    busyLabel: String = stringResource(R.string.profile_saving),
 ) {
-    Button(
+    WhiteNoiseButton(
         onClick = onSave,
         enabled = enabled,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        if (busy) {
-            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-            Spacer(Modifier.width(8.dp))
-        }
-        // Profile edit's primary action is conceptually "save" to the
-        // user; the relay-publish mechanics are an implementation detail
-        // that only the failure surface needs to name (#834).
-        Text(stringResource(R.string.save))
-    }
+        loading = busy,
+        loadingLabel = busyLabel,
+        modifier = modifier.fillMaxWidth(),
+    ) { Text(stringResource(R.string.save)) }
 }
 
 /** Owns the account-scoped draft and existing load, image-upload and publication transactions. */

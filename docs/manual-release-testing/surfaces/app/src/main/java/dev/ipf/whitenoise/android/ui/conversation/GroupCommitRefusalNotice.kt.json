@@ -14,6 +14,14 @@
     ],
     "source_coverage": [
       {
+        "surface": "Refusal uses the shared notice title style",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupCommitRefusalNotice.kt",
+        "anchor": "style = MaterialTheme.typography.titleSmall,",
+        "test_ids": [
+          "GRP-039"
+        ]
+      },
+      {
         "surface": "Refusal banner: R.string.group_commit_refused_title",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupCommitRefusalNotice.kt",
         "anchor": "R.string.group_commit_refused_title",

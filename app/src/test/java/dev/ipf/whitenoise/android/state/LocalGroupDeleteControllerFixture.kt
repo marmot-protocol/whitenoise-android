@@ -14,8 +14,13 @@ import dev.ipf.marmotkit.PresentationTextFfi
 import dev.ipf.marmotkit.PresentedChatRowFfi
 import dev.ipf.marmotkit.SelectedAvatarFfi
 import dev.ipf.marmotkit.SelectedMessageDraftFfi
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
 import org.junit.Assert.assertEquals
 import org.robolectric.Shadows.shadowOf
 import java.lang.reflect.Proxy
@@ -31,12 +36,25 @@ internal const val LOCAL_DELETE_ACCOUNT = "local-delete-account"
 internal val LOCAL_DELETE_ACCOUNT_ID = "a1".repeat(32)
 internal val LOCAL_DELETE_GROUP = "b1".repeat(16)
 
+/** Runs the capture handoff and native fixture on the same virtual clock. */
+@OptIn(ExperimentalCoroutinesApi::class)
+internal fun runLocalGroupDeleteTest(block: suspend TestScope.() -> Unit) =
+    runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            block()
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
 /** The real app state and chat list over a fake native runtime that records every call by name. */
 internal data class LocalGroupDeleteFixture(
     val state: WhiteNoiseAppState,
     val controller: ChatsController,
     val calls: ConcurrentLinkedQueue<String>,
     val failureMethod: AtomicReference<String?>,
+    val present: AtomicBoolean,
 )
 
 /**
@@ -89,7 +107,7 @@ internal fun TestScope.localGroupDeleteFixture(
         listOf(LOCAL_DELETE_GROUP),
         controller.items.map { it.id },
     )
-    return LocalGroupDeleteFixture(state, controller, calls, failureMethod)
+    return LocalGroupDeleteFixture(state, controller, calls, failureMethod, present)
 }
 
 /** Exercise the production debounced projection before checking visible-row mutations. */

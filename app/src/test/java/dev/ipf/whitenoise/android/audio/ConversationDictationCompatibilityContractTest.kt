@@ -81,18 +81,12 @@ class ConversationDictationCompatibilityContractTest {
     }
 
     @Test
-    fun manifestAndRunbookKeepBothAndroidSpeechContractsDiscoverable() {
+    fun manifestKeepsBothAndroidSpeechContractsDiscoverable() {
         val manifest = projectFile("app/src/main/AndroidManifest.xml").readText()
-        val matrix = projectFile("docs/composer-dictation-device-matrix.md").readText()
 
         assertTrue("android.speech.action.RECOGNIZE_SPEECH" in manifest)
         assertTrue("android.speech.RecognitionService" in manifest)
         assertTrue("<package android:name=\"app.offlinespeechtotext\" />" in manifest)
-        assertTrue("SpeechRecognizer" in matrix)
-        assertTrue("RecognitionService" in matrix)
-        assertTrue("Voice IME" in matrix)
-        assertTrue("GrapheneOS" in matrix)
-        assertTrue("no silent fallback" in matrix.lowercase())
     }
 
     @Test

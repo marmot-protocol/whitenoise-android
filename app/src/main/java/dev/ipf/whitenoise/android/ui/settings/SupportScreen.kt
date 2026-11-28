@@ -7,8 +7,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -21,7 +19,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -37,6 +34,7 @@ import dev.ipf.whitenoise.android.state.loadAccountRelayLists
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
+import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
@@ -140,19 +138,10 @@ internal fun SupportContent(
                 ) {
                     row("support_identity") { context ->
                         SettingsGroupPanel(context) {
-                            ListItem(
-                                headlineContent = {
-                                    Text(
-                                        stringResource(R.string.support_contact_title),
-                                        style = MaterialTheme.typography.titleMedium,
-                                    )
-                                },
-                                supportingContent = {
-                                    Text(
-                                        stringResource(R.string.support_contact_subtitle),
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                },
+                            SettingsRichRow(
+                                hero = true,
+                                headlineContent = { Text(stringResource(R.string.support_contact_title)) },
+                                supportingContent = { Text(stringResource(R.string.support_contact_subtitle)) },
                                 leadingContent = {
                                     Surface(
                                         modifier = Modifier.size(48.dp),
@@ -168,7 +157,6 @@ internal fun SupportContent(
                                         )
                                     }
                                 },
-                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                             )
                         }
                     }

@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.ui.chats
 
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -40,16 +39,12 @@ internal fun pinnedBoundaryIndex(
 internal fun LazyListScope.chatListPinnedBoundaryItem(placementDurationMillis: Int) {
     item(key = CHAT_LIST_PINNED_BOUNDARY_KEY, contentType = CHAT_LIST_PINNED_BOUNDARY_CONTENT_TYPE) {
         ChatListPinnedBoundary(
-            Modifier
-                .animateItem(
-                    fadeInSpec = tween(CHAT_LIST_MEMBERSHIP_FADE_MILLIS),
-                    placementSpec = tween(placementDurationMillis),
-                    fadeOutSpec = null,
-                ).zIndex(CHAT_LIST_PINNED_BOUNDARY_Z_INDEX),
+            chatListPlacementMotion(placementDurationMillis).zIndex(CHAT_LIST_PINNED_BOUNDARY_Z_INDEX),
         )
     }
 }
 
+/** The line between pinned and unpinned chats, in full `outlineVariant` in every theme. */
 @Composable
 @Suppress("FunctionNaming")
 internal fun ChatListPinnedBoundary(modifier: Modifier = Modifier) {
@@ -60,6 +55,7 @@ internal fun ChatListPinnedBoundary(modifier: Modifier = Modifier) {
                 .padding(horizontal = 16.dp, vertical = 4.dp)
                 .testTag(CHAT_LIST_PINNED_BOUNDARY_TAG),
     ) {
+        // Full outlineVariant in every theme: the muted AMOLED seam color is too dark for this boundary.
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     }
 }

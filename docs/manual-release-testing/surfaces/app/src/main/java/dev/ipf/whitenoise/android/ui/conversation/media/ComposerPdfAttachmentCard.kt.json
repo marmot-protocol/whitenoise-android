@@ -1,0 +1,142 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfAttachmentCard.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ComposerPdfAttachmentCard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfAttachmentCard.kt",
+        "anchor": "fun ComposerPdfAttachmentCard(",
+        "test_ids": [
+          "MED-064",
+          "MED-065"
+        ]
+      },
+      {
+        "surface": "ComposerPdfFirstPage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfAttachmentCard.kt",
+        "anchor": "fun ComposerPdfFirstPage(",
+        "test_ids": [
+          "MED-064"
+        ]
+      },
+      {
+        "surface": "ComposerPdfFilename",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfAttachmentCard.kt",
+        "anchor": "fun ComposerPdfFilename(",
+        "test_ids": [
+          "MED-064"
+        ]
+      },
+      {
+        "surface": "ComposerPdfPrivacyLine",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfAttachmentCard.kt",
+        "anchor": "fun ComposerPdfPrivacyLine(",
+        "test_ids": [
+          "MED-064",
+          "MED-065"
+        ]
+      },
+      {
+        "surface": "ComposerPdfPrivacyIcon",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfAttachmentCard.kt",
+        "anchor": "fun ComposerPdfPrivacyIcon(",
+        "test_ids": [
+          "MED-064",
+          "MED-065"
+        ]
+      },
+      {
+        "surface": "ComposerPdfPrivacy.color",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfAttachmentCard.kt",
+        "anchor": "fun ComposerPdfPrivacy.color(",
+        "test_ids": [
+          "MED-064",
+          "MED-065"
+        ]
+      },
+      {
+        "surface": "Staged PDF metadata removed state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfAttachmentCard.kt",
+        "anchor": "R.string.composer_pdf_metadata_removed",
+        "test_ids": [
+          "MED-064"
+        ]
+      },
+      {
+        "surface": "Staged draft PDF metadata removed on send state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfAttachmentCard.kt",
+        "anchor": "R.string.composer_pdf_metadata_removed_on_send",
+        "test_ids": [
+          "MED-064"
+        ]
+      },
+      {
+        "surface": "Staged signed PDF metadata state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfAttachmentCard.kt",
+        "anchor": "R.string.composer_pdf_metadata_signed",
+        "test_ids": [
+          "MED-065"
+        ]
+      },
+      {
+        "surface": "Staged protected PDF metadata state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfAttachmentCard.kt",
+        "anchor": "R.string.composer_pdf_metadata_encrypted",
+        "test_ids": [
+          "MED-065"
+        ]
+      },
+      {
+        "surface": "Staged unsupported PDF metadata state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfAttachmentCard.kt",
+        "anchor": "R.string.composer_pdf_metadata_unsupported",
+        "test_ids": [
+          "MED-065"
+        ]
+      },
+      {
+        "surface": "Staged PDF sending with metadata state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfAttachmentCard.kt",
+        "anchor": "R.string.composer_pdf_metadata_sending_as_is",
+        "test_ids": [
+          "MED-065"
+        ]
+      },
+      {
+        "surface": "Staged PDF preview action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfAttachmentCard.kt",
+        "anchor": "R.string.composer_preview_attachment",
+        "test_ids": [
+          "MED-064"
+        ]
+      },
+      {
+        "surface": "Staged PDF remove action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfAttachmentCard.kt",
+        "anchor": "R.string.media_attachment_remove",
+        "test_ids": [
+          "MED-064",
+          "MED-065"
+        ]
+      },
+      {
+        "surface": "Per-PDF metadata options button",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfAttachmentCard.kt",
+        "anchor": "R.string.composer_pdf_metadata_options",
+        "test_ids": [
+          "MED-064"
+        ]
+      },
+      {
+        "surface": "ComposerPdfOptionsButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfAttachmentCard.kt",
+        "anchor": "fun ComposerPdfOptionsButton(",
+        "test_ids": [
+          "MED-064"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

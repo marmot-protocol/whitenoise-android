@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -54,7 +53,9 @@ import dev.ipf.whitenoise.android.audio.canContinueDictation
 import dev.ipf.whitenoise.android.audio.continueDictation
 import dev.ipf.whitenoise.android.audio.followUpAwaitingPrevious
 import dev.ipf.whitenoise.android.audio.requiresCompletionControls
+import dev.ipf.whitenoise.android.audio.supportsFollowUpCapture
 import dev.ipf.whitenoise.android.ui.common.AccountActionColors
+import dev.ipf.whitenoise.android.ui.common.SlotIconButton
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
@@ -66,8 +67,8 @@ internal const val APP_DICTATION_CONTROL_TAG = "app-dictation-control"
 internal const val DICTATION_LISTENING_INDICATOR_TAG = "dictation-listening-indicator"
 internal const val DICTATION_PROGRESS_TAG = "dictation-progress"
 
-/** A compact 24dp listening pulse followed by three adjacent compact commands. */
-internal val DICTATION_ACTIVE_ACTIONS_WIDTH = 132.dp
+/** The leading listening or Continue slot followed by three full-size command slots. */
+internal val DICTATION_ACTIVE_ACTIONS_WIDTH = ComposerShortcutPitch * 4
 internal const val DICTATION_ACTIONS_RESIZE_MILLIS = 200
 internal val DICTATION_LISTENING_PULSE_WIDTH = 24.dp
 
@@ -85,9 +86,9 @@ internal data class DictationControlFacts(
     val continueAvailable: Boolean = false,
     /** A follow-up owns these commands while the previous dictation is still being transcribed. */
     val previousPending: Boolean = false,
+    val keepsLeadingSlot: Boolean = false,
 ) {
-    /** The slot left of Cancel holds the listening pulse or the continue command, never both. */
-    val leadingSlotOccupied: Boolean get() = captureInProgress || continueAvailable
+    val reservesLeadingSlot: Boolean get() = captureInProgress || continueAvailable || keepsLeadingSlot
 }
 
 internal val ConversationDictationController.controlFacts: DictationControlFacts
@@ -101,11 +102,12 @@ internal val ConversationDictationController.controlFacts: DictationControlFacts
             recoveryHandedToComposer = recoveryHandedToComposer,
             continueAvailable = canContinueDictation,
             previousPending = followUpAwaitingPrevious,
+            keepsLeadingSlot = supportsFollowUpCapture,
         )
 
-/** The composer reserves the same width the commands animate to. */
-internal val ConversationDictationController.leadingSlotOccupied: Boolean
-    get() = controlFacts.leadingSlotOccupied
+/** The composer reserves the same width as the compact controls. */
+internal val ConversationDictationController.reservesLeadingSlot: Boolean
+    get() = controlFacts.reservesLeadingSlot
 
 /** Floating app-root control used while the immutable dictation origin is not visible. */
 @Composable
@@ -185,10 +187,10 @@ internal fun ConversationDictationCompactActions(
             dictationStatusLabel(state, facts.captureInProgress)
         }
 
-    // Capture stopping and recovery both change the command width; ease each edge instead of snapping.
+    // Caller-owned capture keeps its width while the leading icon changes.
     val motion = rememberSystemAnimationsEnabled()
     val width by animateDpAsState(
-        targetValue = state.compactActionsWidth(facts.leadingSlotOccupied),
+        targetValue = state.compactActionsWidth(facts.reservesLeadingSlot),
         animationSpec = if (motion) tween(DICTATION_ACTIONS_RESIZE_MILLIS) else snap(),
         label = "dictation actions width",
     )
@@ -227,16 +229,12 @@ private val ConversationDictationState.hasActiveRecognitionActions: Boolean
             this is ConversationDictationState.Listening ||
             this is ConversationDictationState.Processing
 
-/**
- * Active recognition keeps room for the 24dp listening pulse only while capture runs. Paste or Send
- * stops capture, and the capsule narrows with the pulse instead of keeping its blank slot. The
- * composer reserves this same width so its bubble narrows in step with the commands.
- */
-internal fun ConversationDictationState.compactActionsWidth(captureInProgress: Boolean) =
+/** Reserves one full target per shown command, including the optional Continue slot. */
+internal fun ConversationDictationState.compactActionsWidth(reservesLeadingSlot: Boolean) =
     when {
         !hasActiveRecognitionActions -> 96.dp
-        captureInProgress -> DICTATION_ACTIVE_ACTIONS_WIDTH
-        else -> DICTATION_ACTIVE_ACTIONS_WIDTH - DICTATION_LISTENING_PULSE_WIDTH
+        reservesLeadingSlot -> DICTATION_ACTIVE_ACTIONS_WIDTH
+        else -> DICTATION_ACTIVE_ACTIONS_WIDTH - ComposerShortcutPitch
     }
 
 /**
@@ -251,7 +249,7 @@ private fun ConversationDictationActiveActions(
     val sendLabel = stringResource(R.string.send)
     val sendExplanation = composerExplanation(R.string.send, R.string.explanation_conversation_dictation_send)
     ConversationDictationLeadingActions(controller, facts)
-    IconButton(
+    SlotIconButton(
         onClick = settleControlMorph(controller::cancel),
         enabled = !facts.deliveryInProgress,
         modifier =
@@ -269,7 +267,7 @@ private fun ConversationDictationActiveActions(
     }
     ConversationDictationPasteAction(controller, facts)
     if (facts.processingDeliveryMode == ConversationDictationDeliveryMode.SendOnFinish) {
-        IconButton(
+        SlotIconButton(
             onClick = settleControlMorph(controller::send),
             enabled = facts.completionActionsEnabled,
             modifier =
@@ -316,7 +314,7 @@ private fun ConversationDictationPasteAction(
     facts: DictationControlFacts,
 ) {
     val pasteLabel = stringResource(R.string.paste_dictation_transcript)
-    IconButton(
+    SlotIconButton(
         onClick = settleControlMorph(controller::paste),
         enabled = facts.completionActionsEnabled,
         modifier =
@@ -391,7 +389,7 @@ private fun ConversationDictationDismissAction(
             is ConversationDictationState.Failed -> R.string.dismiss
             else -> R.string.dictation_cancel
         }
-    IconButton(
+    SlotIconButton(
         onClick = settleControlMorph(onClick),
         modifier = Modifier.width(ComposerShortcutPitch).height(ComposerShortcutTarget),
     ) {
@@ -476,13 +474,19 @@ internal fun dictationFailureLabel(reason: ConversationDictationFailure): String
         },
     )
 
+/** Keeps Continue and the passive listening pulse centered in the same leading slot. */
 @Composable
 private fun ConversationDictationLeadingActions(
     controller: ConversationDictationController,
     facts: DictationControlFacts,
 ) {
-    Box {
-        ConversationDictationListeningSlot(facts.captureInProgress, previousPending = facts.previousPending)
+    val slot = if (facts.keepsLeadingSlot) Modifier.width(ComposerShortcutPitch) else Modifier
+    Box(slot, contentAlignment = Alignment.Center) {
+        ConversationDictationListeningSlot(
+            visible = facts.captureInProgress,
+            previousPending = facts.previousPending,
+            resize = !facts.keepsLeadingSlot,
+        )
         ConversationDictationContinueSlot(facts.continueAvailable) { controller.continueDictation() }
     }
 }

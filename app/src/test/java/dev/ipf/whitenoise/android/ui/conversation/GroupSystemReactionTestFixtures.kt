@@ -3,9 +3,13 @@ package dev.ipf.whitenoise.android.ui.conversation
 import dev.ipf.marmotkit.GroupSystemEventFfi
 import dev.ipf.marmotkit.GroupSystemEventProvenanceFfi
 import dev.ipf.whitenoise.android.state.TimelineMessage
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 
 /** Reuses the controller transport harness with authenticated native activity projections. */
-open class GroupSystemReactionTestFixtures : PollMessageTestFixtures() {
+open class GroupSystemReactionTestFixtures(
+    nativeDispatcher: CoroutineDispatcher = Dispatchers.IO,
+) : PollMessageTestFixtures(nativeDispatcher) {
     /** A typed native projection, deliberately paired with an unreadable raw body. */
     protected fun activity(): TimelineMessage {
         val source = fileTimelineMessage(71, "", caption = "private-envelope", attachments = emptyList())

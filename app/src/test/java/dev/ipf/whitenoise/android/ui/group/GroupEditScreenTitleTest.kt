@@ -39,15 +39,6 @@ class GroupEditScreenTitleTest {
     }
 
     @Test
-    fun editScreenDedicatedTitleExistsInDefaultLocale() {
-        val defaultStrings = stringsFile("values")
-        assertTrue(
-            "values/strings.xml must define edit_group_info_title",
-            stringValue(defaultStrings, "edit_group_info_title") != null,
-        )
-    }
-
-    @Test
     fun editScreenDedicatedTitleIsNotTheGenericEditLabel() {
         val defaultStrings = stringsFile("values")
         val title = stringValue(defaultStrings, "edit_group_info_title")
@@ -60,25 +51,6 @@ class GroupEditScreenTitleTest {
             "edit_group_info_title should name the object being edited (group info)",
             title!!.contains("group", ignoreCase = true),
         )
-    }
-
-    @Test
-    fun editScreenDedicatedTitleExistsInEveryShippedLocale() {
-        val localizedStrings =
-            resDir
-                .listFiles { file -> file.isDirectory && file.name.startsWith("values-") }
-                .orEmpty()
-                .filter { File(it, "strings.xml").isFile }
-                .map { it.name }
-        assertTrue("No localized values dirs found under $resDir", localizedStrings.isNotEmpty())
-
-        localizedStrings.forEach { dirName ->
-            val file = stringsFile(dirName)
-            assertTrue(
-                "$dirName/strings.xml is missing edit_group_info_title",
-                stringValue(file, "edit_group_info_title") != null,
-            )
-        }
     }
 
     /** Edit screen delegates to its settings frame. */

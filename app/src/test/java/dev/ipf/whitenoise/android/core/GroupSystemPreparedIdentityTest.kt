@@ -106,6 +106,8 @@ class GroupSystemPreparedIdentityTest {
     /** Supplies a deterministic system record whose presentation identity can be asserted. */
     private fun systemRecord() =
         TimelineMessageRecordFfi(
+            agentItem = null,
+            agentItemFirstEventMissing = false,
             clientToken = null,
             messageIdHex = "11".repeat(32),
             sourceMessageIdHex = null,
@@ -123,7 +125,7 @@ class GroupSystemPreparedIdentityTest {
             replyPreview = null,
             mediaJson = null,
             media = emptyList(),
-            agentTextStreamJson = null,
+            thread = null,
             poll = null,
             groupSystem = null,
             hasReports = false,

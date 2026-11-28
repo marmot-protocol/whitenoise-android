@@ -500,6 +500,8 @@ class MessageBubbleLongPressDragTest {
         val media = releaseNotesAttachment()
         val projected =
             TimelineMessageRecordFfi(
+                agentItem = null,
+                agentItemFirstEventMissing = false,
                 clientToken = null,
                 messageIdHex = record.messageIdHex,
                 sourceMessageIdHex = record.messageIdHex,
@@ -516,7 +518,7 @@ class MessageBubbleLongPressDragTest {
                 replyPreview = null,
                 mediaJson = null,
                 media = MessageAttachments.acceptedOutcomes(listOf(media)),
-                agentTextStreamJson = null,
+                thread = null,
                 poll = null,
                 groupSystem = null,
                 hasReports = false,

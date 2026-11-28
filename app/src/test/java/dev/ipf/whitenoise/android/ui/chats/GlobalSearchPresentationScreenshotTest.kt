@@ -20,6 +20,9 @@ import dev.ipf.whitenoise.android.search.GlobalSearchContentKind
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.FollowedPeople
+import dev.ipf.whitenoise.android.ui.common.LocalFollowedPeople
+import dev.ipf.whitenoise.android.ui.common.SectionHeader
 import dev.ipf.whitenoise.android.ui.search.GlobalPersonRow
 import dev.ipf.whitenoise.android.ui.search.GlobalSearchContentFilterChips
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -37,6 +40,13 @@ import org.robolectric.annotation.GraphicsMode
 class GlobalSearchPresentationScreenshotTest {
     @get:Rule val composeRule = createComposeRule()
 
+    private enum class PersonPreview(
+        val displayName: String?,
+    ) {
+        Followed("Alice Rivera"),
+        Unknown(null),
+    }
+
     /** Empty query preserves the prototype's search/microphone field composition. */
     @Test fun emptyLight() = capture("empty_light")
 
@@ -51,8 +61,11 @@ class GlobalSearchPresentationScreenshotTest {
     @Config(sdk = [36], qualifiers = "ar-w320dp-h780dp-mdpi")
     fun typedLargeRtl() = capture("typed_large_rtl", query = "بحث", largeRtl = true)
 
-    /** The actual native identifier profile action has one grouped row. */
-    @Test fun identifierLight() = capture("identifier_light", query = "npub1", person = true)
+    /** The identifier row presents the published name, followed frame and copyable public key. */
+    @Test fun identifierLight() = capture("identifier_light", query = "npub1", person = PersonPreview.Followed)
+
+    /** A valid key with no published metadata still offers a tappable profile and copyable key. */
+    @Test fun identifierFallbackLight() = capture("identifier_fallback_light", "npub1", person = PersonPreview.Unknown)
 
     /** Check-row presentation remains a bounded component, not a claim of native filter availability. */
     @Test fun stagedContentLargeRtl() = capture("staged_content_large_rtl", largeRtl = true, content = true)
@@ -65,7 +78,7 @@ class GlobalSearchPresentationScreenshotTest {
         dark: Boolean = false,
         amoled: Boolean = false,
         largeRtl: Boolean = false,
-        person: Boolean = false,
+        person: PersonPreview? = null,
         content: Boolean = false,
     ) {
         val app =
@@ -87,17 +100,25 @@ class GlobalSearchPresentationScreenshotTest {
                 emptyList(),
                 "",
             )
+        val personId = "b".repeat(64)
+        val followedPeople = FollowedPeople.of(setOf(personId), ownAccountIdHex = null)
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = if (largeRtl) 2f else 1f) {
                 CompositionLocalProvider(
                     LocalLayoutDirection provides if (largeRtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+                    LocalFollowedPeople provides followedPeople,
                 ) {
                     Surface {
                         Column(Modifier.fillMaxWidth().testTag("global-search-preview")) {
                             ChatListTopBar(app, true, query, remember { FocusRequester() }, {}, {}, {}, {}, {}, {})
-                            if (person) {
-                                ChatListSearchSectionHeader("People", "global-search-heading")
-                                GlobalPersonRow("npub1" + "a".repeat(58), {})
+                            if (person != null) {
+                                SectionHeader("People", Modifier.testTag("global-search-heading"))
+                                GlobalPersonRow(
+                                    "npub1" + "a".repeat(58),
+                                    displayName = person.displayName,
+                                    followedAccount = personId.takeIf { person == PersonPreview.Followed },
+                                    onOpen = {},
+                                )
                             }
                             if (content) {
                                 GlobalSearchContentFilterChips(

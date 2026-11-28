@@ -30,6 +30,7 @@ internal class AppProfileSignUp(
     private data class CreatingRuntime(
         val native: dev.ipf.marmotkit.MarmotInterface,
         val epoch: Int,
+        val initialProfile: UserProfileMetadataFfi? = null,
     )
 
     private val creatingRuntimes = java.util.IdentityHashMap<AccountSummaryFfi, CreatingRuntime>()
@@ -55,15 +56,13 @@ internal class AppProfileSignUp(
                 throw kotlinx.coroutines.CancellationException("Creating runtime was replaced")
             }
             val knownAccounts = appState.accounts.mapTo(HashSet(), AccountSummaryFfi::label)
-            val created =
-                appState.marmotIo {
-                    if (initialProfile == null) {
-                        createIdentityWithBootstrapRelays()
-                    } else {
-                        createNamedIdentity(initialProfile)
-                    }
-                }
-            created.requireNewAccount(knownAccounts).also { creatingRuntimes[it] = owner }
+            val receipt = initialProfile?.let { appState.marmotIo { createNamedIdentity(initialProfile) } }
+            val created = receipt?.account ?: appState.marmotIo { createIdentityWithBootstrapRelays() }
+            created.requireNewAccount(knownAccounts).also {
+                creatingRuntimes[it] = owner.copy(initialProfile = receipt?.profile)
+                // Sign up made this key here and nowhere else, so Chats reminds the user to save it (#4279).
+                appState.privateKeyReminders.recordSignUp(it.accountIdHex)
+            }
         }
     }
 
@@ -132,7 +131,10 @@ internal class AppProfileSignUp(
                             appState.presentFailure(R.string.toast_couldnt_publish_profile, "ACCOUNT_SETUP_WAIT", it)
                         }.getOrThrow()
                         // The last readiness read can suspend across an account switch or teardown.
-                        owned() && appState.publishProfile(metadata)
+                        val accepted = pending?.acceptedIdentity?.takeIf { it.label == account }
+                        val initialProfile = accepted?.let { creatingRuntimes[it]?.initialProfile }
+                        // NetworkReady confirms MDK already published its initial profile.
+                        owned() && (initialProfile == metadata || appState.publishProfile(metadata))
                     } else {
                         false
                     }

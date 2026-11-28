@@ -27,6 +27,9 @@ import dev.ipf.whitenoise.android.state.AccountSwitchLocalSnapshot
 import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.DraftStore
+import dev.ipf.whitenoise.android.state.PendingForwardRequest
+import dev.ipf.whitenoise.android.state.PendingForwardRequestStore
+import dev.ipf.whitenoise.android.state.SerializedPendingForwardRequestStore
 import dev.ipf.whitenoise.android.state.ValidatedInternetNetworkTracker
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.WhiteNoiseApp
@@ -35,6 +38,7 @@ import dev.ipf.whitenoise.android.ui.onboarding.SignUpController
 import dev.ipf.whitenoise.android.ui.onboarding.SignUpProfileDraft
 import dev.ipf.whitenoise.android.ui.onboarding.SignUpStage
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.Dispatchers
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -206,8 +210,7 @@ class AddProfileSignUpEntryTest {
         controller.submit(SignUpProfileDraft("Wrong duplicate", ""))
         waitFor { controller.stage == SignUpStage.Complete }
         assertEquals(2, creates.get())
-        assertEquals(1, publishes.get())
-        assertEquals("Bob", published?.name)
+        assertEquals(0, publishes.get())
         assertEquals("bob", app.activeAccountRef)
     }
 
@@ -354,9 +357,12 @@ class AddProfileSignUpEntryTest {
                         creates.incrementAndGet()
                         if (holdCreate) check(createRelease.await(10, TimeUnit.SECONDS))
                         if (failCreate) error("Controlled unaccepted create failure")
+                        val submitted = args!![0] as UserProfileMetadataFfi
+                        // A resumed setup can return an earlier profile, which still needs an explicit save.
+                        val initial = if (failPublishOnce) submitted.copy(about = "Earlier setup") else submitted
                         IdentityCreationResultFfi(
                             nativeCreated ?: bob,
-                            args!![0] as UserProfileMetadataFfi,
+                            initial,
                             AccountSetupReadinessFfi.LOCAL_READY,
                         )
                     }
@@ -395,6 +401,27 @@ class AddProfileSignUpEntryTest {
             listOf(alice, carol),
             "alice",
             initialMarmotRuntime = AppMarmotRuntime(context.cacheDir.resolve("add-profile-signup").path, native),
-        )
+        ).also { app ->
+            // The real pending-forward store holds a process-wide lock across an IO hop. A refresh still inside that
+            // hop when Robolectric resets the main looper keeps the lock, and every later test's refresh waits on it.
+            app.forwardRequestPersistence.override(
+                SerializedPendingForwardRequestStore(NoPendingForwardStore, ioDispatcher = Dispatchers.Main.immediate),
+            )
+        }
+    }
+
+    /** These flows never hold a pending forward request. */
+    private object NoPendingForwardStore : PendingForwardRequestStore {
+        /** Persists nothing. */
+        override fun save(request: PendingForwardRequest) = false
+
+        /** Reports that no request is pending. */
+        override fun load(): PendingForwardRequest? = null
+
+        /** Has nothing to remove. */
+        override fun remove(requestId: String) = Unit
+
+        /** Has nothing to clear. */
+        override fun clear() = Unit
     }
 }

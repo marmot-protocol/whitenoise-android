@@ -11,11 +11,15 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
+import dev.ipf.whitenoise.android.state.SignInAlertTier
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.quickAccountSwitching
 import dev.ipf.whitenoise.android.state.updateQuickAccountSwitching
 import dev.ipf.whitenoise.android.ui.common.ChoiceDialog
+import dev.ipf.whitenoise.android.ui.devices.DevicesRowTrailing
 import dev.ipf.whitenoise.android.ui.devices.LinkedDevicesScreen
+import dev.ipf.whitenoise.android.ui.devices.SignInDevicesRequestEffect
+import dev.ipf.whitenoise.android.ui.devices.devicesRowTier
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.profile.ProfileReadiness
 import dev.ipf.whitenoise.android.ui.profile.rememberProfileReadiness
@@ -38,6 +42,8 @@ internal fun AccountScreen(
 ) {
     // Keyed by account so a roster opened for one profile never reopens over another.
     var linkedDevicesOpen by rememberSaveable(appState.activeAccountRef) { mutableStateOf(false) }
+    // A sign-in notice, alert or notification for this account opens its devices directly.
+    SignInDevicesRequestEffect(appState) { linkedDevicesOpen = true }
     if (linkedDevicesOpen) {
         BackHandler { linkedDevicesOpen = false }
         LinkedDevicesScreen(appState, onBack = { linkedDevicesOpen = false })
@@ -58,6 +64,7 @@ internal fun AccountScreen(
                     readiness = readiness,
                     onOpenLinkedDevices = { linkedDevicesOpen = true },
                     onOpenDetail = onOpenDetail,
+                    devicesTier = appState.devicesRowTier(),
                 )
             }
         }
@@ -65,14 +72,16 @@ internal fun AccountScreen(
 }
 
 /**
- * The Account hub's connected group; the Profile row carries the live readiness summary. The Linked devices row is
- * present only when [onOpenLinkedDevices] is given.
+ * The Account hub's connected group; the Profile row carries the live readiness summary. The Devices row is
+ * present only when [onOpenLinkedDevices] is given, with a badge for a sign-in to review or an open security warning
+ * per [devicesTier].
  */
 @Suppress("FunctionNaming", "LongMethod")
 @Composable
 internal fun AccountHubGroup(
     readiness: ProfileReadiness,
     onOpenLinkedDevices: (() -> Unit)? = null,
+    devicesTier: SignInAlertTier = SignInAlertTier.Passive,
     onOpenDetail: (SettingsDetail?) -> Unit,
 ) {
     SettingsGroup(
@@ -119,7 +128,8 @@ internal fun AccountHubGroup(
                     explanation = stringResource(R.string.explanation_linked_devices_hub),
                     onClick = onOpenLinkedDevices,
                     modifier = Modifier.testTag("settings.account.linked_devices"),
-                    leading = { SettingsLeadingIcon(R.drawable.ic_device) },
+                    trailing = { DevicesRowTrailing(devicesTier) },
+                    leading = { SettingsLeadingIcon(R.drawable.ic_devices) },
                 )
             }
         }
@@ -238,7 +248,7 @@ internal fun ChatsScreen(
 }
 
 /** Voice & language hub: the app language and the spoken, dictated and translated text features. */
-@Suppress("FunctionNaming")
+@Suppress("FunctionNaming", "LongMethod") // Keep the declared hub row order together.
 @Composable
 internal fun VoiceLanguageScreen(
     appState: WhiteNoiseAppState,
@@ -264,6 +274,15 @@ internal fun VoiceLanguageScreen(
                             routeKey = SettingsDetail.Language,
                             onClick = { onOpenDetail(SettingsDetail.Language) },
                             leading = { SettingsLeadingIcon(R.drawable.ic_language) },
+                        )
+                    }
+                    row("voice_notes") { context ->
+                        SettingsLink(
+                            context = context,
+                            title = stringResource(R.string.settings_voice_notes),
+                            routeKey = SettingsDetail.VoiceNotes,
+                            onClick = { onOpenDetail(SettingsDetail.VoiceNotes) },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_mic) },
                         )
                     }
                     row("read_aloud") { context ->
@@ -302,8 +321,8 @@ internal fun VoiceLanguageScreen(
     }
 }
 
-/** Help & support hub: guides, the support chat, donations and the developer tools. */
-@Suppress("FunctionNaming")
+/** Help & support hub: first-run help, the support chat, donations and the developer tools. */
+@Suppress("FunctionNaming", "LongMethod")
 @Composable
 internal fun HelpSupportScreen(
     appState: WhiteNoiseAppState,
@@ -318,6 +337,15 @@ internal fun HelpSupportScreen(
                     destination = SettingsDetail.HelpSupport,
                     surface = "help-support-controls",
                 ) {
+                    row("learn_white_noise") { context ->
+                        SettingsLink(
+                            context = context,
+                            title = stringResource(R.string.learn_white_noise),
+                            routeKey = SettingsDetail.LearnWhiteNoise,
+                            leading = { SettingsLeadingIcon(R.drawable.ic_help) },
+                            onClick = { onOpenDetail(SettingsDetail.LearnWhiteNoise) },
+                        )
+                    }
                     row("help") { context ->
                         SettingsLink(
                             context = context,

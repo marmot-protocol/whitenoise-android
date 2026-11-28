@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
@@ -20,11 +21,10 @@ import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,14 +51,17 @@ import dev.ipf.whitenoise.android.ui.account.StartingAccount
 import dev.ipf.whitenoise.android.ui.account.StartingAccountIndicator
 import dev.ipf.whitenoise.android.ui.chats.chatsExplanation
 import dev.ipf.whitenoise.android.ui.common.PersonAvatar
-import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
 import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
-import dev.ipf.whitenoise.android.ui.common.nativePageBody
+import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
+import dev.ipf.whitenoise.android.ui.emojiPlainText
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.Radii
+import dev.ipf.whitenoise.android.ui.theme.floatingControlFabElevation
 
 private const val SUMMARY_AVATAR_OVERLAP_DP = 20
 private const val SUMMARY_AVATAR_COUNT = 3
@@ -191,33 +194,25 @@ internal fun SelectedMembersReviewScreen(
     onInitialAdminChange: ((RecipientSearch.Candidate, Boolean) -> Unit)? = null,
     startingAs: StartingAccount? = null,
 ) {
-    Scaffold(
+    WhiteNoiseScaffold(
+        contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
         topBar = {
-            // App banners sit below this screen's bar rather than over it (#3312).
-            Column {
-                TopAppBar(
-                    actions = { StartingAccountIndicator(startingAs) },
-                    title = {
-                        Column {
-                            Text(stringResource(R.string.review_selection))
-                            Text(
-                                pluralStringResource(R.plurals.selected_members_count, members.size, members.size),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = onBack, enabled = !busy) {
-                            Icon(
-                                painterResource(R.drawable.ic_arrow_back),
-                                contentDescription = stringResource(R.string.back),
-                            )
-                        }
-                    },
-                )
-                TopNoticeSlot()
-            }
+            WhiteNoiseTopBar(
+                title = stringResource(R.string.review_selection),
+                onBack = onBack,
+                navigationEnabled = !busy,
+                titleContent = {
+                    Column {
+                        Text(stringResource(R.string.review_selection))
+                        Text(
+                            pluralStringResource(R.plurals.selected_members_count, members.size, members.size),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                },
+                actions = { StartingAccountIndicator(startingAs) },
+            )
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
@@ -230,6 +225,7 @@ internal fun SelectedMembersReviewScreen(
                         .then(if (busy) Modifier.semantics { disabled() } else Modifier),
                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                elevation = floatingControlFabElevation(),
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -246,8 +242,11 @@ internal fun SelectedMembersReviewScreen(
             }
         },
     ) { padding ->
+        // The bar's tint follows the list position, so removing people back to a short list clears it.
+        val listState = rememberLazyListState()
         WhiteNoiseLazyColumn(
-            modifier = Modifier.fillMaxWidth().nativePageBody(padding).padding(padding),
+            modifier = Modifier.fillMaxWidth().padding(padding).trackWhiteNoiseHeader(listState),
+            state = listState,
             contentPadding = PaddingValues(bottom = 96.dp),
         ) {
             items(members, key = { it.accountIdHex }) { member ->
@@ -256,7 +255,7 @@ internal fun SelectedMembersReviewScreen(
                 // Only an abbreviation of this member's own key is a key title; a name starting npub1 stays a name.
                 val nameIsKey = abbreviatesPublicKey(memberName, memberNpub)
                 Column(Modifier.fillMaxWidth()) {
-                    ContactRow(
+                    PersonRow(
                         title = memberName,
                         subtitle =
                             appState.shortNpub(member.accountIdHex).takeIf {
@@ -267,6 +266,7 @@ internal fun SelectedMembersReviewScreen(
                         publicKeyInTitle = nameIsKey,
                         avatarSeed = member.accountIdHex,
                         avatarUrl = selectedMemberAvatarUrl(member, appState.contactAvatarSource(member.accountIdHex)),
+                        followedAccount = member.accountIdHex,
                         titleMaxLines = Int.MAX_VALUE,
                         trailing = {
                             IconButton(
@@ -276,7 +276,8 @@ internal fun SelectedMembersReviewScreen(
                             ) {
                                 Icon(
                                     painterResource(R.drawable.ic_close),
-                                    contentDescription = stringResource(R.string.remove_member_named, memberName),
+                                    contentDescription =
+                                        stringResource(R.string.remove_member_named, emojiPlainText(memberName)),
                                 )
                             }
                         },
@@ -314,6 +315,7 @@ internal fun SelectedMemberRoleControl(
     onChange: (Boolean) -> Unit,
 ) {
     val adminLabel = stringResource(R.string.admin)
+    val spokenName = emojiPlainText(name)
     val explanation = chatsExplanation(R.string.admin, R.string.explanation_new_message_admin)
     Row(
         (if (compact) Modifier else Modifier.fillMaxWidth())
@@ -321,7 +323,7 @@ internal fun SelectedMemberRoleControl(
             .explainOnLongPress(explanation)
             .toggleable(value = admin, enabled = enabled, role = Role.Switch, onValueChange = onChange)
             .padding(start = if (compact) 8.dp else inset, end = if (compact) 0.dp else inset)
-            .semantics { contentDescription = "$adminLabel, $name" },
+            .semantics { contentDescription = "$adminLabel, $spokenName" },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {

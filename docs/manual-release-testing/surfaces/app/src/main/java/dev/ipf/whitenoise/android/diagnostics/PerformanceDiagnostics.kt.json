@@ -12,15 +12,6 @@
         ]
       },
       {
-        "surface": "Closed attachment diagnostic vocabulary includes cleaned_by_setting without content or identifiers",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/diagnostics/PerformanceDiagnostics.kt",
-        "anchor": "CLEANED_BY_SETTING(\"cleaned_by_setting\")",
-        "test_ids": [
-          "MED-019",
-          "SET-021"
-        ]
-      },
-      {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/diagnostics/PerformanceDiagnostics.kt",
         "surface": "Account-switch diagnostic vocabulary",
         "anchor": "ACCOUNT_SWITCH(\"account_switch\")",

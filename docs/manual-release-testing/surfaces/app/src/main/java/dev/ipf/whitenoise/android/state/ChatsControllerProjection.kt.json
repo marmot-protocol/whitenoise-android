@@ -10,6 +10,14 @@
         "test_ids": [
           "CHL-008"
         ]
+      },
+      {
+        "surface": "Account-wide membership evicts transcripts for chats outside the window",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatsControllerProjection.kt",
+        "anchor": "private fun ChatsController.syncVoiceTranscriptionMembership(",
+        "test_ids": [
+          "MED-038"
+        ]
       }
     ]
   },

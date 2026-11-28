@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,13 +15,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
@@ -31,6 +31,8 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentationNpubFromReference
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
+import dev.ipf.whitenoise.android.ui.emojiPlainText
 
 /** Public identity without repeating technical labels or exposing operational references. */
 @Composable
@@ -49,6 +51,7 @@ internal fun GroupReviewPersonIdentity(
             48.dp,
             pictureUrl = person.picture,
             pictureDomain = AvatarImageLoader.publicProfiles(),
+            followedAccount = member.accountIdHex,
         )
         GroupReviewPersonText(person, role)
     }
@@ -96,13 +99,13 @@ internal fun GroupReviewPersonText(
     role: String,
     copyable: Boolean = true,
 ) {
-    person.publicName?.let { Text(it, style = MaterialTheme.typography.titleSmall) }
-    groupReviewNicknameLabel(person)?.let { Text(it) }
+    person.publicName?.let { EmojiLabel(it, style = MaterialTheme.typography.titleSmall) }
+    groupReviewNicknameLabel(person)?.let { EmojiLabel(it) }
     if (person.identifier.isNotBlank()) {
         if (copyable) {
             GroupReviewNpub(person.identifier, role)
         } else {
-            Text(groupReviewNpubLabel(person.identifier), style = MaterialTheme.typography.bodySmall)
+            GroupReviewKeyText(person.identifier)
         }
     } else if (person.publicName == null) {
         Text(stringResource(R.string.unknown), style = MaterialTheme.typography.bodySmall)
@@ -116,12 +119,19 @@ internal fun GroupActingAccountIdentity(
     appState: WhiteNoiseAppState,
     accountRef: String? = appState.activeAccountRef,
     modifier: Modifier = Modifier.fillMaxWidth(),
+    showRole: Boolean = false,
 ) {
     val account = appState.accounts.firstOrNull { it.label == accountRef } ?: return
     val identifier = appState.npubForDisplay(account.accountIdHex)
-    Box(modifier.testTag("group.action.acting_account"), contentAlignment = Alignment.CenterEnd) {
+    val alignment = if (showRole) Alignment.CenterStart else Alignment.CenterEnd
+    Box(modifier.testTag("group.action.acting_account"), contentAlignment = alignment) {
         if (identifier.isNotBlank()) {
-            GroupReviewNpub(identifier, stringResource(R.string.group_action_acting_account), compact = true)
+            GroupReviewNpub(
+                identifier,
+                stringResource(R.string.group_action_acting_account),
+                compact = true,
+                showRole = showRole,
+            )
         } else {
             Text(
                 stringResource(R.string.group_action_account_label, account.label),
@@ -145,7 +155,7 @@ internal fun groupReviewPersonDescription(
     role: String,
 ): String {
     val nickname = groupReviewNicknameLabel(person)
-    return listOfNotNull(person.publicName, nickname, role, person.identifier).joinToString(", ")
+    return emojiPlainText(listOfNotNull(person.publicName, nickname, role, person.identifier).joinToString(", "))
 }
 
 /** A small visible label with a full-size copy target and complete spoken identity. */
@@ -155,17 +165,36 @@ private fun GroupReviewNpub(
     npub: String,
     role: String,
     compact: Boolean = false,
+    showRole: Boolean = false,
 ) {
     GroupReviewCopyRow(npub, "$role, $npub") {
-        Text(groupReviewNpubLabel(npub, compact), style = MaterialTheme.typography.bodySmall)
+        if (showRole) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    role,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                GroupReviewKeyText(npub, compact, textDirection = TextDirection.Ltr)
+            }
+        } else {
+            GroupReviewKeyText(npub, compact)
+        }
     }
 }
 
-/** The shortened npub shown beside a name; the full value is spoken and copied. */
-private fun groupReviewNpubLabel(
+@Composable
+@Suppress("FunctionNaming")
+private fun GroupReviewKeyText(
     npub: String,
     compact: Boolean = false,
-): String = IdentityFormatter.short(npub, prefix = if (compact) 8 else 10, suffix = if (compact) 4 else 8)
+    textDirection: TextDirection = MaterialTheme.typography.bodySmall.textDirection,
+) {
+    Text(
+        text = IdentityFormatter.short(npub, prefix = if (compact) 8 else 10, suffix = if (compact) 4 else 8),
+        style = MaterialTheme.typography.bodySmall.copy(textDirection = textDirection),
+    )
+}
 
 /**
  * A row of at least 48dp that copies the full [npub], announced once as [description] with a Copy action.
@@ -180,12 +209,12 @@ internal fun GroupReviewCopyRow(
     horizontalArrangement: Arrangement.Horizontal = Arrangement.Start,
     content: @Composable RowScope.() -> Unit,
 ) {
-    val clipboard = LocalClipboardManager.current
+    val clipboard = rememberClipboardCopier()
     val copyLabel = stringResource(R.string.copy)
     Row(
         modifier
             .heightIn(min = 48.dp)
-            .clickable(onClickLabel = copyLabel, role = Role.Button) { clipboard.setText(AnnotatedString(npub)) }
+            .clickable(onClickLabel = copyLabel, role = Role.Button) { clipboard.copy(npub) }
             .semantics(mergeDescendants = true) { contentDescription = description },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = horizontalArrangement,

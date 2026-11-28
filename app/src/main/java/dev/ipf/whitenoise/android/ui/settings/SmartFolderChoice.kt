@@ -22,12 +22,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.common.DisclosureChevron
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
@@ -93,20 +94,19 @@ internal fun <T> FolderChoice(
     }
 }
 
-private const val EXPANDED_ROTATION = 180f
-
+/** A folder button label with a trailing glyph: a [DisclosureChevron] when [expanded] is set, else [icon]. */
 @Composable
 internal fun FolderButtonLabel(
     label: String,
     icon: Int,
-    expanded: Boolean = false,
+    expanded: Boolean? = null,
 ) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, Modifier.weight(1f))
-        Icon(
-            painterResource(icon),
-            contentDescription = null,
-            modifier = Modifier.size(18.dp).rotate(if (expanded) EXPANDED_ROTATION else 0f),
-        )
+        EmojiLabel(label, Modifier.weight(1f))
+        if (expanded != null) {
+            DisclosureChevron(expanded)
+        } else {
+            Icon(painterResource(icon), contentDescription = null, modifier = Modifier.size(18.dp))
+        }
     }
 }

@@ -1,10 +1,9 @@
 package dev.ipf.whitenoise.android.ui.settings
 
-import android.net.Uri
 import android.os.SystemClock
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -47,10 +46,12 @@ import dev.ipf.whitenoise.android.core.encryptedBackupPassphraseInputsValid
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.exportActiveAccountNsec
 import dev.ipf.whitenoise.android.state.exportEncryptedSecretKeyBackup
+import dev.ipf.whitenoise.android.ui.common.COPIED_FEEDBACK_MILLIS
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
 import dev.ipf.whitenoise.android.ui.common.copySensitiveToClipboard
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
+import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.delay
@@ -71,7 +72,6 @@ internal enum class KeyExportDestination { File, Preview, Share }
 
 /** Timing and geometry the prototype fixes for Profile Keys. */
 private object ProfileKeysDefaults {
-    const val COPIED_MILLIS = 2_000L
     const val MASK = "••••••••••••••••••••••••••••••••"
     const val FILE_STEM_LENGTH = 16
     val ValueRowMinHeight = 64.dp
@@ -80,28 +80,26 @@ private object ProfileKeysDefaults {
 }
 
 /** Transient screen state; everything sensitive clears on stop and on dispose. */
-internal class ProfileKeysUiState {
+internal class ProfileKeysUiState(
+    private val fileExport: KeyFileExport = KeyFileExport(),
+) {
     var privateKey by mutableStateOf<String?>(null)
     var revealRequested by mutableStateOf(false)
     var copiedKey by mutableStateOf<CopiedProfileKey?>(null)
-    var pendingExport by mutableStateOf<PendingKeyExport?>(null)
     var encryptedBackup by mutableStateOf<PendingKeyExport?>(null)
     var shareErrorDialog by mutableStateOf(false)
     var nativeExportError by mutableStateOf<Int?>(null)
     var passwordDialog by mutableStateOf(false)
     var rawExportDialog by mutableStateOf(false)
     var rawKeyConsent = Any()
-    var saveErrorDialog by mutableStateOf(false)
-    var expiredExportDialog by mutableStateOf(false)
     var exportBusy by mutableStateOf(false)
-    var savingExport by mutableStateOf(false)
+    var exportScreenLockRequired by mutableStateOf(false)
     var wipeSheet by mutableStateOf(false)
     var wipeConfirm by mutableStateOf(false)
     var wipeConfirmInput by mutableStateOf("")
     val exportOperation = ProfileKeyOperation()
     val copyOperation = ProfileKeyOperation()
     val revealOperation = ProfileKeyOperation()
-    val saveOperation = ProfileKeyOperation()
     val password = TextFieldState()
     val confirmation = TextFieldState()
 
@@ -117,6 +115,7 @@ internal class ProfileKeysUiState {
         rawKeyConsent = Any()
         exportOperation.cancel()
         exportBusy = false
+        exportScreenLockRequired = false
         clearPasswords()
     }
 
@@ -130,16 +129,14 @@ internal class ProfileKeysUiState {
 
     /** True when no export is being prepared, picked or written. */
     val exportIdle: Boolean
-        get() = !exportBusy && pendingExport == null && !savingExport
+        get() = !exportBusy && fileExport.idle
 
     /**
-     * Prevents delayed exports, file saves and feedback, clipboard writes and reveals after backgrounding or leaving
+     * Prevents delayed export preparation, clipboard writes and reveals after backgrounding or leaving
      * this account.
      */
     fun stopSensitiveOperations() {
         cancelExport()
-        saveOperation.cancel()
-        savingExport = false
         copyOperation.cancel()
         hidePrivateKey()
         copiedKey = null
@@ -184,7 +181,9 @@ internal fun AccountKeysScreen(
     val shareTitle = stringResource(R.string.share_secret_key)
     val accountRef = appState.activeAccountRef
     val runtimeGeneration = appState.runtimeGeneration
-    val ui = remember(accountIdHex, accountRef, runtimeGeneration) { ProfileKeysUiState() }
+    val fileExport = LocalKeyFileExportLauncher.current ?: rememberKeyFileExport(appState)
+    val ui =
+        remember(accountIdHex, accountRef, runtimeGeneration, fileExport.state) { ProfileKeysUiState(fileExport.state) }
     var showSignOut by remember(ui) { mutableStateOf(false) }
     val rawAuthentication = rawExportAuthenticator ?: rememberRawKeyExportAuthentication(ui, appState)
 
@@ -202,46 +201,20 @@ internal fun AccountKeysScreen(
             !appState.signOutInProgress &&
             !appState.wipeInProgress
 
-    fun saveExport(
-        uri: Uri,
-        content: String,
-    ) {
-        ui.savingExport = true
-        val started =
-            ui.saveOperation.start(
-                scope = scope,
-                canDeliver = ::canDeliverSecret,
-                load = { writeKeyExport(content) { context.contentResolver.openOutputStream(uri) } },
-                onResult = { saved -> ui.saveErrorDialog = !saved },
-                onFinished = { ui.savingExport = false },
-            )
-        if (!started) ui.savingExport = false
+    // Copying or exporting the key, plain or encrypted, retires the chat list's reminder to save it (#4279).
+    fun markPrivateKeySaved() {
+        if (ownsAccount()) accountIdHex?.let(appState.privateKeyReminders::markKeySaved)
     }
-
-    val exportLauncher =
-        rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
-            val request = ui.pendingExport
-            ui.pendingExport = null
-            when {
-                uri == null || !canDeliverSecret() -> Unit
-                request == null || request.isExpired() -> ui.expiredExportDialog = true
-                else -> saveExport(uri, request.content)
-            }
-        }
 
     fun launchExport(
         encrypted: Boolean,
         content: String,
         createdAtMillis: Long = SystemClock.elapsedRealtime(),
     ) {
-        ui.pendingExport = PendingKeyExport(encrypted, content, createdAtMillis)
         ui.hideSensitive()
         val stem = npub.take(ProfileKeysDefaults.FILE_STEM_LENGTH)
         val filename = if (encrypted) "$stem-white-noise-key.wnkey.txt" else "$stem-white-noise-key.txt"
-        if (runCatching { exportLauncher.launch(filename) }.isFailure) {
-            ui.pendingExport = null
-            ui.saveErrorDialog = true
-        }
+        fileExport.launch(PendingKeyExport(encrypted, content, createdAtMillis), filename)
     }
 
     fun beginExport(
@@ -258,6 +231,7 @@ internal fun AccountKeysScreen(
             return
         }
         val passphrase = if (encrypted) ui.password.text.toString() else ""
+        ui.exportScreenLockRequired = false
         ui.clearPasswords()
         ui.exportBusy = true
         ui.exportOperation.start(
@@ -288,6 +262,7 @@ internal fun AccountKeysScreen(
                         }
                         KeyExportDestination.Share -> {
                             ui.hideSensitive()
+                            // Launching the chooser does not confirm that the key was saved anywhere.
                             ui.shareErrorDialog = !sharePrivateKey(context, shareTitle, content)
                         }
                     }
@@ -298,10 +273,10 @@ internal fun AccountKeysScreen(
     }
 
     ProfileKeysEffects(ui, lifecycle, rawAuthentication::cancel)
+    val copier = rememberClipboardCopier()
     LaunchedEffect(hasLocalKey, appState.signOutInProgress, appState.wipeInProgress) {
         if (!hasLocalKey || appState.signOutInProgress || appState.wipeInProgress) {
             ui.stopSensitiveOperations()
-            ui.pendingExport = null
         }
     }
 
@@ -324,11 +299,11 @@ internal fun AccountKeysScreen(
                 },
             npub = npub,
             hasLocalKey = hasLocalKey,
+            remoteSigner = rememberRemoteSignerAccountActions(appState, accountIdHex),
             showWipe = WIPE_ENGINE_FFI_AVAILABLE && active != null,
             ui = ui,
             onCopyPublic = {
-                copyToClipboard(context, publicKeyLabel, npub)
-                ui.copiedKey = CopiedProfileKey.Public
+                if (copier.copy(npub, publicKeyLabel)) ui.copiedKey = CopiedProfileKey.Public
             },
             onToggleReveal = {
                 if (ui.revealRequested) {
@@ -358,6 +333,7 @@ internal fun AccountKeysScreen(
                             if (secret != null) {
                                 copySensitiveToClipboard(context, privateKeyLabel, secret)
                                 ui.copiedKey = CopiedProfileKey.Private
+                                markPrivateKeySaved()
                             }
                         },
                     )
@@ -379,6 +355,7 @@ internal fun AccountKeysScreen(
             if (backup != null && !backup.isExpired() && canDeliverSecret()) {
                 copySensitiveToClipboard(context, encryptedBackupLabel, backup.content)
                 ui.copiedKey = CopiedProfileKey.Encrypted
+                markPrivateKeySaved()
             } else {
                 ui.encryptedBackup = null
             }
@@ -389,7 +366,7 @@ internal fun AccountKeysScreen(
                 launchExport(true, backup.content, backup.createdAtMillis)
             } else {
                 ui.encryptedBackup = null
-                if (canDeliverSecret()) ui.expiredExportDialog = true
+                if (canDeliverSecret()) fileExport.state.feedback = KeyFileExportFeedback.Expired
             }
         },
     )
@@ -405,7 +382,7 @@ internal fun AccountKeysScreen(
     }
 }
 
-/** Reveal loading and expiry, pending-export expiry, copied-glyph reset, and hiding everything sensitive on stop. */
+/** Reveal loading and expiry, copied-glyph reset, and hiding everything sensitive on stop. */
 @Suppress("FunctionNaming")
 @Composable
 private fun ProfileKeysEffects(
@@ -419,14 +396,6 @@ private fun ProfileKeysEffects(
             ui.hidePrivateKey()
         }
     }
-    LaunchedEffect(ui.pendingExport) {
-        val request = ui.pendingExport ?: return@LaunchedEffect
-        delay(request.remainingMillis())
-        if (ui.pendingExport === request) {
-            ui.pendingExport = null
-            ui.expiredExportDialog = true
-        }
-    }
     LaunchedEffect(ui.encryptedBackup) {
         val backup = ui.encryptedBackup ?: return@LaunchedEffect
         delay(backup.remainingMillis())
@@ -434,7 +403,7 @@ private fun ProfileKeysEffects(
     }
     LaunchedEffect(ui.copiedKey) {
         if (ui.copiedKey != null) {
-            delay(ProfileKeysDefaults.COPIED_MILLIS)
+            delay(COPIED_FEEDBACK_MILLIS)
             ui.copiedKey = null
         }
     }
@@ -450,7 +419,6 @@ private fun ProfileKeysEffects(
         onDispose {
             lifecycle.removeObserver(observer)
             ui.stopSensitiveOperations()
-            ui.pendingExport = null
         }
     }
 }
@@ -471,6 +439,7 @@ private fun ProfileKeysList(
     onExportRaw: () -> Unit,
     onWipe: () -> Unit,
     onSignOut: () -> Unit,
+    remoteSigner: RemoteSignerAccountActions? = null,
 ) {
     val revealed = ui.privateKey != null
     val exportsEnabled = ui.exportIdle
@@ -523,9 +492,11 @@ private fun ProfileKeysList(
             }
         }
         item(key = "search.AccountKeys.5") {
-            ProfileKeySupportingText(stringResource(R.string.profile_public_key_help))
+            SettingsExplainer(stringResource(R.string.profile_public_key_help))
         }
-        if (!hasLocalKey) {
+        if (remoteSigner != null) {
+            remoteSignerAccountItems(remoteSigner)
+        } else if (!hasLocalKey) {
             item(key = "search.AccountKeys.6") {
                 SettingsCallout(
                     title = stringResource(R.string.access_amber_signed_in),
@@ -555,8 +526,10 @@ private fun ProfileKeysList(
                 }
             }
             item(key = "search.AccountKeys.9") {
-                ProfileKeySupportingText(stringResource(R.string.profile_private_key_help))
-                ProfileKeySupportingText(stringResource(R.string.profile_private_key_use_help))
+                Column(verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related)) {
+                    SettingsExplainer(stringResource(R.string.profile_private_key_help))
+                    SettingsExplainer(stringResource(R.string.profile_private_key_use_help))
+                }
             }
             item(key = "search.AccountKeys.10") { SettingsSection(stringResource(R.string.export)) }
             item(key = "search.AccountKeys.11") {
@@ -712,25 +685,6 @@ private fun ProfileKeyValueRow(
             trailingAction()
         }
     }
-}
-
-/** Helper copy under a key group at the 32 dp content line. */
-@Suppress("FunctionNaming")
-@Composable
-private fun ProfileKeySupportingText(text: String) {
-    Text(
-        text = text,
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(
-                    start = WhiteNoiseSpacing.SettingsSectionInset,
-                    end = WhiteNoiseSpacing.SettingsSectionInset,
-                    top = WhiteNoiseSpacing.Related,
-                ),
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        style = MaterialTheme.typography.bodySmall,
-    )
 }
 
 /** The copy action's glyph: a check while the last copy is still fresh. */

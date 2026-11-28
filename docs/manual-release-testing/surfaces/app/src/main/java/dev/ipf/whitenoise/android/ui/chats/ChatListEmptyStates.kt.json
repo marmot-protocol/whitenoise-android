@@ -56,6 +56,60 @@
         "test_ids": [
           "SET-061"
         ]
+      },
+      {
+        "surface": "FirstRunEmptyChats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListEmptyStates.kt",
+        "anchor": "fun FirstRunEmptyChats(",
+        "test_ids": [
+          "CHL-001",
+          "NCH-001"
+        ]
+      },
+      {
+        "surface": "FirstRunEmptyChatsWithInvite",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListEmptyStates.kt",
+        "anchor": "fun FirstRunEmptyChatsWithInvite(",
+        "test_ids": [
+          "CHL-001",
+          "NCH-001"
+        ]
+      },
+      {
+        "surface": "R.string.first_run_chats_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListEmptyStates.kt",
+        "anchor": "R.string.first_run_chats_title",
+        "test_ids": [
+          "CHL-001",
+          "NCH-001"
+        ]
+      },
+      {
+        "surface": "R.string.first_run_chats_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListEmptyStates.kt",
+        "anchor": "R.string.first_run_chats_detail",
+        "test_ids": [
+          "CHL-001",
+          "NCH-001"
+        ]
+      },
+      {
+        "surface": "R.string.new_message_invite_friend",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListEmptyStates.kt",
+        "anchor": "R.string.new_message_invite_friend",
+        "test_ids": [
+          "CHL-001",
+          "NCH-001"
+        ]
+      },
+      {
+        "surface": "First-run New chat action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListEmptyStates.kt",
+        "anchor": "R.string.first_run_new_chat",
+        "test_ids": [
+          "CHL-001",
+          "NCH-001"
+        ]
       }
     ],
     "settings_controls": [
@@ -147,6 +201,33 @@
         "test_ids": [
           "CHL-001",
           "FIND-004"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Shared chat state layout",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListEmptyStates.kt",
+        "anchor": "StatePage(",
+        "test_ids": [
+          "CHL-001",
+          "FIND-004"
+        ]
+      },
+      {
+        "surface": "R.string.chat_with_support",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListEmptyStates.kt",
+        "anchor": "R.string.chat_with_support",
+        "test_ids": [
+          "SET-071"
+        ]
+      },
+      {
+        "surface": "R.string.learn_white_noise",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListEmptyStates.kt",
+        "anchor": "R.string.learn_white_noise",
+        "test_ids": [
+          "SET-071"
         ]
       }
     ]

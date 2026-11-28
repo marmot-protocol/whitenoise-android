@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.onboarding
 
 import android.content.Context
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -28,6 +29,22 @@ class OnboardingOfflineSetupTest {
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val nsec = "nsec1" + "q".repeat(58)
+
+    /** Closing remote-signer pairing returns first-run onboarding to the same sign-in screen. */
+    @Test
+    fun closingRemoteSignerReturnsToFirstRunSignIn() {
+        val engine = RecordingIdentityLoginCalls(loginFails = { error("opening pairing must not import a key") })
+        val appState = signInTestAppState(context, engine)
+        composeRule.setContent {
+            WhiteNoiseTheme { OnboardingScreen(appState, hasActiveNetwork = { true }) }
+        }
+        composeRule.onNodeWithTag("onboarding.welcome.sign_in").performClick()
+        composeRule.onNodeWithTag("onboarding.sign_in.remote_signer").performClick()
+        composeRule.onNodeWithTag("remote_signer.screen").assertExists()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
+        composeRule.onNodeWithTag("remote_signer.screen").assertDoesNotExist()
+        composeRule.onNodeWithTag("onboarding.sign_in.private_key").assertExists()
+    }
 
     /** Valid nsec reaches identity acceptance even while offline. */
     @Test

@@ -30,45 +30,13 @@ internal fun compareTimelineMessages(
  */
 internal fun orderTimelineMessagesForDisplay(messages: List<TimelineMessage>): List<TimelineMessage> {
     val distinct = messages.distinctBy { it.id }
-    val authoritative =
+    val ordered =
         distinct
             .filter { it.authoritativeOrder != null }
             .sortedWith(compareBy<TimelineMessage> { it.authoritativeOrder }.thenBy { it.id })
             .toMutableList()
-    val overlays = distinct.filter { it.authoritativeOrder == null }
-    if (overlays.isEmpty()) {
-        return authoritative
-    }
-    val messageIds = distinct.mapTo(mutableSetOf()) { it.displayMessageIdHex() }
-    val anchoredOverlays =
-        overlays.filter { overlay ->
-            overlay.displayAfterMessageIdHex?.let(messageIds::contains) == true
-        }
-    val anchoredIds = anchoredOverlays.mapTo(mutableSetOf(), TimelineMessage::id)
-    overlays
-        .filterNot { it.id in anchoredIds }
-        .sortedWith(::compareTimelineMessages)
-        .forEach { overlay -> insertTimelineOverlayByFallbackOrder(authoritative, overlay) }
-
-    val childrenByParent =
-        anchoredOverlays
-            .groupBy(TimelineMessage::displayAfterMessageIdHex)
-            .mapValues { (_, children) -> children.sortedWith(::compareTimelineMessages) }
-    val ordered = ArrayList<TimelineMessage>(distinct.size)
-    val emittedIds = mutableSetOf<String>()
-
-    /** Emits a row and its durable descendants as one contiguous display chain. */
-    fun appendWithAnchoredChildren(row: TimelineMessage) {
-        if (!emittedIds.add(row.id)) return
-        ordered += row
-        childrenByParent[row.displayMessageIdHex()].orEmpty().forEach(::appendWithAnchoredChildren)
-    }
-
-    authoritative.forEach(::appendWithAnchoredChildren)
-    // Malformed or cyclic durable links cannot be allowed to hide rows. Keep
-    // their deterministic fallback order if no rendered parent reached them.
-    anchoredOverlays
-        .filterNot { it.id in emittedIds }
+    distinct
+        .filter { it.authoritativeOrder == null }
         .sortedWith(::compareTimelineMessages)
         .forEach { overlay -> insertTimelineOverlayByFallbackOrder(ordered, overlay) }
     return ordered
@@ -79,9 +47,6 @@ internal fun TimelineMessageRecordFfi.usesAuthoritativePageOrder(): Boolean =
     invalidationStatus == null ||
         sourceEpoch != null ||
         sourceMessageIdHex != null
-
-/** Source-level message identity used by durable stream parent links. */
-private fun TimelineMessage.displayMessageIdHex(): String = projected?.messageIdHex ?: record.messageIdHex
 
 /** Inserts an unanchored overlay without disturbing authoritative relative order. */
 private fun insertTimelineOverlayByFallbackOrder(

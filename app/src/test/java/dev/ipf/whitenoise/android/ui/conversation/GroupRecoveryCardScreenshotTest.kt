@@ -12,11 +12,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -274,6 +276,35 @@ class GroupRecoveryCardScreenshotTest {
             .captureRoboImage("src/test/snapshots/group_recovery_history_notice_$name.png")
         composeRule.onNodeWithText("Dismiss").assertIsDisplayed().performClick()
         composeRule.runOnIdle { assertEquals(1, dismissals) }
+    }
+
+    /** Retry scrolls into view above the composer and fires once at 200% text. */
+    @Test
+    fun retryRemainsReachableWhenEmptyTimelineRecoveryOverflows() {
+        var retries = 0
+        composeRule.setContent {
+            WhiteNoiseTheme(fontScale = 2f) {
+                EmptyConversationRecoveryContent(
+                    state = ConversationEmptyState.NoMessages,
+                    modifier = Modifier.width(260.dp).height(192.dp).padding(bottom = 72.dp),
+                ) {
+                    GroupRecoveryCard(
+                        status = historyNoticeStatus(listOf("notice")),
+                        busy = false,
+                        inviterName = { it },
+                        inviterIdentity = { it },
+                        onConfirm = {},
+                        onDecline = {},
+                        readFailed = true,
+                        onRetry = { retries++ },
+                    )
+                }
+            }
+        }
+        val retry = composeRule.onNodeWithText("Retry")
+        retry.assertIsNotDisplayed()
+        retry.performScrollTo().assertIsDisplayed().performClick()
+        composeRule.runOnIdle { assertEquals(1, retries) }
     }
 
     private fun historyNoticeStatus(noticeIds: List<String>) =

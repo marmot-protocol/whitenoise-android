@@ -48,3 +48,11 @@ internal fun <T> rememberGlobalSearchLookup(
     }
     return result?.takeIf { enabled && it.request === request }
 }
+
+internal fun presentableIdentifierNpub(
+    resolvedAccountIdHex: String?,
+    npubForDisplay: (String) -> String,
+): String? =
+    resolvedAccountIdHex
+        ?.let(npubForDisplay)
+        ?.takeIf { it.startsWith("npub1") }

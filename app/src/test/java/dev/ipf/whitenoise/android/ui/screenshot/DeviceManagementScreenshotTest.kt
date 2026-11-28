@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
+import android.Manifest
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
@@ -16,6 +17,7 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.CompromiseWarningItemFfi
 import dev.ipf.marmotkit.CompromiseWarningReasonFfi
 import dev.ipf.marmotkit.UnrecognizedSignInStateFfi
+import dev.ipf.whitenoise.android.state.DeviceLinkAttempt
 import dev.ipf.whitenoise.android.state.LinkedDeviceChatCounts
 import dev.ipf.whitenoise.android.state.SignInListState
 import dev.ipf.whitenoise.android.ui.devices.DEVICE_DETAIL_REMOVE_TAG
@@ -37,6 +39,8 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.util.TimeZone
@@ -99,10 +103,19 @@ class DeviceManagementScreenshotTest {
     /** The removal confirmation. */
     @Test
     fun removeDialogDark() {
+        shadowOf(RuntimeEnvironment.getApplication()).grantPermissions(Manifest.permission.HIDE_OVERLAY_WINDOWS)
         val tablet = fixtureDevice("tablet", label = "Tablet")
         show(Look(dark = true)) { LinkedDeviceDetailContent(tablet, busy = false, onBack = {}) }
         compose.onNodeWithTag(DEVICE_DETAIL_REMOVE_TAG).performScrollTo().performClick()
         compose.onNode(isDialog()).captureRoboImage("src/test/snapshots/linked_device_remove_dark.png")
+    }
+
+    @Test
+    fun expiredLinkAttemptLight() {
+        val attempt = DeviceLinkAttempt("expired", 1_794_488_400L, reviewed = false)
+        val health = LinkedDevicesHealth(missedLinks = listOf(attempt))
+        show(Look()) { LinkedDevicesContent(fixtureRosterState(), onBack = {}, health = health) }
+        compose.onRoot().captureRoboImage("src/test/snapshots/linked_devices_expired_attempt_light.png")
     }
 
     /** The roster with a security warning, a stalled device, an overdue refresh, chat counts and sign-ins. */
@@ -122,14 +135,14 @@ class DeviceManagementScreenshotTest {
         compose.onRoot().captureRoboImage("src/test/snapshots/linked_devices_health_dark_rtl_large_font.png")
     }
 
-    /** Reviewing a new sign-in: Not now and This wasn't me. */
+    /** Reviewing a new sign-in: Not now, Mine, don't link and This wasn't me. */
     @Test
     fun signInReviewNewLight() {
         show(Look()) { SignInReviewDialog(signIn("a"), onAnswer = {}, onClose = {}) }
         compose.onNode(isDialog()).captureRoboImage("src/test/snapshots/sign_in_review_new_light.png")
     }
 
-    /** Reviewing a sign-in from before this device, with the missing-link note. */
+    /** Reviewing a sign-in from before this device, with the missing-link note and I don't recognize this. */
     @Test
     fun signInReviewBeforeDark() {
         val before = signIn("a", beforeThisDevice = true).copy(previouslyLinkedHere = true)
@@ -161,16 +174,20 @@ class DeviceManagementScreenshotTest {
         compose.onNode(isDialog()).captureRoboImage("src/test/snapshots/linked_devices_repair_light.png")
     }
 
-    /** Every standing notice at once: warning, stalled, overdue, both counts, a failed check and two sign-ins. */
+    /**
+     * Every standing notice at once: warning, stalled, overdue, both counts, a failed check and three sign-ins, one of
+     * them marked Mine, don't link.
+     */
     private fun everything(): LinkedDevicesHealth {
         val warning = CompromiseWarningItemFfi(CompromiseWarningReasonFfi.REJECTED_SIGN_IN, "slot", null, 1u)
         val notNow = signIn("b", beforeThisDevice = true).copy(state = UnrecognizedSignInStateFfi.NOT_NOW)
-        val list = SignInListState(listOf(signIn("a"), notNow), loaded = true, checkFailed = true)
+        val mine = signIn("c").copy(client = "Desktop bot", state = UnrecognizedSignInStateFfi.NOT_NOW)
+        val list = SignInListState(listOf(signIn("a"), notNow, mine), loaded = true, checkFailed = true)
         return LinkedDevicesHealth(
             counts = LinkedDeviceChatCounts(closedToLinkedDevices = 3, holdingRemovedDevice = 1),
             keyPackageRefreshOverdue = true,
             stalled = true,
-            review = SignInReviewState(list = list, warning = listOf(warning), startedFresh = true),
+            review = SignInReviewState(list = list, warning = listOf(warning), startedFresh = true, mine = setOf("c")),
         )
     }
 

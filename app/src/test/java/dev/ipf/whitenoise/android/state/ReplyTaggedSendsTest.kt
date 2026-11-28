@@ -259,6 +259,8 @@ class ReplyTaggedSendsTest {
         id: String,
         clientToken: String,
     ) = TimelineMessageRecordFfi(
+        agentItem = null,
+        agentItemFirstEventMissing = false,
         clientToken = clientToken,
         messageIdHex = id,
         sourceMessageIdHex = id,
@@ -275,7 +277,7 @@ class ReplyTaggedSendsTest {
         replyPreview = null,
         mediaJson = null,
         media = emptyList(),
-        agentTextStreamJson = null,
+        thread = null,
         poll = null,
         groupSystem = null,
         hasReports = false,

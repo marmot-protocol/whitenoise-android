@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.notifications
 import android.os.Build
 import androidx.core.content.LocusIdCompat
 import dev.ipf.marmotkit.NotificationUpdateFfi
-import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -42,23 +41,74 @@ internal suspend fun LocalNotificationPresenter.publishShortcutBeforePost(
     }.takeIf { it }?.let { shortcutId }
 }
 
-/** Publishes the separate reaction shortcut before Android classifies the card for its template. */
+/**
+ * Publishes the separate reaction shortcut before Android classifies the card for its template. A conversation or
+ * account cleanup after [channelWriteEpoch] that cleared this reaction shortcut, or its conversation, stops it.
+ */
 internal suspend fun LocalNotificationPresenter.publishReactionShortcutBeforePost(
     update: NotificationUpdateFfi,
     content: LocalNotificationContent,
+    channelWriteEpoch: Long,
     isPublishAllowed: () -> Boolean,
 ): String? {
     val id =
         reactionConversationShortcutId(update.accountRef, update.groupIdHex)
             ?.takeIf { Build.VERSION.SDK_INT >= Build.VERSION_CODES.R } ?: return null
+    val allowed = {
+        isPublishAllowed() && NotificationChannelWriteGuard.isCurrent(channelWriteEpoch, update.accountRef, id)
+    }
     val published =
         withContext(Dispatchers.Default) {
             conversationShortcuts.publishReactionShortcut(
                 update,
                 content,
                 id,
-                isPublishAllowed,
+                allowed,
             )
         }
     return id.takeIf { published }
 }
+
+/**
+ * Resolves the post's target channel while rechecking [isWriteAllowed] inside the channel creation
+ * lock so a locally deleted conversation or departed account cannot materialize a named child channel.
+ */
+@Suppress("LongParameterList") // Post-routing parameters shared with LocalNotificationPresenter.show().
+internal suspend fun LocalNotificationPresenter.resolvePostChannelId(
+    update: NotificationUpdateFfi,
+    existingCardChannel: String?,
+    channelShortcutId: String?,
+    conversationTitleOverride: String?,
+    senderNameOverride: String?,
+    redactContent: Boolean,
+    vibrationPattern: ConversationVibrationPattern,
+    isWriteAllowed: () -> Boolean,
+): String? =
+    withContext(Dispatchers.Default) {
+        if (!isWriteAllowed()) return@withContext null
+        val channelId =
+            existingCardChannel ?: profileNotificationSoundAuthor(update)?.let { author ->
+                val selection = profileNotificationOverrides.get(update.accountRef, author)
+                if (selection.mode == ProfileNotificationMode.CUSTOM) {
+                    profileNotificationChannels.existing(
+                        accountRef = update.accountRef,
+                        author = author,
+                        pattern = selection.vibration,
+                        title = senderNameOverride ?: update.sender.displayName,
+                        redact = redactContent,
+                        isWriteAllowed = isWriteAllowed,
+                    )
+                } else {
+                    null
+                }
+            } ?: conversationNotificationRouting
+                .resolveForPost(
+                    channel = NotificationChannelSpec.forUpdate(update),
+                    conversationShortcutId = channelShortcutId,
+                    conversationTitle = conversationTitleOverride,
+                    primaryVibrationPattern = vibrationPattern,
+                    accountRef = update.accountRef,
+                    isWriteAllowed = isWriteAllowed,
+                ).channelId
+        channelId.takeIf { isWriteAllowed() }
+    }

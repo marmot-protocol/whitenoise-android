@@ -1,8 +1,9 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
 import android.util.Log
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -35,7 +36,6 @@ import dev.ipf.whitenoise.android.state.AttachmentOpenPhase
 import dev.ipf.whitenoise.android.state.AttachmentOpenTrace
 import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import dev.ipf.whitenoise.android.state.ConversationController
-import dev.ipf.whitenoise.android.state.FileUploadProgress
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -52,8 +52,9 @@ import dev.ipf.whitenoise.android.state.hasCachedAttachmentInMemory
 import dev.ipf.whitenoise.android.state.performAttachmentUserAction
 import dev.ipf.whitenoise.android.state.refreshAttachmentTransferState
 import dev.ipf.whitenoise.android.state.requestAttachmentInstallerHandoff
-import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
-import dev.ipf.whitenoise.android.ui.settings.settingsMorphBounds
+import dev.ipf.whitenoise.android.ui.common.motionBoundsOnScreen
+import dev.ipf.whitenoise.android.ui.common.pressFeedbackInsideClip
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMediaTileShape
 import kotlinx.coroutines.flow.first
 
 internal fun Modifier.fileBubbleWidth(): Modifier = fillMaxWidth()
@@ -399,16 +400,20 @@ internal fun MediaFileBubble(
         }
     }
 
+    val cardPress = remember { MutableInteractionSource() }
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = ConversationRichContentShape,
+        shape = ConversationMediaTileShape,
         modifier =
             Modifier
                 .fileBubbleWidth()
-                .onGloballyPositioned { activationBounds[0] = it.settingsMorphBounds(view) }
+                .onGloballyPositioned { activationBounds[0] = it.motionBoundsOnScreen(view) }
                 .fileAttachmentFirstFrameVisibility(mine || firstFrameCacheResolved)
                 .testTag(fileAttachmentCardTestTag(messageIdHex, attachmentIndex))
+                // No highlight here: it is drawn inside the Surface's clip, so the outline is not clipped twice.
                 .combinedClickable(
+                    interactionSource = cardPress,
+                    indication = null,
                     enabled =
                         firstFrameCacheResolved &&
                             canRequestAttachmentOpen(transferState, reference.sourceEpoch, mine),
@@ -452,23 +457,25 @@ internal fun MediaFileBubble(
                     },
                 ),
     ) {
-        MediaFileBubbleContent(
-            reference = reference,
-            presentation = presentation,
-            transferState = transferState,
-            timestampText = timestampText,
-            showStatus = showStatus,
-            status = status,
-            footerWarningText = footerWarningText,
-            openPending = opening,
-            nativeProgress = presentationProgress.takeUnless { heldUntilDelivered },
-            cancellationState = cancellationState,
-            // A held own card has no native transfer to cancel.
-            onCancelTransfer =
-                {
-                    controller.cancelAttachmentTransfer(messageIdHex, attachmentIndex)
-                }.takeUnless { heldUntilDelivered },
-        )
+        Box(Modifier.pressFeedbackInsideClip(cardPress), propagateMinConstraints = true) {
+            MediaFileBubbleContent(
+                reference = reference,
+                presentation = presentation,
+                transferState = transferState,
+                timestampText = timestampText,
+                showStatus = showStatus,
+                status = status,
+                footerWarningText = footerWarningText,
+                openPending = opening,
+                nativeProgress = presentationProgress.takeUnless { heldUntilDelivered },
+                cancellationState = cancellationState,
+                // A held own card has no native transfer to cancel.
+                onCancelTransfer =
+                    {
+                        controller.cancelAttachmentTransfer(messageIdHex, attachmentIndex)
+                    }.takeUnless { heldUntilDelivered },
+            )
+        }
     }
     if (readerOpen && documentKind != null) {
         val actions =
@@ -586,78 +593,3 @@ internal fun canRequestAttachmentOpen(
         AttachmentTransferState.Cancelled,
         -> mine || sourceEpoch != 0uL
     }
-
-private fun formatFileSize(bytes: Long): String {
-    if (bytes < 0L) return ""
-    if (bytes < 1024L) return "$bytes B"
-    val kb = bytes / 1024.0
-    if (kb < 1024.0) return String.format(java.util.Locale.US, "%.1f KB", kb)
-    val mb = kb / 1024.0
-    if (mb < 1024.0) return String.format(java.util.Locale.US, "%.1f MB", mb)
-    val gb = mb / 1024.0
-    return String.format(java.util.Locale.US, "%.1f GB", gb)
-}
-
-/**
- * Pill for a file still being sent. While [uploadProgress] is known, the ring fills with the whole send's
- * progress, the size line shows the step's short label and TalkBack reads the step with its bytes.
- */
-@Composable
-internal fun PendingFilePill(
-    fileName: String,
-    mediaType: String,
-    sizeBytes: Long,
-    failed: Boolean,
-    statusLabel: String,
-    onRetry: (() -> Unit)? = null,
-    timestampText: String? = null,
-    showStatus: Boolean = false,
-    status: MessageStatus = MessageStatus.Pending,
-    uploadProgress: FileUploadProgress? = null,
-) {
-    val presentation = remember(mediaType, fileName) { resolveAttachmentPresentation(mediaType, fileName) }
-    val progress = uploadProgress?.takeIf { !failed }
-    val progressText = progress?.let { uploadProgressLabel(it) }
-    val progressDescription = progress?.let { uploadProgressDescription(it) }
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = ConversationRichContentShape,
-        modifier =
-            Modifier
-                .fileBubbleWidth()
-                .testTag(PENDING_FILE_CARD_TEST_TAG)
-                .then(
-                    if (failed && onRetry != null) {
-                        Modifier.clickable(onClick = onRetry)
-                    } else {
-                        Modifier
-                    },
-                ),
-    ) {
-        FileBubbleContent(
-            fileName = fileName,
-            presentation = presentation,
-            transferState =
-                if (failed) {
-                    AttachmentTransferState.Failed
-                } else {
-                    AttachmentTransferState.Downloading
-                },
-            metadataText =
-                when {
-                    failed && timestampText != null -> statusLabel
-                    progressText != null -> progressText
-                    else -> formatFileSize(sizeBytes)
-                },
-            metadataIsError = failed && timestampText != null,
-            // The size line already names the upload step while bytes are known, so it is not repeated here.
-            trailingMetadataText = timestampText ?: statusLabel.takeIf { progressText == null },
-            trailingMetadataIsError = failed && timestampText == null,
-            trailingStatus = status.takeIf { showStatus },
-            loadingDescription = statusLabel,
-            transferDirection = FileTransferDirection.Upload,
-            progressDescription = progressDescription,
-            progressFraction = progress?.ringFraction,
-        )
-    }
-}

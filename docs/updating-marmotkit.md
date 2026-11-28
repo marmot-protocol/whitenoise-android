@@ -5,11 +5,12 @@ Normal builds never regenerate bindings from a local MDK checkout. Maintainers
 update the reviewed pin in `app/src/main/marmotkit/MARMOT_VERSION` only after
 MDK has published the corresponding release.
 
-The [official 0.18.0 adoption](marmotkit-0.18.0.md) records Android's pin and
-consumer changes. The [official 0.17.0 adoption](marmotkit-0.17.0.md) records the
+The [official 0.19.0 adoption](marmotkit-0.19.0.md) records Android's pin and
+consumer changes. The [official 0.18.0 adoption](marmotkit-0.18.0.md) records the
 populated upgrade baseline.
 
-The [official 0.16.0 adoption](marmotkit-0.16.0.md), the
+The [official 0.17.0 adoption](marmotkit-0.17.0.md), the
+[official 0.16.0 adoption](marmotkit-0.16.0.md), the
 [official 0.15.0 release](marmotkit-0.15.0.md), the
 [November 9 nightly](https://github.com/marmot-protocol/mdk/releases/tag/marmotkit-v0.15.0-nightly.20261109),
 [8 November nightly](https://github.com/marmot-protocol/mdk/releases/tag/marmotkit-v0.15.0-nightly.20261108),
@@ -70,9 +71,11 @@ ignores history comparison. The October 22 nightly includes MDK #2513's fixes fo
 [#2381](https://github.com/marmot-protocol/mdk/issues/2381). All seven cases must
 execute: no ignored recovery case can satisfy adoption.
 
-The populated campaign builds current master and the candidate with one disposable
-signer and isolated `.mdkqualification` package. It fails closed if master no
-longer pins the reviewed 0.17.0 source `4df811ae`. Qualification
+The populated campaign builds the reviewed Android master revision
+(`c0f475b9`, set in `scripts/build-mdk-qualification.sh`) and the candidate with one
+disposable signer and isolated `.mdkqualification` package, once with audit sharing
+enabled and once declined. It fails closed unless the baseline pins MarmotKit
+0.19.0 from MDK source `3fce9546`. Qualification
 sources must compile against both runtimes: when a MarmotKit type differs, keep the
 candidate's form in the qualification package and the baseline's form under
 `scripts/mdk-baseline-overlay/` as `<File>.kt.txt`, which the staging script copies
@@ -132,7 +135,48 @@ assertions now prove retained-data reopening, not a fresh rekey. No new storage
 migration is introduced relative to the October 23 nightly. Physical app-performance
 evidence remains separate from hosted qualification; phone testing is paused.
 
+### Android 0.20.0-rc.4 staging decision
+
+On November 28, 2026, the maintainer waived
+`healthyAccountReceivesAfterLocalDeletionAndRestart` only when the relay
+silently ignores history comparison, for MarmotKit `0.20.0-rc.4`
+(`07567caf0814fa0f5688c5da83a7209f94c71e03`) on Android `develop` and internal
+staging. The [qualification run](https://github.com/marmot-protocol/whitenoise-android/actions/runs/46127170756)
+on Android commit `a7f6835f55` missed the first incoming message with audit on
+and off. The retained-data upgrade, cold restart and all seven cases with an
+explicit comparison refusal passed in both modes. Track the missed message in
+[MDK #3643](https://github.com/marmot-protocol/mdk/issues/3643). Required review
+and CI still apply. Production and later pins require their own qualification.
+
 ## 1. Select and inspect the release
+
+### Manual RC sync for develop
+
+Run the following from a clean MarmotKit pin on a branch based on
+`origin/develop`:
+
+```bash
+git fetch origin develop
+git switch -c chore/marmotkit-rc origin/develop
+just sync-rc
+```
+
+This previews the proposed pin diff and prints the release impact and links to
+the signature delta and integration notes. It reads the published `rc-meta` manifest,
+checks the Android ZIP against both published SHA-256 values, validates the
+bundle, and derives the Kotlin API counts from that ZIP. If the pin already
+matches the published RC, it reports that and exits.
+
+Review the UniFFI changes and storage migrations before applying the update with
+`python3 scripts/sync_marmotkit_rc.py --apply <reviewed RC version>`. Preview the
+new version if the published RC has advanced. When the ZIP manifest has no
+feature list, verify the exact source and builder and the effective feature
+flags for every ABI using the publishing run printed by the command. Keep the
+evidence with the pin PR and add `--verified-features` to the apply command.
+Open the pin PR against `develop`, adapt Android callers as needed and get fresh
+Android CI. Production on `master` requires a Stable pin.
+
+### Inspect a release by hand
 
 Prefer a formal `marmotkit-v<version>` release. Record its exact tag, asset URL,
 and MDK source SHA. Download the Android ZIP and calculate its SHA-256:

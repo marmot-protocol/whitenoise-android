@@ -22,6 +22,7 @@ import dev.ipf.marmotkit.GroupPushTokenDebugEntryFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.settings.DiagnosticRow
 import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
@@ -48,19 +49,17 @@ internal fun DeveloperInfoPanel(
     }
 }
 
-/** A lifecycle row's glyph in the row's own colour, replaced by progress while its mutation runs. */
+/** A lifecycle row's glyph, tinted by its row, replaced by progress while its mutation runs. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun DangerLeading(
     @DrawableRes icon: Int,
     inProgress: Boolean,
-    destructive: Boolean = true,
 ) {
-    val tint = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
     if (inProgress) {
         CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
     } else {
-        SettingsLeadingIcon(icon, tint = tint)
+        SettingsLeadingIcon(icon)
     }
 }
 
@@ -149,7 +148,7 @@ private fun PushTokenDebugRows(
     yesNo: (Boolean) -> String,
 ) {
     val memberName = appState.chatMemberTitle(token.memberIdHex)
-    Text(
+    EmojiLabel(
         memberName,
         style = MaterialTheme.typography.titleSmall,
         fontWeight = FontWeight.SemiBold,

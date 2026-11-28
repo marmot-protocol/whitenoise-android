@@ -14,13 +14,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.BottomSheetDefaults
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.ModalBottomSheetProperties
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -49,6 +47,10 @@ import dev.ipf.whitenoise.android.state.REPORT_REASONS
 import dev.ipf.whitenoise.android.state.boundedExplanation
 import dev.ipf.whitenoise.android.state.reportReasonLabel
 import dev.ipf.whitenoise.android.ui.common.ProseTextField
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetInset
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 
 internal const val REPORT_SHEET_TEST_TAG = "message.report"
@@ -98,7 +100,7 @@ internal fun ReportMessageSheet(
     form: ReportFormState = ReportFormState(sending),
 ) {
     var reason by remember { mutableStateOf(REPORT_REASONS.first()) }
-    var explanation by remember { mutableStateOf("") }
+    val explanation = remember { TextFieldState() }
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val terminal = rememberSheetTerminalMotion(sheet, ownerKey)
     var closingAudience by remember(terminal) { mutableStateOf<ReportAudience?>(null) }
@@ -106,15 +108,10 @@ internal fun ReportMessageSheet(
         closingAudience = audience
         terminal.close(onDismissRequest)
     }
-    ModalBottomSheet(
+    WhiteNoiseModalBottomSheet(
         onDismissRequest = close,
         sheetState = sheet,
-        sheetGesturesEnabled = terminal.acceptsInput,
-        properties =
-            ModalBottomSheetProperties(
-                shouldDismissOnBackPress = terminal.acceptsInput,
-                shouldDismissOnClickOutside = terminal.acceptsInput,
-            ),
+        interactionEnabled = terminal.acceptsInput,
         modifier = Modifier.testTag(REPORT_SHEET_TEST_TAG),
         dragHandle = { ReportMessageDragHandle() },
     ) {
@@ -122,7 +119,6 @@ internal fun ReportMessageSheet(
             reason,
             { reason = it },
             explanation,
-            { explanation = it },
             form.sending || !terminal.acceptsInput,
             { acceptedReason, acceptedExplanation ->
                 onSubmit(acceptedReason, acceptedExplanation, close)
@@ -188,8 +184,7 @@ private fun ReportMessageDragHandle() {
 internal fun ReportMessageForm(
     reason: ReportReasonFfi,
     onReasonChange: (ReportReasonFfi) -> Unit,
-    explanation: String,
-    onExplanationChange: (String) -> Unit,
+    explanation: TextFieldState,
     sending: Boolean,
     onSubmit: (ReportReasonFfi, String) -> Unit,
     team: ReportTeamChoice = ReportTeamChoice(),
@@ -201,24 +196,26 @@ internal fun ReportMessageForm(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
-                    .padding(bottom = if (compact) 4.dp else 24.dp),
+                    .padding(bottom = if (compact) 4.dp else WhiteNoiseSheetInset),
             verticalArrangement = Arrangement.spacedBy(if (compact) 4.dp else 12.dp),
         ) {
             ReportMessageBody(
                 reason,
                 onReasonChange,
                 explanation,
-                onExplanationChange,
                 Modifier.weight(1f, fill = false),
                 enabled = !sending && !form.locked,
                 team = team,
                 error = form.error,
             )
-            Button(
-                onClick = { onSubmit(reason, boundedExplanation(explanation)) },
+            WhiteNoiseButton(
+                onClick = { onSubmit(reason, boundedExplanation(explanation.text.toString())) },
                 enabled = !sending && (team.reachesGroup || team.reachesTeam),
-                modifier = Modifier.fillMaxWidth().testTag("message.report.send"),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = WhiteNoiseSheetInset)
+                        .testTag("message.report.send"),
             ) {
                 Text(stringResource(R.string.report_message_send))
             }
@@ -235,8 +232,7 @@ internal fun ReportMessageForm(
 private fun ReportMessageBody(
     reason: ReportReasonFfi,
     onReasonChange: (ReportReasonFfi) -> Unit,
-    explanation: String,
-    onExplanationChange: (String) -> Unit,
+    explanation: TextFieldState,
     modifier: Modifier,
     enabled: Boolean,
     team: ReportTeamChoice,
@@ -248,44 +244,51 @@ private fun ReportMessageBody(
     LaunchedEffect(error) { if (error != null) scroll.animateScrollTo(scroll.maxValue) }
     Column(
         modifier = modifier.fillMaxWidth().verticalScroll(scroll).testTag(REPORT_BODY_TEST_TAG),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         val profile = team.audience == ReportAudience.TeamProfile
         val title = if (profile) R.string.report_team_action else R.string.report_message_title
-        Text(stringResource(title), style = MaterialTheme.typography.titleMedium)
-        if (team.reachesGroup) ReportDetail(R.string.report_message_detail)
-        Column(Modifier.selectableGroup()) {
-            REPORT_REASONS.forEach { candidate ->
-                ReportReasonRow(
-                    label = stringResource(reportReasonLabel(candidate)),
-                    selected = candidate == reason,
-                    enabled = enabled,
-                    onSelect = { onReasonChange(candidate) },
+        WhiteNoiseSheetHeader(stringResource(title))
+        Column(
+            Modifier.padding(horizontal = WhiteNoiseSheetInset),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            if (team.reachesGroup) ReportDetail(R.string.report_message_detail)
+            Column(Modifier.selectableGroup()) {
+                REPORT_REASONS.forEach { candidate ->
+                    ReportReasonRow(
+                        label = stringResource(reportReasonLabel(candidate)),
+                        selected = candidate == reason,
+                        enabled = enabled,
+                        onSelect = { onReasonChange(candidate) },
+                    )
+                }
+            }
+            ProseTextField(
+                state = explanation,
+                enabled = enabled,
+                maxLength = REPORT_EXPLANATION_LIMIT,
+                label = {
+                    val hint =
+                        if (teamOnly) {
+                            R.string.report_team_explanation_hint
+                        } else {
+                            R.string.report_message_explanation_hint
+                        }
+                    Text(stringResource(hint))
+                },
+                modifier = Modifier.fillMaxWidth().testTag("message.report.explanation"),
+                singleLine = false,
+                minLines = 2,
+            )
+            ReportTeamSection(team, enabled)
+            error?.let {
+                Text(
+                    stringResource(it),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.testTag(REPORT_ERROR_TEST_TAG),
                 )
             }
-        }
-        ProseTextField(
-            value = explanation,
-            enabled = enabled,
-            emojiMaxLength = REPORT_EXPLANATION_LIMIT,
-            onValueChange = { onExplanationChange(it.take(REPORT_EXPLANATION_LIMIT)) },
-            label = {
-                val hint =
-                    if (teamOnly) R.string.report_team_explanation_hint else R.string.report_message_explanation_hint
-                Text(stringResource(hint))
-            },
-            modifier = Modifier.fillMaxWidth().testTag("message.report.explanation"),
-            singleLine = false,
-            minLines = 2,
-        )
-        ReportTeamSection(team, enabled)
-        error?.let {
-            Text(
-                stringResource(it),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.testTag(REPORT_ERROR_TEST_TAG),
-            )
         }
     }
 }

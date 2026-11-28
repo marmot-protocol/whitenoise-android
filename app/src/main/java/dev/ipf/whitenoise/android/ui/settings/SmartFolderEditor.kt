@@ -32,8 +32,10 @@ import dev.ipf.whitenoise.android.state.FolderField
 import dev.ipf.whitenoise.android.state.FolderMode
 import dev.ipf.whitenoise.android.state.SmartFolderCodec
 import dev.ipf.whitenoise.android.state.SmartFolderFilter
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEntityPickerSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoisePickerItem
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
@@ -513,12 +515,9 @@ internal fun SmartFolderConditionDialog(
                                 stringResource(R.string.smart_folder_select_people) + " (${keys.size})",
                             )
                         }
-                        Text(
+                        EmojiLabel(
                             keys.joinToString { hex ->
-                                people
-                                    .firstOrNull {
-                                        it.id == hex
-                                    }?.title ?: hex.take(KEY_PREVIEW_LENGTH) + "…"
+                                people.firstOrNull { it.id == hex }?.title ?: hex.take(KEY_PREVIEW_LENGTH) + "…"
                             },
                         )
                         if (optionsExpanded) {
@@ -563,10 +562,8 @@ internal fun SmartFolderConditionDialog(
                                 },
                             ) { Text(stringResource(R.string.smart_folder_add_key)) }
                             if (invalidKey) {
-                                Text(
-                                    stringResource(R.string.smart_folder_invalid_key),
-                                    color = MaterialTheme.colorScheme.error,
-                                )
+                                val message = stringResource(R.string.smart_folder_invalid_key)
+                                WhiteNoiseCallout(text = message, icon = R.drawable.ic_error, isError = true)
                             }
                         }
                     }

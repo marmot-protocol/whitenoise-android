@@ -50,6 +50,7 @@ import dev.ipf.whitenoise.android.ui.common.nativePageHeader
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.MyLocation
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseElevation
 import org.osmdroid.config.Configuration
 import org.osmdroid.events.MapListener
 import org.osmdroid.events.ScrollEvent
@@ -194,7 +195,11 @@ internal fun LocationPickerScreen(
                         .padding(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surface, tonalElevation = 3.dp) {
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surface,
+                    shadowElevation = WhiteNoiseElevation.FloatingControl,
+                ) {
                     IconButton(onClick = dismiss) {
                         Icon(painterResource(R.drawable.ic_close), contentDescription = stringResource(R.string.close))
                     }

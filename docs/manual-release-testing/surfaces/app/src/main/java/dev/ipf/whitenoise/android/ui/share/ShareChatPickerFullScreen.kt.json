@@ -77,6 +77,15 @@
           "SYS-004",
           "PRO-008"
         ]
+      },
+      {
+        "surface": "Share picker Close on the shared top bar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerFullScreen.kt",
+        "anchor": "navigation = WhiteNoiseTopBarNavigation.Close",
+        "test_ids": [
+          "SYS-001",
+          "SYS-004"
+        ]
       }
     ],
     "source_coverage": [
@@ -84,24 +93,6 @@
         "surface": "Stored group-avatar surface: R.string.recent_chats",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerFullScreen.kt",
         "anchor": "R.string.recent_chats",
-        "test_ids": [
-          "CHL-017",
-          "PRO-008"
-        ]
-      },
-      {
-        "surface": "Stored group-avatar surface: R.string.share_no_chats",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerFullScreen.kt",
-        "anchor": "R.string.share_no_chats",
-        "test_ids": [
-          "CHL-017",
-          "PRO-008"
-        ]
-      },
-      {
-        "surface": "Stored group-avatar surface: R.string.share_no_matches",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerFullScreen.kt",
-        "anchor": "R.string.share_no_matches",
         "test_ids": [
           "CHL-017",
           "PRO-008"
@@ -138,7 +129,8 @@
           "SET-051"
         ]
       }
-    ]
+    ],
+    "settings_controls": []
   },
   "discovery_exceptions": []
 }

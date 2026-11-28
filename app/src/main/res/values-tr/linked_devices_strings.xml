@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="linked_devices">Bağlı cihazlar</string>
+    <string name="linked_devices">Cihazlar</string>
+    <string name="settings_search_alias_linked_devices">bağlı cihazlar|cihaz bağla|cihazı bağla</string>
+    <string name="group_account_devices_title">Bağlı cihazlar</string>
     <string name="linked_devices_detail">Bağlı bir cihazdan gönderdiğiniz mesajlar, tüm bağlı cihazlarınızda sizin mesajlarınız olarak görünür.</string>
     <string name="linked_devices_this_device">Bu cihaz</string>
     <string name="linked_devices_other_devices">Diğer cihazlar</string>
@@ -36,9 +38,9 @@
     <string name="error_account_unlinked">Bu cihazın bu hesapla bağlantısı kaldırıldı, bu yüzden burada oturum açamaz. Hesabı bu cihazdan kaldırın, ardından bu cihazı yeniden bağlamak için tekrar oturum açın.</string>
     <string name="wipe_report_left_to_other_devices">Diğer cihazlarınızın tamamlayacağı sohbetler: %1$d</string>
     <string name="wipe_report_other_devices_not_reached">Diğer cihazlarınızdan bu cihazın oturumunu kapatmayı tamamlamaları istenemedi. Birinden kaldırana kadar bu cihazı listelemeye devam edebilirler.</string>
-    <string name="history_imported_from_device">%1$s cihazından içe aktarıldı</string>
-    <string name="history_imported_from_another_device">Başka bir cihazdan içe aktarıldı</string>
-    <string name="history_restored_from_backup">Yedekten geri yüklendi</string>
+    <string name="history_imported_from_device">Yukarıdaki mesajlar %1$s cihazından geldi</string>
+    <string name="history_imported_from_another_device">Yukarıdaki mesajlar başka bir cihazdan geldi</string>
+    <string name="history_restored_from_backup">Yukarıdaki mesajlar yedekten geri yüklendi</string>
     <string name="history_receiving">Önceki mesajlar başka bir cihazınızdan alınıyor…</string>
     <string name="history_retrying">Önceki mesajlar yüklenemedi. Otomatik olarak tekrar deneyeceğiz.</string>
     <string name="link_device_this_title">Bu cihazı bağla</string>
@@ -75,7 +77,7 @@
     <string name="link_request_review">İncele</string>
     <string name="link_request_not_now">Şimdi değil</string>
     <string name="link_request_preparing">Yeni cihaz denetleniyor…</string>
-    <string name="link_request_compare_detail">İki cihazda da aynı emojilerin aynı sırada göründüğünü kontrol edin. Farklıysa “Şimdi değil” seçeneğine dokunun.</string>
+    <string name="link_request_compare_detail">Elinizdeki cihazda aynı emojilerin aynı sırayla gösterildiğini kontrol edin. Emojileri kimseye okumayın veya ekran görüntüsü göndermeyin.</string>
     <string name="link_request_label">Cihaz adı</string>
     <string name="link_request_label_too_long">Bu ad çok uzun.</string>
     <string name="link_request_add_to_chats">Tüm sohbetlerime ekle</string>
@@ -91,6 +93,14 @@
     <string name="link_request_linked">Yeni cihaz bağlandı.</string>
     <string name="link_request_added_elsewhere">%1$s, %2$s tarafından eklendi.</string>
     <string name="link_request_added_elsewhere_unnamed">Cihaz, başka bir cihazınız tarafından eklendi.</string>
+    <string name="link_request_notice">Yeni bir cihaz hesabınıza bağlanmak istiyor.</string>
+    <string name="link_request_notice_other_profile">Yeni bir cihaz %1$s profiline bağlanmak istiyor.</string>
+    <string name="link_request_repeated_notice">Tekrarlanan bağlama istekleri: anahtarınız başkasının elinde olabilir.</string>
+    <string name="link_request_repeated_notice_other_profile">%1$s için tekrarlanan bağlama istekleri: anahtarınız başkasının elinde olabilir.</string>
+    <string name="link_request_repeated_title">Tekrarlanan bağlama istekleri</string>
+    <string name="link_request_repeated_detail">Bir saat içinde birden fazla kez cihazlar bu hesaba bağlanmak istedi. Özel anahtarınız başkasının elinde olabilir, bu yüzden bağlama sunulmuyor. Bu istekleri siz yaptıysanız daha sonra tek bir cihazdan yeniden deneyin.</string>
+    <string name="link_request_dont_link">Bağlamayın</string>
+    <string name="link_request_review_devices">Cihazları incele</string>
     <string name="device_detail_rename">Yeniden adlandır</string>
     <string name="device_detail_rename_detail">Bu cihaz için tüm cihazlarınızda gösterilen ad.</string>
     <string name="device_detail_keep">Etkin değilken tut</string>
@@ -109,7 +119,7 @@
     <string name="devices_leftover_chats_detail">Bu sohbetler kaldırma işlemini cihazlarınızdan alamıyor. Bir sohbet yöneticisi cihazı orada kaldırabilir.</string>
     <string name="devices_key_refresh_overdue">Bu cihaz davet anahtarlarını yenileyemedi. 30 gün sonra yeni sohbetlere eklenemeyebilir. Cihazlarınızın yetişebilmesi için uygulamayı açık tutun.</string>
     <string name="devices_stalled">Bu cihaz artık diğer cihazlarınıza yetişemiyor. Devam etmek için bağlantısını onarın.</string>
-    <string name="device_repair_confirm_again">Ayarlar bölümünde bağlı cihazları açın ve bağlantı kurmadan önce onarımı yeniden onaylayın.</string>
+    <string name="device_repair_confirm_again">Ayarlar bölümünde “Cihazlar”ı açın ve bağlantı kurmadan önce onarımı yeniden onaylayın.</string>
     <string name="device_repair_try_link_again">Bağlantı sıfırlandı. Onarımı tamamlamak için cihazı tekrar bağlamayı deneyin.</string>
     <string name="devices_repair">Bu cihazın bağlantısını onar</string>
     <string name="devices_repair_confirm">Bu cihazı yeniden bağlayabilmeniz için mevcut bağlantı kaldırılır. Sohbetleriniz, mesajlarınız, taslaklarınız ve ayarlarınız korunur. Bağlamayı iptal etseniz bile eski bağlantı geri yüklenemez.</string>
@@ -123,8 +133,8 @@
     <string name="sign_in_signed_out">Artık oturum açık değil</string>
     <string name="sign_in_question_new">Bu siz miydiniz?</string>
     <string name="sign_in_question_before">Bu cihaz hâlâ sizde mi?</string>
-    <string name="sign_in_detail_new">Birisi başka bir cihazda oturum açtı. Sizseniz o cihazı bağlayabilirsiniz. Siz değilseniz “Bu ben değildim” seçeneğine dokunun.</string>
-    <string name="sign_in_detail_before">Bu cihaz, hesapta bundan önce oturum açmıştı. Hâlâ sizdeyse bu cihazı oradan bağlayın. Değilse sıfırdan başlayabilirsiniz.</string>
+    <string name="sign_in_detail_new">Birisi başka bir cihazda oturum açtı. Sizseniz o cihazı bağlayabilirsiniz. Bağlamak istemediğiniz kendi uygulamanızsa “Benim, bağlama” seçeneğine dokunun. Siz değilseniz “Bu ben değildim” seçeneğine dokunun.</string>
+    <string name="sign_in_detail_before">Bu cihaz, hesapta bundan önce oturum açmıştı. Hâlâ sizdeyse bu cihazı oradan bağlayın ya da sıfırdan başlayın. Tanımıyorsanız “Bunu tanımıyorum” seçeneğine dokunun.</string>
     <string name="sign_in_previously_linked">Daha önce burada bağlanan bir cihaz, bu cihazın geçerli listesinde yok. Bağlantıyı denetlemek için iki cihazı da açın.</string>
     <string name="sign_in_reject">Bu ben değildim</string>
     <string name="sign_in_reject_confirm">Bu oturum açma işlemi tüm cihazlarınızda size ait değil olarak işaretlenir ve bir güvenlik uyarısı gösterilir. Cihazın oturumu açık kalır ve anahtarınız değişmez.</string>
@@ -136,10 +146,10 @@
     <string name="start_fresh_title">Hayır, sıfırdan başla</string>
     <string name="start_fresh_detail">Şimdilik bu cihazı tek başına kullanın. Daha önce oturum açtığınız cihazlardan biriyle bu cihazı daha sonra bağlayabilirsiniz.</string>
     <string name="started_fresh_note">Bu cihaz sıfırdan başladı. Burada yalnızca bundan sonra davet edildiğiniz sohbetler görünür.</string>
-    <string name="compromise_warning_title">Güvenlik uyarısı</string>
-    <string name="compromise_warning_rejected">Bu hesaba yapılan bir oturum açma size ait değil olarak işaretlendi. Başka biri bu hesabın anahtarına veya imzalayıcısıyla bir oturuma sahip olabilir.</string>
-    <string name="compromise_warning_foreign_key">Bu cihaz kendi yuvasında oluşturmadığı davet anahtarları buldu ve onları değiştirdi. Başka biri bu hesabın anahtarına veya imzalayıcısıyla bir oturuma sahip olabilir.</string>
-    <string name="compromise_warning_dismiss">Görüldü olarak işaretle</string>
+    <string name="compromise_warning_title">Gizli anahtarınız başka birinde olabilir</string>
+    <string name="compromise_warning_rejected">Bu hesaptaki bir oturum açma sizin değil olarak işaretlendi.</string>
+    <string name="compromise_warning_foreign_key">Bu cihaz kendi yuvasında oluşturmadığı davet anahtarları buldu.</string>
+    <string name="compromise_warning_dismiss">Bu cihazda gizle</string>
     <string name="compromise_warning_dismiss_detail">Bu uyarıyı yalnızca bu cihazda gizler. Bir cihazı kaldırmaz, bir oturum açmayı reddetmez ve anahtarınızı güvenceye almaz.</string>
     <string name="device_move_section">Bu cihaz taşınıyor</string>
     <string name="device_move_waiting">Diğer cihazların eklemesi bekleniyor</string>
@@ -158,8 +168,8 @@
     <string name="link_offer_reminder">Diğer cihazlarınızdaki sohbetleri görmek için bu cihazı bağlayın.</string>
     <string name="link_request_default_label">Yeni cihaz</string>
     <string name="link_request_options">Seçenekler</string>
-    <string name="link_request_options_detail">Cihazın adını seçin ve sohbetleri geçmişleriyle birlikte paylaşıp paylaşmayacağınıza karar verin.</string>
-    <string name="explanation_link_request_options">Yeni cihazın adını ve neler alacağını açar.</string>
+    <string name="link_request_options_detail">Sohbetlerin ve geçmişlerinin paylaşılıp paylaşılmayacağını seçin.</string>
+    <string name="explanation_link_request_options">Yeni cihazın neler alacağını açar.</string>
     <string name="device_move_advanced">Gelişmiş</string>
     <string name="setup_device_link_next">Oturum açtıktan sonra diğer cihazlarınızdaki sohbetleri almak için bu cihazı bağlayabilirsiniz.</string>
     <string name="unlinked_account_remove_for">%1$s hesabını bu cihazdan kaldır</string>
@@ -177,4 +187,41 @@
     <string name="unlinked_remove_sign_in_detail">Bu cihazın bağlantısı kesildi. Bu profilin sohbetleri ve verileri bu cihazdan silinsin ve girdiğiniz anahtarla oturum açılsın mı? Diğer cihazlarınızdaki veriler korunur.</string>
     <string name="invite_decline_wait_for_sync">Sohbet eşitlendikten sonra Reddet seçeneğine yeniden dokunun.</string>
     <string name="invite_decline_check_delivery">Son grup değişikliği tüm aktarıcılara ulaşmadı. Yeniden denemeden önce bu sohbette teslimat uyarısı olup olmadığını kontrol edin.</string>
+    <string name="sign_in_claim">Kendini şöyle tanıtıyor: %1$s</string>
+    <string name="sign_in_mine">Benim, bağlama</string>
+    <string name="sign_in_mine_state">Sizin, bağlı değil</string>
+    <string name="sign_in_dont_recognize">Bunu tanımıyorum</string>
+    <string name="compromise_warning_explainer">Anahtarınız her yerde oturum açabilir ve değiştirilemez ya da iptal edilemez. White Noise bilinmeyen cihazları bağlı cihazlarınızın dışında tutar ama onları dışarıda bırakamaz.</string>
+    <string name="compromise_warning_steps_title">Ne yapmalı</string>
+    <string name="compromise_warning_step_remove">1. Tanımadığınız tüm cihazları kaldırın.</string>
+    <string name="compromise_warning_step_signer">2. İmzalama uygulaması kullanıyorsanız bağlı uygulamaları açın ve tanımadığınız uygulamaları kaldırın.</string>
+    <string name="compromise_warning_step_move">3. Yeni bir hesaba geçin. Kişilerinizin onu eklemesi gerekecek.</string>
+    <string name="compromise_alert_review">Cihazları incele</string>
+    <string name="compromise_warning_hide_failed">Uyarı gizlenemedi. Tekrar deneyin.</string>
+    <string name="sign_in_alert_review_banner">Bağlamadığınız bir cihaz hesabınızda oturum açtı. Sizin olup olmadığını kontrol edin.</string>
+    <string name="sign_in_alert_review_action">İncele</string>
+    <string name="sign_in_alert_badge_review">İncelenecek oturum açma</string>
+    <string name="sign_in_alert_badge_compromise">Güvenlik uyarısı</string>
+    <string name="sign_in_alert_review_body">Bağlamadığınız bir cihaz hesabınızda oturum açtı. Sizin olup olmadığını kontrol etmek için White Noise’u açın.</string>
+    <string name="sign_in_alert_review_public">İncelenecek oturum açma</string>
+    <string name="sign_in_alert_compromise_body">Ne olduğunu ve ne yapmanız gerektiğini görmek için White Noise’u açın.</string>
+    <string name="sign_in_alert_compromise_public">Güvenlik kontrolü gerekiyor</string>
+    <string name="device_detail_remove_stolen">Bu cihaz kaybolduysa veya çalındıysa, onu elinde tutan kişide anahtarınız hâlâ olabilir.</string>
+    <plurals name="sign_in_alert_review_title">
+        <item quantity="one">İncelenecek yeni oturum açma</item>
+        <item quantity="other">İncelenecek %d yeni oturum açma</item>
+    </plurals>
+    <string name="link_request_expired_attempt">Bir cihaz %1$s tarihinde bağlanmayı denedi.</string>
+    <string name="link_consent_requested_at">İstek zamanı: %1$s</string>
+    <string name="link_consent_access">Bağlanan cihaz sohbetlerinizi okuyabilir, sohbet geçmişinizi alabilir ve adınıza mesaj gönderebilir.</string>
+    <string name="link_consent_have_device">Yalnızca White Noise’u önünüzde duran bir cihazda kendiniz kurmaya başladıysanız devam edin.</string>
+    <string name="link_consent_scam">White Noise, bir cihaz bağlamanızı veya emojileri kontrol etmenizi istemek için sizinle asla iletişime geçmez. Biri sizden bunu istediyse bu bir dolandırıcılıktır.</string>
+    <string name="link_consent_on_call">Şu anda bir görüşmedesiniz. Dolandırıcılar cihaz bağlamanız için sizi telefonda yönlendirebilir.</string>
+    <string name="link_consent_with_me">Yeni cihaz yanımda</string>
+    <string name="link_consent_did_not_start">Bunu ben başlatmadım</string>
+    <string name="link_consent_someone_asked">Biri benden bunu yapmamı istedi</string>
+    <string name="link_consent_unlock">Emojileri karşılaştırmak için bu telefonun kilidini açın</string>
+    <string name="link_consent_lock_required">Cihaz bağlamak için bu telefonda ekran kilidi ayarlayın.</string>
+    <string name="link_consent_report_guidance">Bağlantı reddedildi. Bildirmek için oturum açma kaydını Cihazlar bölümünde açın.</string>
+    <string name="link_touch_blocked">Başka bir uygulama White Noise’u kapatıyor. Uygulamanın penceresini kapatıp tekrar deneyin.</string>
 </resources>

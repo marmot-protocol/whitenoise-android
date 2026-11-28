@@ -6,6 +6,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,7 +19,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -57,14 +57,17 @@ import dev.ipf.whitenoise.android.state.usesDirectTranscriptChrome
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.DisclosureChevron
+import dev.ipf.whitenoise.android.ui.common.FollowedPersonAvatarFrame
+import dev.ipf.whitenoise.android.ui.common.pressFeedbackInsideClip
+import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageDeleteDialog
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.ExpandLess
-import dev.ipf.whitenoise.android.ui.icons.filled.ExpandMore
-import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
+import dev.ipf.whitenoise.android.ui.emojiPlainText
+import dev.ipf.whitenoise.android.ui.theme.Radii
 
 private val FAILURE_STATUSES = setOf("failed", "error", "cancelled", "canceled")
 private val SUCCESS_STATUSES = setOf("completed", "complete", "finished", "success", "succeeded", "done")
+
 private const val AGENT_OPERATION_ROW_WIDTH_FRACTION = 0.95f
 
 internal fun shouldRenderDedicatedAgentOperationRow(
@@ -191,6 +194,7 @@ internal fun AgentOperationRow(
 ) {
     var expanded by rememberSaveable(messageId) { mutableStateOf(false) }
     val (senderModifier, senderClick) = rememberMeasuredControlClick { origin -> onSenderClick?.invoke(origin) }
+    val senderSpokenName = sender?.let { emojiPlainText(it.name) }
     Box(
         modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
         contentAlignment = if (mine) Alignment.CenterEnd else Alignment.CenterStart,
@@ -200,29 +204,31 @@ internal fun AgentOperationRow(
             verticalAlignment = Alignment.Bottom,
         ) {
             if (sender != null) {
-                Box(
-                    modifier =
-                        if (onSenderClick != null) {
-                            Modifier
-                                .then(senderModifier)
-                                .clip(CircleShape)
-                                .semantics { contentDescription = sender.name }
-                                .clickable(
-                                    onClickLabel = stringResource(R.string.chat_list_search_open_profile),
-                                    role = Role.Button,
-                                    onClick = senderClick,
-                                )
-                        } else {
-                            Modifier
-                        },
-                ) {
-                    Avatar(
-                        title = sender.name,
-                        seed = sender.seed,
-                        size = 32.dp,
-                        pictureUrl = sender.avatarUrl,
-                        pictureDomain = AvatarImageLoader.publicProfiles(),
-                    )
+                FollowedPersonAvatarFrame(sender.seed, 32.dp) {
+                    Box(
+                        modifier =
+                            if (onSenderClick != null) {
+                                Modifier
+                                    .then(senderModifier)
+                                    .clip(CircleShape)
+                                    .semantics { contentDescription = senderSpokenName ?: sender.name }
+                                    .clickable(
+                                        onClickLabel = stringResource(R.string.chat_list_search_open_profile),
+                                        role = Role.Button,
+                                        onClick = senderClick,
+                                    )
+                            } else {
+                                Modifier
+                            },
+                    ) {
+                        Avatar(
+                            title = sender.name,
+                            seed = sender.seed,
+                            size = 32.dp,
+                            pictureUrl = sender.avatarUrl,
+                            pictureDomain = AvatarImageLoader.publicProfiles(),
+                        )
+                    }
                 }
                 Spacer(Modifier.width(8.dp))
             }
@@ -266,13 +272,17 @@ internal fun AgentOperationChip(
             },
         )
     val messageActionsLabel = stringResource(R.string.message_actions)
+    val cardPress = remember { MutableInteractionSource() }
     Surface(
         modifier =
             modifier
                 .fillMaxWidth()
                 .then(
                     if (operation.canExpand || onRequestDelete != null) {
+                        // The highlight is drawn inside the Surface's clip, so the outline is not clipped twice.
                         Modifier.combinedClickable(
+                            interactionSource = cardPress,
+                            indication = null,
                             onClickLabel = toggleLabel.takeIf { operation.canExpand },
                             onLongClickLabel = messageActionsLabel.takeIf { onRequestDelete != null },
                             role = Role.Button,
@@ -283,13 +293,13 @@ internal fun AgentOperationChip(
                         Modifier
                     },
                 ),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(Radii.md),
         color = MaterialTheme.colorScheme.surfaceVariant,
         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            modifier = Modifier.pressFeedbackInsideClip(cardPress).padding(horizontal = 12.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             AgentOperationHeader(
@@ -312,6 +322,7 @@ internal fun AgentOperationChip(
     }
 }
 
+/** The operation title row: status glyph, title and the expand control for a long-running agent step. */
 @Composable
 private fun AgentOperationHeader(
     operation: AgentOperationPresentation,
@@ -340,11 +351,7 @@ private fun AgentOperationHeader(
         )
         AgentOperationStatus(operation = operation, color = statusColor)
         if (operation.canExpand) {
-            Icon(
-                imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp),
-            )
+            DisclosureChevron(expanded)
         }
     }
 }

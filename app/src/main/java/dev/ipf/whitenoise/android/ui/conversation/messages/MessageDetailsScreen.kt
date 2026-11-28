@@ -4,6 +4,7 @@ package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,19 +14,15 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -38,7 +35,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -60,11 +56,13 @@ import dev.ipf.whitenoise.android.state.shouldShowOriginalTimestamp
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.common.AdaptiveContent
+import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.Avatar
-import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
+import dev.ipf.whitenoise.android.ui.common.SectionHeader
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
 import dev.ipf.whitenoise.android.ui.common.currentDateTimeDisplay
-import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
-import dev.ipf.whitenoise.android.ui.common.nativePageBody
+import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
@@ -103,7 +101,7 @@ internal fun messageDetailsRecipients(
 
 /**
  * The prototype's Message Details page: the message on its own card, the facts table, reactions and the
- * delivery list, presented full screen with Back like the reader.
+ * delivery list, presented full screen under the shared top bar with a Back arrow, as a pushed detail page.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("LongParameterList")
@@ -139,36 +137,18 @@ internal fun MessageDetailsScreen(
         onDismissRequest = onDismissRequest,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
-        Scaffold(
+        WhiteNoiseScaffold(
             modifier = Modifier.fillMaxSize().testTag(MESSAGE_DETAILS_TAG),
             contentWindowInsets = WindowInsets.safeDrawing,
             containerColor = MaterialTheme.colorScheme.surface,
-            topBar = {
-                // App banners sit below this screen's bar rather than over it (#3312).
-                Column {
-                    TopAppBar(
-                        title = { Text(stringResource(R.string.message_details)) },
-                        navigationIcon = {
-                            IconButton(onClick = dismiss) {
-                                Icon(painterResource(R.drawable.ic_arrow_back), stringResource(R.string.back))
-                            }
-                        },
-                        colors =
-                            TopAppBarDefaults.topAppBarColors(
-                                containerColor = MaterialTheme.colorScheme.surface,
-                                scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                            ),
-                    )
-                    TopNoticeSlot()
-                }
-            },
+            topBar = { WhiteNoiseTopBar(title = stringResource(R.string.message_details), onBack = dismiss) },
         ) { padding ->
-            AdaptiveContent(Modifier.fillMaxSize().nativePageBody(padding).padding(padding)) {
+            AdaptiveContent(Modifier.fillMaxSize().padding(padding)) {
                 Column(
                     modifier =
                         Modifier
                             .fillMaxSize()
-                            .fadingVerticalScroll(rememberScrollState())
+                            .whiteNoiseVerticalScroll(rememberScrollState())
                             .padding(WhiteNoiseSpacing.CompactScreenMargin)
                             .testTag(MESSAGE_DETAILS_LIST_TAG),
                     verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),
@@ -183,6 +163,25 @@ internal fun MessageDetailsScreen(
                 }
             }
         }
+    }
+}
+
+/** A card with its section header above it, on the card's own content line. */
+@Composable
+private fun MessageCardGroup(
+    title: String,
+    content: @Composable () -> Unit,
+) {
+    Column {
+        SectionHeader(
+            text = title,
+            contentPadding =
+                PaddingValues(
+                    horizontal = WhiteNoiseSpacing.CompactScreenMargin,
+                    vertical = WhiteNoiseSpacing.Related,
+                ),
+        )
+        content()
     }
 }
 
@@ -244,7 +243,7 @@ private fun MessageFactsSection(
     val timeLabel =
         when (status) {
             MessageStatus.Sent -> R.string.message_info_sent_at
-            MessageStatus.Received, MessageStatus.Streaming -> R.string.message_info_received_at
+            MessageStatus.Received -> R.string.message_info_received_at
             MessageStatus.Pending, MessageStatus.Failed -> R.string.message_info_created_at
         }
     val primarySeconds = if (!mine && record.receivedAt > 0uL) record.receivedAt else record.recordedAt
@@ -298,7 +297,6 @@ private fun messageStatusLabels(): MessageStatusLabels =
         sent = stringResource(R.string.message_status_sent),
         received = stringResource(R.string.message_status_received),
         failed = stringResource(R.string.message_status_failed),
-        streaming = stringResource(R.string.message_status_streaming),
     )
 
 /** One label / value row of the facts table, with an optional copy action. */
@@ -335,42 +333,31 @@ private fun FactRow(
 /** Reactions with their counts. */
 @Composable
 private fun MessageReactionsSection(reactions: List<ReactionTally>) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        border = amoledOutlineBorder(),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-    ) {
-        Column {
-            Text(
-                text = stringResource(R.string.reactions),
-                modifier =
-                    Modifier.padding(
-                        start = WhiteNoiseSpacing.CompactScreenMargin,
-                        top = WhiteNoiseSpacing.CompactScreenMargin,
-                        end = WhiteNoiseSpacing.CompactScreenMargin,
-                        bottom = WhiteNoiseSpacing.Related,
-                    ),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            reactions.forEachIndexed { index, tally ->
-                if (index > 0) {
-                    HorizontalDivider(
-                        modifier = Modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
-                        color = MaterialTheme.colorScheme.outlineVariant,
+    MessageCardGroup(stringResource(R.string.reactions)) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            border = amoledOutlineBorder(),
+            shape = MaterialTheme.shapes.large,
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+        ) {
+            Column {
+                reactions.forEachIndexed { index, tally ->
+                    if (index > 0) {
+                        AppDivider(
+                            modifier = Modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
+                        )
+                    }
+                    ListItem(
+                        modifier = Modifier.testTag("message.details.reaction.$index"),
+                        headlineContent = {
+                            Text(pluralStringResource(R.plurals.people_reacted, tally.count, tally.count))
+                        },
+                        leadingContent = {
+                            EmojiLabel(tally.emoji, style = LocalTextStyle.current.copy(fontSize = ReactionGlyphSize))
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     )
                 }
-                ListItem(
-                    modifier = Modifier.testTag("message.details.reaction.$index"),
-                    headlineContent = {
-                        Text(pluralStringResource(R.plurals.people_reacted, tally.count, tally.count))
-                    },
-                    leadingContent = {
-                        EmojiLabel(tally.emoji, style = LocalTextStyle.current.copy(fontSize = ReactionGlyphSize))
-                    },
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                )
             }
         }
     }
@@ -387,35 +374,24 @@ private fun MessageReportsSection(
     canDismiss: Boolean,
     onDismiss: (ContentReportFfi) -> Unit,
 ) {
-    val locale = ConfigurationCompat.getLocales(LocalConfiguration.current)[0] ?: Locale.ROOT
-    val zone = ZoneId.systemDefault()
-    Surface(
-        modifier = Modifier.fillMaxWidth().testTag("message.details.reports"),
-        border = amoledOutlineBorder(),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-    ) {
-        Column {
-            Text(
-                text = stringResource(R.string.message_reports_section),
-                modifier =
-                    Modifier.padding(
-                        start = WhiteNoiseSpacing.CompactScreenMargin,
-                        top = WhiteNoiseSpacing.CompactScreenMargin,
-                        end = WhiteNoiseSpacing.CompactScreenMargin,
-                        bottom = WhiteNoiseSpacing.Related,
-                    ),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            reports.forEachIndexed { index, report ->
-                if (index > 0) {
-                    HorizontalDivider(
-                        modifier = Modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
-                        color = MaterialTheme.colorScheme.outlineVariant,
-                    )
+    MessageCardGroup(stringResource(R.string.message_reports_section)) {
+        val locale = ConfigurationCompat.getLocales(LocalConfiguration.current)[0] ?: Locale.ROOT
+        val zone = ZoneId.systemDefault()
+        Surface(
+            modifier = Modifier.fillMaxWidth().testTag("message.details.reports"),
+            border = amoledOutlineBorder(),
+            shape = MaterialTheme.shapes.large,
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+        ) {
+            Column {
+                reports.forEachIndexed { index, report ->
+                    if (index > 0) {
+                        AppDivider(
+                            modifier = Modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
+                        )
+                    }
+                    MessageReportRow(report, index, reporterName(report.reporter), locale, zone, canDismiss, onDismiss)
                 }
-                MessageReportRow(report, index, reporterName(report.reporter), locale, zone, canDismiss, onDismiss)
             }
         }
     }
@@ -493,6 +469,7 @@ private fun MessageDeliverySection(
                             size = DeliveryAvatarSize,
                             pictureUrl = senderAvatarUrl,
                             pictureDomain = AvatarImageLoader.publicProfiles(),
+                            followedAccount = senderSeed,
                         )
                     },
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -509,6 +486,7 @@ private fun MessageDeliverySection(
                                 size = DeliveryAvatarSize,
                                 pictureUrl = recipient.avatarUrl,
                                 pictureDomain = AvatarImageLoader.publicProfiles(),
+                                followedAccount = recipient.seed,
                             )
                         },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),

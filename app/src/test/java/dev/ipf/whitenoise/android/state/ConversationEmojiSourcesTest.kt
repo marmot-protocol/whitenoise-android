@@ -97,6 +97,8 @@ class ConversationEmojiSourcesTest {
         val reference = MediaDownloadIntegrationFixture.reference(0).copy(locators = listOf(locator))
         val tokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList(), blankLinesBefore = ByteArray(0))
         return TimelineMessageRecordFfi(
+            agentItem = null,
+            agentItemFirstEventMissing = false,
             clientToken = null,
             messageIdHex = messageId,
             sourceMessageIdHex = messageId,
@@ -113,7 +115,7 @@ class ConversationEmojiSourcesTest {
             replyPreview = null,
             mediaJson = null,
             media = MessageAttachments.acceptedOutcomes(listOf(reference)),
-            agentTextStreamJson = null,
+            thread = null,
             poll = null,
             groupSystem = null,
             hasReports = false,

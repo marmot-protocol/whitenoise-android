@@ -333,7 +333,6 @@ class ConversationNotificationChannelsTest {
                 NotificationChannelSpec.MENTIONS,
                 NotificationChannelSpec.REACTIONS,
                 NotificationChannelSpec.INVITES,
-                NotificationChannelSpec.AGENT_ACTIVITY,
             ),
             ConversationNotificationChannels.relevantParents(isDm = false),
         )
@@ -343,7 +342,6 @@ class ConversationNotificationChannelsTest {
                 NotificationChannelSpec.MENTIONS,
                 NotificationChannelSpec.REACTIONS,
                 NotificationChannelSpec.INVITES,
-                NotificationChannelSpec.AGENT_ACTIVITY,
             ),
             ConversationNotificationChannels.relevantParents(isDm = true),
         )
@@ -365,7 +363,6 @@ class ConversationNotificationChannelsTest {
         assertNull(mentionChannel)
         assertNull(conversationChannel(NotificationChannelSpec.REACTIONS.id, shortcut))
         assertNull(conversationChannel(NotificationChannelSpec.INVITES.id, shortcut))
-        assertNull(conversationChannel(NotificationChannelSpec.AGENT_ACTIVITY.id, shortcut))
         // A group conversation never receives on the DM parent, so no DM child.
         assertNull(conversationChannel(ConversationNotificationChannels.primaryMessageParent(isDm = true).id, shortcut))
     }
@@ -386,7 +383,6 @@ class ConversationNotificationChannelsTest {
         assertNull(conversationChannel(NotificationChannelSpec.MENTIONS.id, shortcut))
         assertNull(conversationChannel(NotificationChannelSpec.REACTIONS.id, shortcut))
         assertNull(conversationChannel(NotificationChannelSpec.INVITES.id, shortcut))
-        assertNull(conversationChannel(NotificationChannelSpec.AGENT_ACTIVITY.id, shortcut))
         assertNull(conversationChannel(NotificationChannelSpec.GROUP_MESSAGES.id, shortcut))
     }
 

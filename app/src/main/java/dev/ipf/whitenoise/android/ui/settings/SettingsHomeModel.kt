@@ -257,6 +257,7 @@ internal fun settingsDetailParent(detail: SettingsDetail): SettingsDetail? =
         -> SettingsDetail.Chats
         SettingsDetail.EmojiSets -> SettingsDetail.CustomEmoji
         SettingsDetail.Language,
+        SettingsDetail.VoiceNotes,
         SettingsDetail.TextToSpeech,
         SettingsDetail.Translation,
         SettingsDetail.Dictation,
@@ -268,6 +269,7 @@ internal fun settingsDetailParent(detail: SettingsDetail): SettingsDetail? =
         SettingsDetail.BlockedUsers,
         -> SettingsDetail.DevicePrivacy
         SettingsDetail.Help,
+        SettingsDetail.LearnWhiteNoise,
         SettingsDetail.Support,
         SettingsDetail.Donate,
         SettingsDetail.Developer,
@@ -290,5 +292,7 @@ internal fun settingsDetailParent(detail: SettingsDetail): SettingsDetail? =
         SettingsDetail.Data,
         SettingsDetail.AiAgents,
         -> null
-        SettingsDetail.ManageStorage -> SettingsDetail.Data
+        SettingsDetail.HistoryBackups,
+        SettingsDetail.ManageStorage,
+        -> SettingsDetail.Data
     }

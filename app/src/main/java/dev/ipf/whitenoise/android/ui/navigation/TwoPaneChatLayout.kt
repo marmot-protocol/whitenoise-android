@@ -17,45 +17,33 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.LocalWindowFolds
 import dev.ipf.whitenoise.android.ui.common.LocalWindowLayout
 import dev.ipf.whitenoise.android.ui.common.WindowHeightClass
-
-/** Width of the chat list when it sits beside the conversation. */
-internal val TwoPaneListWidth = 360.dp
-
-/**
- * Share of the width after the divider that the chat list takes on short, wide windows such as a
- * phone held horizontally (#3866), up to [ShortWindowListMaxWidth]. From the 840dp expanded
- * breakpoint this is always wider than [TwoPaneListWidth].
- */
-internal const val SHORT_WINDOW_LIST_FRACTION = 0.5f
-
-/**
- * Widest the chat list grows on short windows. Phones held horizontally stay below it and keep the
- * even split; wider short windows, such as a tablet in split screen or a desktop window, give the
- * extra width to the conversation instead of the list.
- */
-internal val ShortWindowListMaxWidth = 480.dp
+import dev.ipf.whitenoise.android.ui.keyboard.chatPaneKeyInput
+import dev.ipf.whitenoise.android.ui.keyboard.rememberChatPaneKeyOwner
+import kotlin.math.abs
 
 internal const val TWO_PANE_LIST_TAG = "two_pane_list"
 internal const val CONVERSATION_PANE_PLACEHOLDER_TAG = "conversation_pane_placeholder"
 
 /**
- * Places the chat list beside the conversation on expanded-width windows.
+ * Places the chat list beside the conversation when [twoPane] is set; [chatPaneSplit] decides
+ * the proportions and keeps both panes off a half-open hinge.
  *
  * The conversation pane keeps the same composition position whether or not the list is shown, so
- * crossing the two-pane width keeps the open conversation, its scroll position and its draft.
- * Compact-height windows split the width evenly, up to [ShortWindowListMaxWidth], instead of fixing
- * the list at [TwoPaneListWidth], which would leave a phone held horizontally with a narrow list
- * beside a very wide conversation.
+ * crossing the two-pane width or folding keeps the open conversation, its scroll position and its
+ * draft.
  *
  * Side by side, each pane touches only one outer edge, so a camera cutout or navigation bar on the
  * other edge must not pad it: the list drops the end-side inset and the conversation the start-side.
+ *
+ * Side by side, the pane holding focus (or pressed last) owns the hardware keyboard's in-chat search (#4005).
  */
 @Composable
 internal fun TwoPaneChatFrame(
@@ -64,6 +52,9 @@ internal fun TwoPaneChatFrame(
     conversationPane: @Composable () -> Unit,
 ) {
     val shortWindow = LocalWindowLayout.current.heightClass == WindowHeightClass.Compact
+    val folds = LocalWindowFolds.current.upright
+    val windowWidthPx = LocalWindowInfo.current.containerSize.width
+    val keyOwner = rememberChatPaneKeyOwner(twoPane)
     Layout(
         modifier = Modifier.fillMaxSize(),
         content = {
@@ -71,6 +62,7 @@ internal fun TwoPaneChatFrame(
                 Box(
                     Modifier
                         .consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.End))
+                        .chatPaneKeyInput(keyOwner, list = true)
                         .testTag(TWO_PANE_LIST_TAG),
                 ) {
                     listPane()
@@ -78,11 +70,13 @@ internal fun TwoPaneChatFrame(
                 VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             }
             Box(
-                if (twoPane) {
-                    Modifier.consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.Start))
-                } else {
-                    Modifier
-                },
+                Modifier.chatPaneKeyInput(keyOwner, list = false).then(
+                    if (twoPane) {
+                        Modifier.consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.Start))
+                    } else {
+                        Modifier
+                    },
+                ),
             ) {
                 conversationPane()
             }
@@ -96,20 +90,21 @@ internal fun TwoPaneChatFrame(
         }
         val (list, divider, conversation) = measurables
         val dividerPlaceable = divider.measure(Constraints(minHeight = height, maxHeight = height))
-        val space = (width - dividerPlaceable.width).coerceAtLeast(0)
-        // Truncating gives an odd leftover pixel to the conversation.
-        val listWidth =
-            if (shortWindow) {
-                minOf((space * SHORT_WINDOW_LIST_FRACTION).toInt(), ShortWindowListMaxWidth.roundToPx())
-            } else {
-                TwoPaneListWidth.roundToPx()
-            }.coerceAtMost(space)
-        val listPlaceable = list.measure(Constraints.fixed(listWidth, height))
-        val conversationPlaceable = conversation.measure(Constraints.fixed(space - listWidth, height))
+        val split =
+            chatPaneSplit(
+                width = width,
+                dividerWidth = dividerPlaceable.width,
+                shortWindow = shortWindow,
+                // Fold bounds are in window coordinates, so they only apply while the frame spans the window.
+                folds = folds.takeIf { abs(width - windowWidthPx) <= 1 }.orEmpty(),
+                layoutDirection = layoutDirection,
+            )
+        val listPlaceable = list.measure(Constraints.fixed(split.listWidth, height))
+        val conversationPlaceable = conversation.measure(Constraints.fixed(width - split.conversationStart, height))
         layout(width, height) {
             listPlaceable.placeRelative(0, 0)
-            dividerPlaceable.placeRelative(listWidth, 0)
-            conversationPlaceable.placeRelative(listWidth + dividerPlaceable.width, 0)
+            dividerPlaceable.placeRelative(split.listWidth, 0)
+            conversationPlaceable.placeRelative(split.conversationStart, 0)
         }
     }
 }

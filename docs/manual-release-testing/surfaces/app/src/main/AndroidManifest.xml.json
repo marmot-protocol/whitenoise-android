@@ -382,6 +382,14 @@
           "NTF-014",
           "TTS-001"
         ]
+      },
+      {
+        "surface": "permission:android.permission.HIDE_OVERLAY_WINDOWS",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "android.permission.HIDE_OVERLAY_WINDOWS",
+        "test_ids": [
+          "SET-079"
+        ]
       }
     ],
     "source_coverage": [
@@ -391,6 +399,14 @@
         "anchor": "android:memtagMode",
         "test_ids": [
           "SYS-013"
+        ]
+      },
+      {
+        "surface": "Firebase Messaging auto-init stays off until native push needs a token",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "firebase_messaging_auto_init_enabled",
+        "test_ids": [
+          "NTF-060"
         ]
       }
     ]

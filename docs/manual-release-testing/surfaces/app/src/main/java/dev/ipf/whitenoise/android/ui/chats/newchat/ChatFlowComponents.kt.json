@@ -4,25 +4,9 @@
   "categories": {
     "composable_surfaces": [
       {
-        "surface": "Custom emoji authored labels: ChatFlowComponents",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ChatFlowComponents.kt",
-        "anchor": "EmojiLabel(",
-        "test_ids": [
-          "MSG-037"
-        ]
-      },
-      {
         "surface": "ComingSoonBadge",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ChatFlowComponents.kt",
         "anchor": "fun ComingSoonBadge(",
-        "test_ids": [
-          "NCH-001"
-        ]
-      },
-      {
-        "surface": "ContactRow",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ChatFlowComponents.kt",
-        "anchor": "fun ContactRow(",
         "test_ids": [
           "NCH-001"
         ]
@@ -77,14 +61,6 @@
         ]
       },
       {
-        "surface": "SectionHeader",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ChatFlowComponents.kt",
-        "anchor": "fun SectionHeader(",
-        "test_ids": [
-          "NCH-001"
-        ]
-      },
-      {
         "surface": "SelectionIndicator",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ChatFlowComponents.kt",
         "anchor": "fun SelectionIndicator(",
@@ -98,15 +74,6 @@
         "anchor": "fun SettingsActionRow(",
         "test_ids": [
           "NCH-001"
-        ]
-      },
-      {
-        "surface": "ContactRow public-key copy label",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ChatFlowComponents.kt",
-        "anchor": "PublicKeyCopyText(",
-        "test_ids": [
-          "NCH-001",
-          "ACC-002"
         ]
       }
     ],
@@ -152,9 +119,9 @@
         ]
       },
       {
-        "surface": "string:user_search_you_follow",
+        "surface": "string:clear",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ChatFlowComponents.kt",
-        "anchor": "R.string.user_search_you_follow",
+        "anchor": "R.string.clear",
         "test_ids": [
           "NCH-001"
         ]

@@ -36,7 +36,7 @@ import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.LocalCustomEmoji
 import dev.ipf.whitenoise.android.ui.LocalReceivedEmoji
 import dev.ipf.whitenoise.android.ui.ReceivedEmoji
-import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
+import dev.ipf.whitenoise.android.ui.chats.newchat.PersonRow
 import dev.ipf.whitenoise.android.ui.conversation.PollCard
 import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionPillRow
 import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
@@ -158,7 +158,7 @@ class EmojiLabelScreenshotTest {
                         Column(Modifier.padding(16.dp)) {
                             EmojiLabel("Team :party: :wn:", style = MaterialTheme.typography.headlineSmall)
                             EmojiLabel("About :marmot: · :remote: · :unknown: · `:party:`")
-                            ContactRow("Ada :party:", "npub1fixture", "ada", null)
+                            PersonRow("Ada :party:", "npub1fixture", "ada", null)
                             ReplyPreviewCard(
                                 senderTitle = "Ada :party: :remote:",
                                 isOwn = false,

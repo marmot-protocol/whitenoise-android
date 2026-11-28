@@ -4,15 +4,13 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -26,11 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.StickerFfi
 import dev.ipf.marmotkit.StickerPackFfi
@@ -40,11 +34,11 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.rethrowIfCancellation
 import dev.ipf.whitenoise.android.state.stickerFailureDetail
+import dev.ipf.whitenoise.android.ui.common.SectionHeader
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
-import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 
 private const val SHEET_HEIGHT_SHARE = 0.88f
 
@@ -100,7 +94,6 @@ internal fun StickerSheet(
         onDismissRequest = close,
         sheetState = sheet,
         interactionEnabled = terminal.acceptsInput,
-        containerColor = amoledSheetContainerColor(),
     ) {
         Column(Modifier.fillMaxWidth().heightIn(max = maxHeight).testTag("sticker.sheet")) {
             when (val current = page) {
@@ -145,44 +138,6 @@ internal fun StickerSheet(
     }
 }
 
-/** The sheet's title bar with optional back, a page [action] and close. */
-@Suppress("FunctionNaming")
-@Composable
-internal fun StickerSheetTopBar(
-    title: String,
-    onBack: (() -> Unit)?,
-    onClose: () -> Unit,
-    action: @Composable () -> Unit = {},
-) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(
-                start = if (onBack == null) WhiteNoiseSpacing.Section else WhiteNoiseSpacing.Related,
-                end = WhiteNoiseSpacing.Related,
-                bottom = WhiteNoiseSpacing.Related,
-            ),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (onBack != null) {
-            IconButton(onClick = onBack) {
-                Icon(painterResource(R.drawable.ic_arrow_back), stringResource(R.string.back))
-            }
-        }
-        Text(
-            title,
-            style = MaterialTheme.typography.titleLarge,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f).semantics { heading() },
-        )
-        action()
-        IconButton(onClick = onClose) {
-            Icon(painterResource(R.drawable.ic_close), stringResource(R.string.close))
-        }
-    }
-}
-
 /** The pack's display title, or a generic label when it has none. */
 @Composable
 internal fun stickerPackTitle(pack: StickerPackFfi): String {
@@ -194,12 +149,7 @@ internal fun stickerPackTitle(pack: StickerPackFfi): String {
 @Suppress("FunctionNaming")
 @Composable
 internal fun StickerSectionTitle(text: String) {
-    Text(
-        text,
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(top = WhiteNoiseSpacing.Related).semantics { heading() },
-    )
+    SectionHeader(text, contentPadding = PaddingValues(top = WhiteNoiseSpacing.Related))
 }
 
 /** Secondary explanatory text inside a sticker page. */

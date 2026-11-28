@@ -49,6 +49,17 @@
           "SET-036"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Translation picker flag rendered beside the localized name",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationLanguageSheet.kt",
+        "anchor": "flag = translationLanguageFlag(code)",
+        "test_ids": [
+          "CON-045",
+          "SET-036"
+        ]
+      }
     ]
   }
 }

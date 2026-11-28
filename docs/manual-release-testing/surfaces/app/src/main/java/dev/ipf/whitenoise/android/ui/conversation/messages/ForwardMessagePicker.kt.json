@@ -92,9 +92,9 @@
         ]
       },
       {
-        "surface": "Forward picker close: R.string.close",
+        "surface": "Forward search close: R.string.conversation_search_close",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
-        "anchor": "R.string.close",
+        "anchor": "R.string.conversation_search_close",
         "test_ids": [
           "MSG-010",
           "PRO-008"
@@ -139,6 +139,23 @@
         "surface": "Forward selected review clears search without changing recipients",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
         "anchor": "onReviewSelected = { query = \"\" }",
+        "test_ids": [
+          "MSG-010"
+        ]
+      },
+      {
+        "surface": "Forward picker Close on the shared top bar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
+        "anchor": "navigation = WhiteNoiseTopBarNavigation.Close",
+        "test_ids": [
+          "MSG-010",
+          "PRO-008"
+        ]
+      },
+      {
+        "surface": "Forward sending profile beside Close",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
+        "anchor": "navigationAccessory = {",
         "test_ids": [
           "MSG-010"
         ]
@@ -190,6 +207,22 @@
           "SCR-002",
           "SCR-003",
           "SCR-004"
+        ]
+      },
+      {
+        "surface": "Forward list position drives the bar tint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
+        "anchor": ".trackWhiteNoiseHeader(listState)",
+        "test_ids": [
+          "MSG-010"
+        ]
+      },
+      {
+        "surface": "Forward: shared empty search title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
+        "anchor": "R.string.no_matches",
+        "test_ids": [
+          "FLD-001"
         ]
       }
     ]

@@ -1,8 +1,21 @@
 package dev.ipf.whitenoise.android.state
 
+import android.app.NotificationManager
 import androidx.compose.material3.SnackbarResult
+import androidx.core.content.pm.ShortcutInfoCompat
+import androidx.core.content.pm.ShortcutManagerCompat
+import androidx.core.graphics.drawable.IconCompat
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.notifications.ConversationNotificationChannels
+import dev.ipf.whitenoise.android.notifications.ConversationVibrationPattern
+import dev.ipf.whitenoise.android.notifications.FailingDeleteNotificationManager
+import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
+import dev.ipf.whitenoise.android.notifications.NotificationChannels
+import dev.ipf.whitenoise.android.notifications.PinnedConversationTokens
+import dev.ipf.whitenoise.android.notifications.conversationShortcutId
+import dev.ipf.whitenoise.android.notifications.setPinnedConversationTestKey
+import dev.ipf.whitenoise.android.share.buildShareShortcutIntent
 import dev.ipf.whitenoise.android.ui.chats.PendingLocalChatDelete
 import dev.ipf.whitenoise.android.ui.common.finishLocalDeleteSnackbar
 import kotlinx.coroutines.CancellationException
@@ -18,12 +31,14 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.util.concurrent.atomic.AtomicBoolean
+import javax.crypto.spec.SecretKeySpec
 
 /** Exercises the actual controller, platform journal and privacy-safe notice boundary. */
 @RunWith(RobolectricTestRunner::class)
@@ -145,10 +160,11 @@ class LocalGroupDeleteControllerTest {
 
     @Test
     fun exhaustedNativeDeleteRestoresRowAndReportsItsPhase() =
-        runTest {
+        runLocalGroupDeleteTest {
             val fixture = fixture("deleteGroupLocal")
             assertFalse(fixture.controller.deleteGroupLocalFromChatList(GROUP))
-            flushChatRows()
+            // Publish the debounced row on the fixture's Main dispatcher.
+            testScheduler.advanceTimeBy(20)
             assertEquals(3, fixture.calls.count { it == "deleteGroupLocal" })
             assertEquals(1, fixture.calls.count { it == "catchUpAccounts" })
             assertTrue(fixture.controller.items.any { it.id == GROUP })
@@ -194,7 +210,7 @@ class LocalGroupDeleteControllerTest {
 
     @Test
     fun successfulRetryRetiresItsWarningAndKeepsTheSafePresenceCheck() =
-        runTest {
+        runLocalGroupDeleteTest {
             val fixture = fixture("deleteGroupLocal")
             assertFalse(fixture.controller.deleteGroupLocalFromChatList(GROUP))
             assertNotNull(
@@ -420,6 +436,217 @@ class LocalGroupDeleteControllerTest {
                 flushChatRows()
                 assertTrue(fixture.controller.items.none { it.id == GROUP })
             } finally {
+                Dispatchers.resetMain()
+            }
+        }
+
+    /** Failing before channel redaction leaves durable local-delete cleanup pending until retry deletes the channel. */
+    @Test
+    @Config(sdk = [36], shadows = [FailingDeleteNotificationManager::class])
+    fun channelRedactionFailureKeepsLocalDeleteCleanupPendingUntilRetrySucceeds() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            FailingDeleteNotificationManager.reset()
+            try {
+                val fixture = fixture()
+                val context = fixture.state.appContext
+                NotificationChannels.ensureChannels(context)
+                val shortcutId = checkNotNull(conversationShortcutId(ACCOUNT, GROUP))
+                val channelId =
+                    checkNotNull(
+                        ConversationNotificationChannels.ensureConversationChannel(
+                            context,
+                            NotificationChannelSpec.GROUP_MESSAGES.id,
+                            shortcutId,
+                            "Secret Deleted Group",
+                            accountRef = ACCOUNT,
+                        ),
+                    )
+                val manager = checkNotNull(context.getSystemService(NotificationManager::class.java))
+                FailingDeleteNotificationManager.failingCreateChannelIds = setOf(channelId)
+                var deferred = 0
+                assertTrue(
+                    fixture.controller.deleteGroupLocalFromChatList(
+                        GROUP,
+                        observer = LocalChatDeleteObserver(onCleanupDeferred = { deferred++ }),
+                    ),
+                )
+                assertEquals(1, deferred)
+                assertTrue(fixture.state.localGroupDeleteCleanupJournal.hasPending())
+                assertNotNull(manager.getNotificationChannel(channelId))
+                FailingDeleteNotificationManager.reset()
+                fixture.state.reconcilePendingLocalGroupDeleteCleanups()
+                assertFalse(fixture.state.localGroupDeleteCleanupJournal.hasPending())
+                assertNull(manager.getNotificationChannel(channelId))
+            } finally {
+                FailingDeleteNotificationManager.reset()
+                Dispatchers.resetMain()
+            }
+        }
+
+    /**
+     * A live local delete stages its journal before native commit. Failed channel redaction keeps the journal
+     * and a generic shortcut until replay removes the channel.
+     */
+    @Test
+    @Config(sdk = [36], shadows = [FailingDeleteNotificationManager::class])
+    fun liveLocalDeleteStagesBeforeNativeCommitAndRetriesChannelFailure() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            FailingDeleteNotificationManager.reset()
+            try {
+                lateinit var state: WhiteNoiseAppState
+                val fixture =
+                    localGroupDeleteFixture(
+                        controllers,
+                        beforeDelete = { assertNotNull(state.localGroupDeleteCleanupJournal.find(ACCOUNT, GROUP)) },
+                    ).also { state = it.state }
+                val context = fixture.state.appContext
+                NotificationChannels.ensureChannels(context)
+                val shortcutId = checkNotNull(conversationShortcutId(ACCOUNT, GROUP))
+                val channelId =
+                    checkNotNull(
+                        ConversationNotificationChannels.ensureConversationChannel(
+                            context,
+                            NotificationChannelSpec.GROUP_MESSAGES.id,
+                            shortcutId,
+                            "Secret Left Group",
+                            accountRef = ACCOUNT,
+                        ),
+                    )
+                ShortcutManagerCompat.pushDynamicShortcut(
+                    context,
+                    ShortcutInfoCompat
+                        .Builder(context, shortcutId)
+                        .setShortLabel("Secret Left Group")
+                        .setIntent(buildShareShortcutIntent(context))
+                        .setIcon(IconCompat.createWithResource(context, R.drawable.ic_stat_whitenoise))
+                        .setLongLived(true)
+                        .build(),
+                )
+                val manager = checkNotNull(context.getSystemService(NotificationManager::class.java))
+                FailingDeleteNotificationManager.failingCreateChannelIds = setOf(channelId)
+
+                fixture.state.deleteGroupLocalWithClientCleanup(ACCOUNT, GROUP)
+
+                assertFalse(fixture.present.get())
+                assertNotNull(fixture.state.localGroupDeleteCleanupJournal.find(ACCOUNT, GROUP))
+                assertNotNull(manager.getNotificationChannel(channelId))
+                val kept = ShortcutManagerCompat.getDynamicShortcuts(context).single { it.id == shortcutId }
+                assertEquals(context.getString(R.string.app_name), kept.shortLabel.toString())
+
+                FailingDeleteNotificationManager.reset()
+                fixture.state.reconcilePendingLocalGroupDeleteCleanups()
+                assertFalse(fixture.state.localGroupDeleteCleanupJournal.hasPending())
+                assertNull(manager.getNotificationChannel(channelId))
+            } finally {
+                FailingDeleteNotificationManager.reset()
+                Dispatchers.resetMain()
+            }
+        }
+
+    /** A queued vibration-pattern write cannot recreate a `:conv:` channel after local conversation deletion wins. */
+    @Test
+    fun staleVibrationPatternWriteAfterLocalDeleteDoesNotRecreateConversationChannel() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            try {
+                val fixture = fixture()
+                val context = fixture.state.appContext
+                NotificationChannels.ensureChannels(context)
+                val manager = checkNotNull(context.getSystemService(NotificationManager::class.java))
+                val beforeJobs =
+                    fixture.state.mutationsScope.coroutineContext[Job]
+                        ?.children
+                        ?.toSet()
+                        .orEmpty()
+                fixture.state.conversationVibrationChannelMutex.lock()
+                val vibrationJobs: List<Job>
+                try {
+                    fixture.state.setConversationVibrationPattern(
+                        GROUP,
+                        isDm = false,
+                        conversationTitle = "Deleted Chat",
+                        pattern = ConversationVibrationPattern.DOUBLE,
+                    )
+                    vibrationJobs =
+                        fixture.state.mutationsScope.coroutineContext[Job]
+                            ?.children
+                            ?.filterNot { it in beforeJobs }
+                            ?.toList()
+                            .orEmpty()
+                    assertTrue(fixture.controller.deleteGroupLocalFromChatList(GROUP))
+                } finally {
+                    fixture.state.conversationVibrationChannelMutex.unlock()
+                }
+                assertTrue(vibrationJobs.isNotEmpty())
+                vibrationJobs.forEach { it.join() }
+                assertEquals(
+                    ConversationVibrationPattern.SYSTEM_DEFAULT,
+                    fixture.state.conversationVibrationPreferences.pattern(ACCOUNT, GROUP),
+                )
+                assertTrue(manager.notificationChannels.none { it.id.contains(":conv:") })
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
+
+    /**
+     * If channel cleanup fails during `removePinnedConversationShortcuts`, launcher tokens for the
+     * removed group are still durably revoked and visible shortcuts are relabeled while the call throws
+     * so the delete journal retains its retry.
+     */
+    @Test
+    @Config(sdk = [36], shadows = [FailingDeleteNotificationManager::class])
+    fun removePinnedConversationShortcutsRevokesTokensWhenChannelCleanupFails() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            FailingDeleteNotificationManager.reset()
+            setPinnedConversationTestKey(SecretKeySpec(ByteArray(32) { it.toByte() }, "AES"))
+            try {
+                val fixture = fixture()
+                val context = fixture.state.appContext
+                NotificationChannels.ensureChannels(context)
+                val tokens = PinnedConversationTokens.create(context)
+                val capability = requireNotNull(tokens.issue(ACCOUNT, GROUP))
+                assertTrue(tokens.isValid(capability))
+                val shortcutId = checkNotNull(conversationShortcutId(ACCOUNT, GROUP))
+                val channelId =
+                    checkNotNull(
+                        ConversationNotificationChannels.ensureConversationChannel(
+                            context,
+                            NotificationChannelSpec.GROUP_MESSAGES.id,
+                            shortcutId,
+                            "Secret Journal Retry Chat",
+                            accountRef = ACCOUNT,
+                        ),
+                    )
+                ShortcutManagerCompat.pushDynamicShortcut(
+                    context,
+                    ShortcutInfoCompat
+                        .Builder(context, shortcutId)
+                        .setShortLabel("Secret Journal Retry Chat")
+                        .setIntent(buildShareShortcutIntent(context))
+                        .setIcon(IconCompat.createWithResource(context, R.drawable.ic_stat_whitenoise))
+                        .setLongLived(true)
+                        .build(),
+                )
+                val manager = checkNotNull(context.getSystemService(NotificationManager::class.java))
+                FailingDeleteNotificationManager.failingCreateChannelIds = setOf(channelId)
+
+                val result = runCatching { fixture.state.removePinnedConversationShortcuts(ACCOUNT, GROUP) }
+
+                assertTrue(result.isFailure)
+                assertFalse(
+                    "Launcher token must be revoked even when channel cleanup fails",
+                    tokens.isValid(capability),
+                )
+                assertNotNull(manager.getNotificationChannel(channelId))
+                val kept = ShortcutManagerCompat.getDynamicShortcuts(context).single { it.id == shortcutId }
+                assertEquals(context.getString(R.string.app_name), kept.shortLabel.toString())
+            } finally {
+                setPinnedConversationTestKey(null)
+                FailingDeleteNotificationManager.reset()
                 Dispatchers.resetMain()
             }
         }

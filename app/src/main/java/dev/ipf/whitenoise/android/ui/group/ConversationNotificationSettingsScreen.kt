@@ -45,6 +45,7 @@ import dev.ipf.whitenoise.android.notifications.openNotificationChannelSettings
 import dev.ipf.whitenoise.android.notifications.openPreparedConversationNotificationSettings
 import dev.ipf.whitenoise.android.state.ChatNotifyMode
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.captureConversationChannelWriteGuard
 import dev.ipf.whitenoise.android.state.conversationAlertPreferences
 import dev.ipf.whitenoise.android.ui.common.currentDateTimeDisplay
 import dev.ipf.whitenoise.android.ui.settings.SettingsExplainer
@@ -220,6 +221,12 @@ private fun NotificationCategoriesSection(
             if (descriptor == null || accountRef == null) {
                 emptyList()
             } else {
+                val writeAllowed =
+                    appState.captureConversationChannelWriteGuard(
+                        accountRef,
+                        groupIdHex,
+                        descriptor.shortcutId,
+                    )
                 val resolved = withContext(Dispatchers.Default) { routing.settings(descriptor) }
                 val requestedParents =
                     resolved
@@ -237,6 +244,7 @@ private fun NotificationCategoriesSection(
                                 conversationAvatarUrl = conversationAvatarUrl,
                                 primaryVibrationPattern = descriptor.primaryVibrationPattern,
                                 requestedParents = requestedParents,
+                                isWriteAllowed = writeAllowed,
                             ),
                     )
                 resolved.map { setting -> setting.withPreparation(preparation) }

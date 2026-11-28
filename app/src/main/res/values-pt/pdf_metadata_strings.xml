@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="composer_pdf_pages">
+        <item quantity="one">PDF · %d página</item>
+        <item quantity="other">PDF · %d páginas</item>
+    </plurals>
+    <string name="composer_pdf_metadata_options">Opções de metadados do PDF</string>
+    <string name="composer_pdf_keep_metadata">Manter metadados</string>
+    <string name="composer_pdf_remove_metadata">Remover metadados</string>
+    <string name="composer_pdf_metadata_options_body">Os destinatários podem ver o autor, as datas e outras propriedades na cópia original de %1$s.</string>
+    <string name="composer_pdf_metadata_removed">Metadados removidos</string>
+    <string name="composer_pdf_metadata_removed_on_send">Metadados removidos ao enviar</string>
+    <string name="composer_pdf_metadata_signed">Assinado: mantém metadados</string>
+    <string name="composer_pdf_metadata_encrypted">Protegido: mantém metadados</string>
+    <string name="composer_pdf_metadata_unsupported">Metadados não removíveis</string>
+    <string name="composer_pdf_metadata_sending_as_is">Enviado com metadados</string>
+    <string name="composer_pdf_metadata_dialog_title">Enviar com metadados?</string>
+    <string name="composer_pdf_metadata_dialog_signed">%1$s está assinado. Remover os metadados invalidaria a assinatura, por isso só pode ser enviado como está.</string>
+    <string name="composer_pdf_metadata_dialog_encrypted">%1$s está protegido por senha, por isso os metadados não podem ser removidos.</string>
+    <string name="composer_pdf_metadata_dialog_unsupported">O White Noise não consegue remover com segurança os metadados de %1$s.</string>
+    <plurals name="composer_pdf_metadata_dialog_several">
+        <item quantity="one">Não é possível remover os metadados de %1$d PDF: %2$s.</item>
+        <item quantity="other">Não é possível remover os metadados de %1$d PDFs: %2$s.</item>
+    </plurals>
+    <string name="composer_pdf_metadata_dialog_consequence">Todos neste chat poderão ver dados como o autor, os apps que o criaram e quando foi criado ou alterado.</string>
+    <string name="composer_pdf_metadata_send_as_is">Enviar como está</string>
+    <string name="media_file_pdf_metadata_kept">Este PDF não foi enviado porque não foi possível remover os metadados. Envie-o pela caixa de mensagem para escolher se quer enviá-lo como está.</string>
+</resources>

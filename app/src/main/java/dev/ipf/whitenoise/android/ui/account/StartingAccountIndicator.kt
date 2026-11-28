@@ -22,7 +22,11 @@ import androidx.core.text.BidiFormatter
 import androidx.core.text.TextDirectionHeuristicsCompat
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
+import dev.ipf.whitenoise.android.ui.common.isCanonicalNpub
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSizes
 
 /** Identity of the captured creation owner, separate from recipients and the proposed group. */
 internal data class StartingAccount(
@@ -30,6 +34,7 @@ internal data class StartingAccount(
     val name: String,
     val pictureUrl: String?,
     val identifier: String,
+    val npub: String = "",
 )
 
 /** Read the existing presentation only while the captured owner still matches the active runtime. */
@@ -48,6 +53,7 @@ internal fun startingAccount(
             appState.accountDisplayNameCached(it.accountIdHex),
             appState.avatarUrl(it.accountIdHex),
             appState.shortNpub(it.accountIdHex),
+            appState.npubForDisplay(it.accountIdHex),
         )
     }
 }
@@ -66,7 +72,7 @@ internal fun StartingAccountIndicator(account: StartingAccount?) {
             title = account.name,
             seed = account.accountIdHex,
             pictureUrl = account.pictureUrl,
-            size = 32.dp,
+            size = WhiteNoiseSizes.AvatarSmall,
             touchTargetSize = 48.dp,
             actionDescription = stringResource(R.string.starting_as),
             onClick = { expanded = true },
@@ -82,11 +88,20 @@ internal fun StartingAccountIndicator(account: StartingAccount?) {
                         .padding(horizontal = 16.dp, vertical = 8.dp)
                         .testTag("creation.starting_account.disclosure"),
                 ) {
-                    Text(label, style = MaterialTheme.typography.bodyLarge)
-                    Text(
-                        formatter.unicodeWrap(account.identifier, TextDirectionHeuristicsCompat.LTR),
-                        style = MaterialTheme.typography.bodySmall,
-                    )
+                    EmojiLabel(label, style = MaterialTheme.typography.bodyLarge)
+                    if (isCanonicalNpub(account.npub)) {
+                        PublicKeyCopyText(
+                            account.identifier,
+                            account.npub,
+                            style = MaterialTheme.typography.bodySmall,
+                            keyboardFocusable = true,
+                        )
+                    } else {
+                        Text(
+                            formatter.unicodeWrap(account.identifier, TextDirectionHeuristicsCompat.LTR),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
                 }
             },
         )

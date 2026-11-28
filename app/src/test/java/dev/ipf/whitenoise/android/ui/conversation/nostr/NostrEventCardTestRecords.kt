@@ -18,6 +18,8 @@ internal fun eventCardTimelineRecord(
     contentTokens: MarkdownDocumentFfi = EMPTY_MARKDOWN_DOCUMENT,
     deleted: Boolean = false,
 ) = TimelineMessageRecordFfi(
+    agentItem = null,
+    agentItemFirstEventMissing = false,
     clientToken = null,
     messageIdHex = messageIdHex,
     sourceMessageIdHex = null,
@@ -34,7 +36,7 @@ internal fun eventCardTimelineRecord(
     replyPreview = null,
     mediaJson = null,
     media = emptyList(),
-    agentTextStreamJson = null,
+    thread = null,
     poll = null,
     groupSystem = null,
     hasReports = false,

@@ -3,6 +3,7 @@ set -euo pipefail
 
 workflow=.github/workflows/android-pr-preview-publish.yml
 build=.github/workflows/android-pr-apk.yml
+cleanup=.github/workflows/android-pr-preview-cleanup.yml
 gradle=app/build.gradle.kts
 publisher=.github/scripts/publish-pr-apk-to-github-release.sh
 
@@ -59,9 +60,16 @@ grep -Fq '.github/scripts/update-pr-preview-links.js' "$workflow"
 grep -Fq 'stable app identity; keeps app data when switching PRs' .github/scripts/update-pr-preview-links.js
 grep -Fq 'github.event.repository.default_branch' "$workflow"
 reject 'github.event.workflow_run.repository.default_branch' "$workflow"
-# workflow_run.head_sha may gate pull_request runs, but must not override the
-# candidate-provenance HEAD_SHA in the description step used by manual backfills.
-grep -Fq 'WORKFLOW_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}' "$workflow"
+# Only the master builder's manual dispatch reaches the preview signing key; a
+# modified builder on another branch runs that branch's copy and must be refused.
+grep -Fq "github.event.workflow_run.event == 'workflow_dispatch' &&" "$workflow"
+grep -Fq "github.event.workflow_run.head_branch == 'master' &&" "$workflow"
+grep -Fq "github.event.workflow_run.path == '.github/workflows/android-pr-apk.yml' &&" "$workflow"
+reject "github.event.workflow_run.event == 'pull_request'" "$workflow"
+grep -Fq '[[ "$BUILDER_BRANCH" == master && "$BUILDER_PATH" == .github/workflows/android-pr-apk.yml ]]' "$workflow"
+grep -Fq '/git/ref/heads/master' "$workflow"
+grep -Fq 'compare/${BUILDER_SHA}...${master_sha}' "$workflow"
+# The description step used by manual backfills keeps the validated candidate HEAD_SHA.
 if grep -Eq '^[[:space:]]+HEAD_SHA: \$\{\{ github\.event\.workflow_run\.head_sha \}\}$' "$workflow"; then
   printf 'Description step must use the validated candidate HEAD_SHA.\n' >&2
   exit 1
@@ -84,6 +92,24 @@ grep -Fq 'GH_TOKEN: ${{ github.token }}' "$workflow"
 grep -Fq 'PREVIEW_CHANNEL="$channel"' "$workflow"
 grep -Fq '.github/scripts/publish-pr-apk-to-github-release.sh' "$workflow"
 reject 'BLOSSOM_UPLOAD_NSEC' "$workflow"
+# Cleanup and publication must share a queue. The cleanup job runs only
+# trusted code on close, with release write access and PR read access.
+grep -Fq 'pull_request_target:' "$cleanup"
+grep -Fq 'types: [closed]' "$cleanup"
+grep -Fq 'ref: ${{ github.event.repository.default_branch }}' "$cleanup"
+grep -Fq 'persist-credentials: false' "$cleanup"
+grep -Fq 'group: android-pr-preview-publish-pr-${{ github.event.number }}' "$cleanup"
+grep -Fq 'queue: max' "$cleanup"
+grep -Fq 'queue: max' "$workflow"
+grep -Fq 'contents: write' "$cleanup"
+grep -Fq 'pull-requests: read' "$cleanup"
+reject 'pull-requests: write' "$cleanup"
+reject 'secrets.' "$cleanup"
+reject 'github.event.pull_request.head.sha' "$cleanup"
+grep -Fq '.github/scripts/pr-preview-release-assets.sh prune' "$cleanup"
+grep -Fq '.github/scripts/pr-preview-release-assets.sh check-capacity "${channels[@]}"' "$workflow"
+bash .github/scripts/test-pr-preview-release-assets.sh
+
 # Both the pre-checkout prepare job and the post-checkout publish job must bind
 # artifact downloads explicitly to this repository. Without --repo, gh fails
 # before checkout with "not a git repository" and no preview links are posted.

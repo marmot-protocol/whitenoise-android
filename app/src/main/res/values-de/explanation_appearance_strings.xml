@@ -58,5 +58,6 @@
     <string name="explanation_appearance_action_color_save">Speichert diese Aktionsfarbe für das aktive Profil und das aktuelle Design auf diesem Gerät. Verfügbar, sobald die Farbe gültig ist und sich von der gespeicherten unterscheidet.</string>
     <string name="explanation_appearance_action_color_reset">Entfernt deine eigene Aktionsfarbe für das aktuelle Design und kehrt zum Standard zurück. Sie gilt für das aktive Profil auf diesem Gerät.</string>
     <string name="explanation_appearance_bubble_colors_save">Speichert die gewählten Blasenfarben. Sie gelten für das aktive Profil auf diesem Gerät oder nur für diesen Chat, wenn du den Bildschirm aus einem Chat geöffnet hast.</string>
-    <string name="explanation_appearance_bubble_colors_menu">Öffnet ein Menü mit einer Zurücksetzen-Aktion, die deine eigenen Blasenfarben hier löscht und zu den Standardfarben zurückkehrt.</string>
+    <string name="explanation_appearance_bubble_colors_reset">Löscht deine eigenen Blasenfarben hier und kehrt zu den Standardfarben zurück, in einem Chat zu deinen globalen Farben. Bis zum Speichern ändert sich nichts.</string>
+    <string name="explanation_appearance_dictation_transcribe_voice_messages">Offline Speech to Text erstellt Transkripte auf diesem Gerät. Über die Schaltfläche neben der Nachricht lässt sich das Transkript ausblenden.</string>
 </resources>

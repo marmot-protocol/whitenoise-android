@@ -2,14 +2,17 @@ package dev.ipf.whitenoise.android.media.sandbox
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowSystemClock
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
+import java.time.Duration
 
 /** Real pinned Sonic processing; the device seam records accepted PCM, not an assumed audible hardware head. */
 @RunWith(RobolectricTestRunner::class)
@@ -99,6 +102,126 @@ class RawPcmOutputSonicTest {
         target.javaClass.getDeclaredField(name).let {
             it.isAccessible = true
             it.set(target, value)
+        }
+    }
+
+    @Test fun presentationClockLagsMixerAndHoldsEndOfStreamUntilTheAudibleTail() {
+        val device = Device().apply { presented = 0L }
+        RawPcmOutput(8000, 1, device).use { output ->
+            output.play()
+            assertEquals(160, output.write(ByteArray(160), 0))
+            output.prepareForWait(true)
+            assertTrue(device.head >= 80)
+            assertEquals(10_000L, output.mixerPositionUs)
+            assertEquals(0L, output.positionUs())
+            assertFalse(output.drained())
+
+            device.presented = 40L
+            output.prepareForWait(true)
+            assertEquals(5000L, output.positionUs())
+            assertFalse(output.drained())
+
+            device.presented = 80L
+            output.prepareForWait(true)
+            assertEquals(10_000L, output.positionUs())
+            assertTrue(output.drained())
+        }
+    }
+
+    @Test fun losingTheTimestampAfterTheMixerStopsStillPlaysTheAudibleTail() {
+        val device = Device().apply { presented = 0L }
+        RawPcmOutput(8000, 1, device).use { output ->
+            output.play()
+            assertEquals(160, output.write(ByteArray(160), 0))
+            output.prepareForWait(true)
+            assertTrue(device.head >= 80)
+
+            ShadowSystemClock.advanceBy(Duration.ofMillis(4))
+            device.presented = 40L
+            output.prepareForWait(true)
+
+            ShadowSystemClock.advanceBy(Duration.ofMillis(1))
+            device.presented = null
+            output.prepareForWait(true)
+            assertFalse(output.drained())
+            assertEquals(6_000L, output.positionUs())
+
+            ShadowSystemClock.advanceBy(Duration.ofMillis(4))
+            output.prepareForWait(true)
+            assertTrue(output.drained())
+        }
+    }
+
+    @Test fun timestampGapAfterZeroLagUsesTheRouteDelayForNewFrames() {
+        val device =
+            Device().apply {
+                presented = 0L
+                fallbackPresentationLatencyMs = 10
+            }
+        RawPcmOutput(8000, 1, device).use { output ->
+            output.play()
+            output.prepareForWait(false)
+            device.presented = null
+            assertEquals(160, output.write(ByteArray(160), 0))
+            output.prepareForWait(true)
+            assertFalse(output.drained())
+            assertEquals(0L, output.positionUs())
+
+            ShadowSystemClock.advanceBy(Duration.ofMillis(10))
+            output.prepareForWait(true)
+            assertTrue(output.drained())
+        }
+    }
+
+    @Test fun underrunRejectsStaleSamplesUntilTheHardwareClockAdvancesAgain() {
+        var sampleTimeNs = 1_000_000_000L
+        var sampleFrame = 8_000L
+        val clock =
+            RawPcmPresentationClock(8_000) { timestamp ->
+                timestamp.nanoTime = sampleTimeNs
+                timestamp.framePosition = sampleFrame
+                true
+            }
+        assertEquals(8_000L, clock.frames(sampleTimeNs, underruns = 0, mixerHead = 8_400))
+        sampleTimeNs += 50_000_000L
+        sampleFrame += 400
+        assertEquals(8_400L, clock.frames(sampleTimeNs, underruns = 0, mixerHead = 8_800))
+
+        val stalledAtNs = sampleTimeNs + 1_000_000_000L
+        assertEquals(16_400L, clock.frames(stalledAtNs, underruns = 0, mixerHead = 9_200))
+        sampleTimeNs += 100_000_000L
+        sampleFrame = 9_000L
+        assertNull(clock.frames(stalledAtNs, underruns = 1, mixerHead = 9_200))
+
+        // Android can report the final old frame with a new timestamp while the audio pipeline is idle.
+        sampleTimeNs = stalledAtNs + 50_000_000L
+        sampleFrame = 9_200L
+        assertNull(clock.frames(sampleTimeNs, underruns = 1, mixerHead = 9_440))
+
+        // Android 11 can pause and play the same track again after priming.
+        clock.reset()
+        sampleTimeNs += 50_000_000L
+        assertNull(clock.frames(sampleTimeNs, underruns = 1, mixerHead = 9_440))
+
+        sampleTimeNs += 50_000_000L
+        sampleFrame = 9_280L
+        assertEquals(9_280L, clock.frames(sampleTimeNs, underruns = 1, mixerHead = 9_680))
+    }
+
+    @Test fun endOfStreamWaitsForRouteLatencyBeforeTheFirstTimestamp() {
+        val device = Device().apply { fallbackPresentationLatencyMs = 150 }
+        RawPcmOutput(8000, 1, device).use { output ->
+            output.play()
+            assertEquals(160, output.write(ByteArray(160), 0))
+            output.prepareForWait(true)
+            assertTrue(device.head >= 80)
+            assertEquals(0L, output.positionUs())
+            assertFalse(output.drained())
+
+            ShadowSystemClock.advanceBy(Duration.ofMillis(150))
+            output.prepareForWait(true)
+            assertEquals(10_000L, output.positionUs())
+            assertTrue(output.drained())
         }
     }
 
@@ -238,6 +361,8 @@ class RawPcmOutputSonicTest {
         var autoAdvance = true
         var failRestore = false
         var head = 0
+        var presented: Long? = null
+        override var fallbackPresentationLatencyMs = 0L
         var calls = 0
         var fail = false
         var pauseAttempted = false
@@ -263,6 +388,8 @@ class RawPcmOutputSonicTest {
             access()
             return head
         }
+
+        override fun presentationFrames(mixerHead: Long): Long? = presented
 
         override fun write(
             buffer: ByteBuffer,

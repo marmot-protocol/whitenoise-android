@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,10 +28,8 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ChatHistoryImports
 import dev.ipf.whitenoise.android.state.ChatHistoryTransfer
 import dev.ipf.whitenoise.android.state.ImportedHistorySource
-import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.chatHistoryTransfer
-import dev.ipf.whitenoise.android.state.importedHistoryBoundary
+import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.devices.followEventsWhileStarted
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
@@ -84,20 +81,18 @@ internal fun rememberChatHistoryImports(
 }
 
 /**
- * What a timeline row draws above itself for imported history. At the top of the loaded history, a transfer still
- * under way says so. Where the rows before this one were imported and this one was not, a label names where they
- * came from. Both are drawn inside the row, like the day separator, so no row is added, removed or reordered and
- * scroll position is unaffected while history arrives.
+ * What a timeline row draws above itself for imported history, ahead of its day separator. At the top of the loaded
+ * history, a transfer still under way says so. Where the rows before this one were imported and this one was not, a
+ * label names where they came from, directly under them. Both are drawn inside the row, like the day separator, so
+ * no row is added, removed or reordered and scroll position is unaffected while history arrives.
  */
 @Composable
 internal fun ImportedHistoryMarkers(
-    older: TimelineMessage?,
-    item: TimelineMessage,
-    atHistoryStart: Boolean,
+    transfer: ChatHistoryTransfer?,
+    boundary: ImportedHistorySource?,
 ) {
-    val state = LocalChatHistoryImport.current()
-    if (atHistoryStart) chatHistoryTransfer(state)?.let { ChatHistoryTransferNotice(it) }
-    importedHistoryBoundary(older?.projected, item.projected, state)?.let { ImportedHistoryBoundary(it) }
+    transfer?.let { ChatHistoryTransferNotice(it) }
+    boundary?.let { ImportedHistoryBoundary(it) }
 }
 
 /** Says that earlier messages are arriving from another device, or that MDK will try again after a failed attempt. */
@@ -147,7 +142,7 @@ internal fun ImportedHistoryBoundary(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
     ) {
-        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+        AppDivider(color = MaterialTheme.colorScheme.outline)
         Text(
             text = text,
             style = MaterialTheme.typography.labelMedium,

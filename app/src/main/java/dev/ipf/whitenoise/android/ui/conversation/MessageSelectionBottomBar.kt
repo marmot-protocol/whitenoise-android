@@ -36,8 +36,8 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ForwardBlockedReason
 import dev.ipf.whitenoise.android.ui.common.BottomPanelSurface
+import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.conversation.messages.forwardBlockedReasonLabel
-import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

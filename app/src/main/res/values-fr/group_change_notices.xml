@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="group_change_invite_not_sent">Invitation non envoyée</string>
+    <string name="group_change_member_not_removed">Membre non retiré</string>
+    <string name="group_change_details_not_updated">Détails du groupe non mis à jour</string>
+    <string name="group_change_leave_failed">Impossible de quitter le groupe</string>
+    <string name="group_change_end_failed">Impossible de mettre fin au groupe</string>
+    <string name="group_change_message_not_sent">Message non envoyé</string>
+    <string name="group_change_not_made">Modification du groupe non appliquée</string>
+    <string name="group_change_reason_not_admin">Vous n’êtes plus administrateur de ce groupe.</string>
+    <string name="group_change_reason_not_member">Vous n’êtes plus membre de ce groupe.</string>
+    <string name="group_change_reason_not_delivered">La modification n’a atteint aucun des relais du groupe. Vérifiez votre connexion et réessayez.</string>
+    <string name="group_change_reason_refused">Les relais du groupe ont refusé la modification. Vérifiez la discussion et réessayez.</string>
+    <string name="group_change_reason_not_accepted">Le groupe n’a pas pu accepter la modification. Vérifiez la discussion et réessayez.</string>
+    <string name="group_change_reason_superseded">Une autre modification du groupe a été faite au même moment. Vérifiez la discussion et réessayez.</string>
+    <string name="group_change_already_done">Une autre modification de ce groupe a déjà fait ce que la vôtre aurait fait.</string>
+    <string name="group_change_notice_detail">%1$s. %2$s</string>
+</resources>

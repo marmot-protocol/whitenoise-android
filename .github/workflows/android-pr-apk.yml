@@ -22,7 +22,7 @@ on:
         required: false
         type: string
       include_isolated:
-        description: Also build the unsigned isolated channel for opt-in qualification runs; never signed or linked
+        description: Also build, sign, publish and link a side-by-side isolated preview
         required: false
         type: boolean
         default: false
@@ -114,7 +114,7 @@ jobs:
         run: printf 'WHITENOISE_MARMOTKIT_CACHE_DIR=%s\n' "$RUNNER_TEMP/marmotkit-cache" >> "$GITHUB_ENV"
 
       - name: Set up JDK 17
-        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: '17'

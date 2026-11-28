@@ -49,15 +49,6 @@
     ],
     "settings_controls": [
       {
-        "surface": "string:cancel",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackagesScreen.kt",
-        "anchor": "R.string.cancel",
-        "test_ids": [
-          "ACC-016",
-          "ACC-018"
-        ]
-      },
-      {
         "surface": "string:delete",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackagesScreen.kt",
         "anchor": "R.string.delete",
@@ -215,7 +206,8 @@
         "anchor": "R.string.refresh",
         "test_ids": [
           "ACC-016",
-          "ACC-018"
+          "ACC-018",
+          "SET-072"
         ]
       },
       {

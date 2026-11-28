@@ -72,6 +72,7 @@ internal fun MessageActionMenu(
     initiatingHoldActive: Boolean = false,
     anchorBoundsInWindow: IntRect?,
     anchorWindowYPx: Float?,
+    anchorWindowXPx: Float? = null,
     canReply: Boolean,
     canReact: Boolean,
     canDelete: Boolean,
@@ -105,6 +106,7 @@ internal fun MessageActionMenu(
     onSpeak: () -> Unit,
     onSpeakCodeLiterally: () -> Unit = {},
     onTranslate: () -> Unit = {},
+    onTranscribe: (() -> Unit)? = null,
     onKeepOnScreen: () -> Unit = {},
     onShowLess: () -> Unit = {},
     onShare: () -> Unit = {},
@@ -124,6 +126,7 @@ internal fun MessageActionMenu(
 
     val explainedForwardBlock = forwardBlockedReason?.takeUnless { it == ForwardBlockedReason.Unsupported }
     val showForwardAction = canForward || explainedForwardBlock != null
+    val canTranscribe = onTranscribe != null
     val actionKinds =
         remember(
             canReply,
@@ -134,6 +137,7 @@ internal fun MessageActionMenu(
             canSpeak,
             canSpeakCodeLiterally,
             canTranslate,
+            canTranscribe,
             showForwardAction,
             canKeepOnScreen,
             canShowLess,
@@ -151,6 +155,7 @@ internal fun MessageActionMenu(
                 canSpeak = canSpeak,
                 canSpeakCodeLiterally = canSpeakCodeLiterally,
                 canTranslate = canTranslate,
+                canTranscribe = canTranscribe,
                 canForward = showForwardAction,
                 canKeepOnScreen = canKeepOnScreen,
                 canShowLess = canShowLess,
@@ -158,7 +163,7 @@ internal fun MessageActionMenu(
                 canSave = canSave,
                 canInfo = canInfo,
                 canReport = canReport,
-            )
+            ).let(::messageActionMenuOrder)
         }
     val labeledActions: List<Pair<MessageActionKind?, String>> =
         buildList {
@@ -185,6 +190,7 @@ internal fun MessageActionMenu(
                 // Forward transfers ownership to a picker above the still-open menu.
                 dismissBeforeActivation = kind != MessageActionKind.Forward,
                 destructive = kind == null,
+                firstLevel = isFirstLevelMessageAction(kind),
                 icon = { MessageActionIcon(kind) },
                 explanation = Explanation(label, stringResource(messageActionExplanationRes(kind))),
                 onClick = {
@@ -195,6 +201,7 @@ internal fun MessageActionMenu(
                         MessageActionKind.SelectText -> onSelectText()
                         MessageActionKind.CopyText -> onCopyText()
                         MessageActionKind.Translate -> onTranslate()
+                        MessageActionKind.Transcribe -> onTranscribe?.invoke()
                         MessageActionKind.Speak -> onSpeak()
                         MessageActionKind.SpeakCodeLiterally -> onSpeakCodeLiterally()
                         MessageActionKind.Forward -> onForward()
@@ -213,10 +220,12 @@ internal fun MessageActionMenu(
     // stays anchored to the bubble at the original press position.
     val pressedBounds = remember { anchorBoundsInWindow }
     val pressedY = remember { anchorWindowYPx }
+    val pressedX = remember { anchorWindowXPx }
     FocusedMessageActions(
         initiatingHoldActive = initiatingHoldActive,
         sourceBounds = pressedBounds,
         touchY = pressedY,
+        touchX = pressedX,
         mine = mine,
         actions = actions,
         quickReactions = quickReactionEmojis,

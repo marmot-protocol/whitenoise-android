@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
@@ -33,6 +34,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -43,10 +45,16 @@ import androidx.lifecycle.SavedStateHandle
 import dev.ipf.whitenoise.android.state.ConversationTimelineTestIds
 import dev.ipf.whitenoise.android.ui.chats.CHAT_LIST_HEAD_INPUT_GATE_MILLIS
 import dev.ipf.whitenoise.android.ui.common.LocalWindowLayout
+import dev.ipf.whitenoise.android.ui.common.TwoPaneMinWindowWidth
 import dev.ipf.whitenoise.android.ui.common.WindowLayout
-import dev.ipf.whitenoise.android.ui.common.WindowWidthClass
+import dev.ipf.whitenoise.android.ui.keyboard.HardwareShortcutCommand
+import dev.ipf.whitenoise.android.ui.keyboard.HardwareShortcutRouter
+import dev.ipf.whitenoise.android.ui.keyboard.LocalHardwareShortcutRouter
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.CompletableDeferred
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -55,7 +63,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
-/** Two-pane chat layout across the 840dp boundary, through the production frame and shell. */
+/** Two-pane chat layout across the 661dp boundary, through the production frame and shell. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en-w1280dp-h800dp-mdpi")
 class TwoPaneChatLayoutTest {
@@ -70,7 +78,7 @@ class TwoPaneChatLayoutTest {
         composeRule.setContent {
             CompositionLocalProvider(LocalWindowLayout provides WindowLayout.fromSize(DpSize(width.value, HEIGHT))) {
                 TwoPaneChatFrame(
-                    twoPane = LocalWindowLayout.current.widthClass == WindowWidthClass.Expanded,
+                    twoPane = LocalWindowLayout.current.fitsTwoPanes,
                     listPane = { Text("list") },
                 ) {
                     val identity = remember { Any() }
@@ -96,8 +104,8 @@ class TwoPaneChatLayoutTest {
 
     /**
      * Short, wide windows such as a phone held horizontally split the panes evenly after the divider,
-     * with the list capped for very wide short windows; taller expanded windows keep the fixed 360dp
-     * list (#3866).
+     * with the list capped for very wide short windows (#3866). Taller windows give the list 40%, from
+     * 300dp up to 360dp, and the conversation never drops below 360dp.
      */
     @Test
     fun shortExpandedWindowsBalanceThePanes() {
@@ -109,7 +117,10 @@ class TwoPaneChatLayoutTest {
                 DpSize(960.dp, 432.dp) to 479.5.dp,
                 DpSize(1080.dp, 432.dp) to ShortWindowListMaxWidth,
                 DpSize(1280.dp, 400.dp) to ShortWindowListMaxWidth,
-                DpSize(840.dp, 480.dp) to TwoPaneListWidth,
+                DpSize(700.dp, 360.dp) to 339.dp,
+                DpSize(661.dp, 841.dp) to 300.dp,
+                DpSize(673.dp, 841.dp) to 300.dp,
+                DpSize(840.dp, 480.dp) to 335.dp,
                 DpSize(1280.dp, 800.dp) to TwoPaneListWidth,
             )
         expected.forEach { (window, listWidth) ->
@@ -274,12 +285,53 @@ class TwoPaneChatLayoutTest {
         }
     }
 
-    /** Mounts the production shell under a test-controlled window width and always releases its jobs. */
+    /**
+     * Beside the list, tapping another chat while its first page loads retires the open conversation but keeps it on
+     * screen until the tapped chat is ready. That retained conversation must not take Ctrl+Shift+F, even while
+     * keyboard focus stays in its composer (#4005).
+     */
+    @Test
+    fun retainedConversationDuringAPendingOpenWithdrawsInChatSearch() {
+        val router = HardwareShortcutRouter()
+        // The tapped chat's first page never loads, so its open stays pending.
+        val fixture = ReturnFixture(otherChatTimelineGate = CompletableDeferred())
+        withMountedShell(mutableStateOf(EXPANDED_WIDTH), fixture, router) { _, holder, _ ->
+            openTarget(fixture, holder)
+            composer().requestFocus()
+            settle()
+            assertTrue(conversationSearchAvailable(router))
+
+            // The shell gives a tapped chat CONVERSATION_PENDING_OPEN_TIMEOUT_MILLIS to load before showing it anyway,
+            // so the clock stays inside that window while the open is pending.
+            composeRule.mainClock.autoAdvance = false
+            try {
+                composeRule.onNodeWithTag("chat.row.${fixture.rows.first().groupIdHex}").performClick()
+                composeRule.mainClock.advanceTimeBy(CONVERSATION_PENDING_OPEN_TIMEOUT_MILLIS / 3)
+
+                assertNull(composeRule.runOnIdle { holder.selectedChat.value })
+                composer().assertIsFocused()
+                assertFalse(conversationSearchAvailable(router))
+                assertFalse(composeRule.runOnIdle { router.dispatch(HardwareShortcutCommand.ConversationSearch) })
+            } finally {
+                composeRule.mainClock.autoAdvance = true
+            }
+        }
+    }
+
+    /** Whether Ctrl+Shift+F would run right now, read on the main thread. */
+    private fun conversationSearchAvailable(router: HardwareShortcutRouter): Boolean =
+        composeRule.runOnIdle { HardwareShortcutCommand.ConversationSearch in router.availableCommands() }
+
+    /**
+     * Mounts the production shell for [fixture] under a test-controlled window width, with [router] taking the
+     * shell's shortcuts when given, and always releases its jobs.
+     */
     private fun withMountedShell(
         width: MutableState<Dp>,
+        fixture: ReturnFixture = ReturnFixture(),
+        router: HardwareShortcutRouter? = null,
         exercise: (ReturnFixture, MainShellStateHolder, () -> Int) -> Unit,
     ) {
-        val fixture = ReturnFixture()
         val mounted = mutableStateOf(true)
         var fallThroughBacks = 0
         val holder = MainShellStateHolder(fixture.appState, SavedStateHandle())
@@ -292,6 +344,7 @@ class TwoPaneChatLayoutTest {
             if (mounted.value) {
                 CompositionLocalProvider(
                     LocalWindowLayout provides WindowLayout.fromSize(DpSize(width.value, HEIGHT)),
+                    LocalHardwareShortcutRouter provides router,
                 ) {
                     WhiteNoiseTheme { MainShell(appState = fixture.appState, stateHolder = holder) }
                 }
@@ -343,8 +396,8 @@ class TwoPaneChatLayoutTest {
     }
 
     private companion object {
-        val EXPANDED_WIDTH = 840.dp
-        val BELOW_EXPANDED_WIDTH = 839.dp
+        val EXPANDED_WIDTH = TwoPaneMinWindowWidth
+        val BELOW_EXPANDED_WIDTH = TwoPaneMinWindowWidth - 1.dp
         val HEIGHT = 800.dp
         val SHORT_HEIGHT = 400.dp
         const val PANE_TOLERANCE = 1f

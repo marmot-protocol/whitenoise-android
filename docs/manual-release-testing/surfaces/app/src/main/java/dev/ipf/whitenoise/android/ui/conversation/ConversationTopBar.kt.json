@@ -52,14 +52,6 @@
         "test_ids": [
           "CON-049"
         ]
-      },
-      {
-        "surface": "R.string.conversation_header_timer_change",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTopBar.kt",
-        "anchor": "R.string.conversation_header_timer_change",
-        "test_ids": [
-          "SET-058"
-        ]
       }
     ],
     "source_coverage": [

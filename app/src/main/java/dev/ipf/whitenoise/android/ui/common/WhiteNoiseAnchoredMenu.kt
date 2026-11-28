@@ -10,6 +10,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.DropdownMenuGroup
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.DropdownMenuPopup
+import androidx.compose.material3.DropdownMenuPopupPositionProvider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -17,14 +18,21 @@ import androidx.compose.material3.MenuAnchorPosition
 import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.PopupProperties
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.keyboard.HardwareShortcutBlocker
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
+import kotlin.math.roundToInt
 
 /** Expressive anchored commands; optional focus leaves a held native row pointer with its original owner. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -38,12 +46,41 @@ internal fun WhiteNoiseAnchoredMenu(
     anchorSpacing: Dp = 0.dp,
     focusable: Boolean = true,
     canRunAction: () -> Boolean = { true },
+    touchX: Float? = null,
 ) {
     BackHandler(enabled = expanded && !focusable, onBack = onDismissRequest)
+    // A nonfocusable menu leaves keys with the activity, so its shortcuts wait for the menu.
+    if (expanded) HardwareShortcutBlocker()
+    val rowPosition = MenuDefaults.rememberDropdownMenuPopupPositionProvider(MenuAnchorPosition.Below)
+    val position =
+        remember(rowPosition, touchX) {
+            if (touchX == null) {
+                rowPosition
+            } else {
+                object : DropdownMenuPopupPositionProvider by rowPosition {
+                    override fun calculatePosition(
+                        anchorBounds: IntRect,
+                        windowSize: IntSize,
+                        layoutDirection: LayoutDirection,
+                        popupContentSize: IntSize,
+                    ): IntOffset {
+                        val maxLeft = (windowSize.width - popupContentSize.width).coerceAtLeast(0)
+                        val left = (touchX - popupContentSize.width / 2f).roundToInt().coerceIn(0, maxLeft)
+                        // Align both horizontal anchor edges while retaining the row's vertical fit.
+                        return rowPosition.calculatePosition(
+                            anchorBounds.copy(left = left, right = left + popupContentSize.width),
+                            windowSize,
+                            layoutDirection,
+                            popupContentSize,
+                        )
+                    }
+                }
+            }
+        }
     DropdownMenuPopup(
         expanded = expanded,
         onDismissRequest = onDismissRequest,
-        popupPositionProvider = MenuDefaults.rememberDropdownMenuPopupPositionProvider(MenuAnchorPosition.Below),
+        popupPositionProvider = position,
         properties = PopupProperties(focusable = focusable),
         modifier = Modifier.padding(vertical = anchorSpacing),
     ) {

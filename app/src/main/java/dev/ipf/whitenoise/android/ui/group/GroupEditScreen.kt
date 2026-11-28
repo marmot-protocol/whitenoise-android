@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LinearProgressIndicator
@@ -34,16 +35,15 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
@@ -59,15 +59,14 @@ import dev.ipf.whitenoise.android.state.StalenessGuard
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.ui.common.Avatar
-import dev.ipf.whitenoise.android.ui.common.GroupNameEmojiField
 import dev.ipf.whitenoise.android.ui.common.IMAGE_DOCUMENT_MIME_TYPES
+import dev.ipf.whitenoise.android.ui.common.IdentityHeader
 import dev.ipf.whitenoise.android.ui.common.IdentityImageCropFlow
 import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
-import dev.ipf.whitenoise.android.ui.common.ProseTextField
-import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseFilledTonalButton
 import dev.ipf.whitenoise.android.ui.common.conversationGroupAvatarAsset
+import dev.ipf.whitenoise.android.ui.common.insertTextEntryEmoji
 import dev.ipf.whitenoise.android.ui.common.rememberAvatarPreparationRecovery
 import dev.ipf.whitenoise.android.ui.common.rememberConversationGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberEmojiSheetFieldAnchor
@@ -79,6 +78,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.insertEmojiAtSelectio
 import dev.ipf.whitenoise.android.ui.profile.AvatarFullScreenViewer
 import dev.ipf.whitenoise.android.ui.profile.rememberAvatarImageAvailable
 import dev.ipf.whitenoise.android.ui.rememberRecentEmojiRecentsOwner
+import dev.ipf.whitenoise.android.ui.settings.SettingsBottomAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.CancellationException
@@ -140,11 +140,11 @@ internal fun GroupEditScreen(
         // kind-1210 row) while this screen is open, and re-keying on those values
         // would re-init the fields and discard the user's in-progress edit. State
         // resets only when navigating to a different group. (CodeRabbit, #512.)
-        var name by
-            rememberSaveable(controller.group.groupIdHex, stateSaver = TextFieldValue.Saver) {
-                mutableStateOf(TextFieldValue(controller.group.name))
+        val name =
+            rememberSaveable(controller.group.groupIdHex, saver = TextFieldState.Saver) {
+                TextFieldState(controller.group.name, initialSelection = TextRange.Zero)
             }
-        var description by remember(controller.group.groupIdHex) { mutableStateOf(controller.group.description) }
+        val description = remember(controller.group.groupIdHex) { TextFieldState(controller.group.description) }
         // The values the editor opened with: a field the user left alone is not sent, even when
         // another admin changes it while the editor is open (#3704).
         val openedName = rememberSaveable(controller.group.groupIdHex) { controller.group.name }
@@ -212,12 +212,15 @@ internal fun GroupEditScreen(
         val hasGroupImage =
             ProfileSanitizer.protocolImageUrl(controller.group.avatarUrl) != null ||
                 controller.group.imageHashHex != null
+        val detailsChanged =
+            name.text.toString() != controller.group.name ||
+                description.text.toString() != controller.group.description
         // A photo being prepared or uploaded holds Save too, so a save cannot close the editor under it.
         val saveEnabled =
             !saving &&
                 !imageSaving &&
                 !controller.mutationInFlight &&
-                (name.text != controller.group.name || description != controller.group.description)
+                detailsChanged
 
         LaunchedEffect(nameEditable) {
             if (!nameEditable) showEmojiPicker = false
@@ -229,7 +232,14 @@ internal fun GroupEditScreen(
             controller.clearLastMutationError()
             appState.launchMutation {
                 try {
-                    if (controller.updateGroupProfile(name.text, description, openedName, openedDescription)) onBack()
+                    val saved =
+                        controller.updateGroupProfile(
+                            name.text.toString(),
+                            description.text.toString(),
+                            openedName,
+                            openedDescription,
+                        )
+                    if (saved) onBack()
                 } finally {
                     saving = false
                 }
@@ -431,6 +441,7 @@ internal fun GroupEditScreen(
         pendingPublicPhoto?.let { selected ->
             val generation = imagePickGeneration.capture()
 
+            /** True while the picked photo still belongs to the current owner, pick generation and editable state. */
             fun selectionIsCurrent(): Boolean =
                 imageOwnerIsCurrent() &&
                     imagePickGeneration.isCurrent(generation) &&
@@ -531,7 +542,7 @@ internal fun GroupEditScreen(
             },
             bottomBar = {
                 if (canEdit) {
-                    StickyFormActionBar {
+                    SettingsBottomAction(elevated = false) {
                         WhiteNoiseButton(
                             onClick = { saveGroupProfile() },
                             enabled = saveEnabled,
@@ -553,40 +564,41 @@ internal fun GroupEditScreen(
                         .padding(vertical = WhiteNoiseSpacing.Section),
                 verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Section),
             ) {
-                Column(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
+                IdentityHeader(
+                    top = {
+                        Text(stringResource(R.string.group_photo_title), style = MaterialTheme.typography.titleMedium)
+                        groupPhotoVisibilityDetail(controller.group)?.let { detail ->
+                            Text(
+                                stringResource(detail),
+                                style = MaterialTheme.typography.bodyMedium,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.testTag("group_edit.photoVisibility"),
+                            )
+                        }
+                    },
+                    avatar = { avatarSize ->
+                        Box(
+                            modifier =
+                                Modifier
+                                    .clip(CircleShape)
+                                    .clickable(
+                                        enabled = groupAvatarImageAvailable,
+                                        onClickLabel = stringResource(R.string.profile_view_picture),
+                                        role = Role.Button,
+                                    ) { avatarViewerOpen = true },
+                        ) {
+                            Avatar(
+                                title = controller.title(groupTitleCopy),
+                                seed = controller.group.groupIdHex,
+                                size = avatarSize,
+                                pictureUrl = groupAvatarUrl.takeIf { encryptedGroupAvatar == null },
+                                picture = encryptedGroupAvatar,
+                                groupAnimation = groupAvatar.groupAnimation,
+                                pictureDomain = groupAvatar.pictureDomain,
+                            )
+                        }
+                    },
                 ) {
-                    Text(stringResource(R.string.group_photo_title), style = MaterialTheme.typography.titleMedium)
-                    groupPhotoVisibilityDetail(controller.group)?.let { detail ->
-                        Text(
-                            stringResource(detail),
-                            style = MaterialTheme.typography.bodyMedium,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.testTag("group_edit.photoVisibility"),
-                        )
-                    }
-                    Box(
-                        modifier =
-                            Modifier
-                                .clip(CircleShape)
-                                .clickable(
-                                    enabled = groupAvatarImageAvailable,
-                                    onClickLabel = stringResource(R.string.profile_view_picture),
-                                    role = Role.Button,
-                                ) { avatarViewerOpen = true },
-                    ) {
-                        Avatar(
-                            title = controller.title(groupTitleCopy),
-                            seed = controller.group.groupIdHex,
-                            size = GroupEditAvatarSize,
-                            pictureUrl = groupAvatarUrl.takeIf { encryptedGroupAvatar == null },
-                            picture = encryptedGroupAvatar,
-                            groupAnimation = groupAvatar.groupAnimation,
-                            pictureDomain = groupAvatar.pictureDomain,
-                        )
-                    }
                     if (imageSaving) LinearProgressIndicator(Modifier.fillMaxWidth())
                     Box {
                         WhiteNoiseFilledTonalButton(
@@ -628,31 +640,14 @@ internal fun GroupEditScreen(
                         )
                     }
                 }
-                Column(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
-                    verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),
-                ) {
-                    GroupNameEmojiField(
-                        value = name,
-                        onValueChange = { name = it },
-                        label = stringResource(R.string.group_name),
-                        emojiPickerOpen = showEmojiPicker,
-                        onEmojiPickerClick = { if (nameEditable) showEmojiPicker = true },
-                        enabled = nameEditable,
-                        modifier = Modifier.fillMaxWidth(),
-                        emojiAnchor = nameEmojiAnchor,
-                    )
-                    ProseTextField(
-                        value = description,
-                        filled = true,
-                        onValueChange = { description = it },
-                        label = { Text(stringResource(R.string.group_description)) },
-                        minLines = 3,
-                        maxLines = 6,
-                        enabled = canEdit,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
+                GroupEditFields(
+                    name = name,
+                    description = description,
+                    enabled = nameEditable,
+                    nameEmojiAnchor = nameEmojiAnchor,
+                    emojiPickerOpen = showEmojiPicker,
+                    onEmojiPickerClick = { if (nameEditable) showEmojiPicker = true },
+                )
             }
         }
 
@@ -736,7 +731,10 @@ internal fun GroupEditScreen(
                 closeOnPick = false,
                 onDismissRequest = { showEmojiPicker = false },
                 onEmojiPicked = { emoji ->
-                    if (nameEditable) name = insertEmojiAtSelection(name, emoji)
+                    if (nameEditable) {
+                        val current = TextFieldValue(name.text.toString(), name.selection)
+                        insertTextEntryEmoji(name, insertEmojiAtSelection(current, emoji), inputTransformation = null)
+                    }
                 },
                 recentEmojis = recentEmojiRecentsOwner.recents,
                 onEmojiUsed = { emoji -> if (nameEditable) recentEmojiRecentsOwner.onEmojiUsed(emoji) },
@@ -745,8 +743,6 @@ internal fun GroupEditScreen(
         }
     }
 }
-
-private val GroupEditAvatarSize = 120.dp
 
 /** Settings frame shared by the native editor and its descriptive-title screenshot coverage. */
 @Composable

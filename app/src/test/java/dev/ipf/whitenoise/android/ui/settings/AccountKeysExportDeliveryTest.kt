@@ -4,6 +4,7 @@ import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.hardware.biometrics.BiometricManager
 import android.net.Uri
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.LocalActivityResultRegistryOwner
@@ -11,12 +12,18 @@ import androidx.activity.result.ActivityResultRegistry
 import androidx.activity.result.ActivityResultRegistryOwner
 import androidx.activity.result.contract.ActivityResultContract
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -31,11 +38,13 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.test.core.app.ApplicationProvider
+import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.DraftStore
+import dev.ipf.whitenoise.android.state.PrivateKeyReminderStage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.reachSensitiveClipDeadline
 import dev.ipf.whitenoise.android.ui.common.useTestWorkManager
@@ -53,6 +62,9 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+import org.robolectric.shadow.api.Shadow
+import org.robolectric.shadows.ShadowBiometricManager
 import org.robolectric.shadows.ShadowDialog
 import org.robolectric.shadows.ShadowSystemClock
 import java.io.ByteArrayOutputStream
@@ -67,6 +79,7 @@ import java.util.concurrent.atomic.AtomicInteger
 /** Exercises the real key-screen confirmations, lifecycle observer, document launcher and returned-URI callback. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en-w360dp-h1200dp-mdpi")
+@Suppress("LargeClass") // The export, lifecycle and provider cases share one real-screen fixture.
 class AccountKeysExportDeliveryTest {
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
@@ -81,6 +94,64 @@ class AccountKeysExportDeliveryTest {
     }
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun rawExportShowsScreenLockRequirementInTheDialog() {
+        val fixture = renderWithoutScreenLock()
+        openExportDialog(encrypted = false)
+        assertScreenLockNoticeInDialog(R.string.keep_your_private_key_safe, R.string.export_nsec)
+        dialogButton(R.string.cancel).performClick()
+
+        openExportDialog(encrypted = false)
+        assertScreenLockNoticeInDialog(R.string.keep_your_private_key_safe, R.string.share)
+        assertEquals(0, fixture.native.rawCalls.get())
+        assertEquals(0, fixture.picker.launchCount)
+        composeRule.onNode(isDialog()).captureRoboImage("src/test/snapshots/profile_keys_raw_screen_lock.png")
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun encryptedExportShowsScreenLockRequirementInTheDialog() {
+        val fixture = renderWithoutScreenLock()
+        openExportDialog(encrypted = true)
+        assertScreenLockNoticeInDialog(R.string.encrypted_private_key, R.string.export)
+        dialogButton(R.string.cancel).performClick()
+
+        openExportDialog(encrypted = true)
+        assertScreenLockNoticeInDialog(R.string.encrypted_private_key, R.string.key_export_view_backup)
+        assertEquals(0, fixture.native.encryptedCalls.get())
+        assertEquals(0, fixture.picker.launchCount)
+        composeRule.onNode(isDialog()).captureRoboImage("src/test/snapshots/profile_keys_backup_screen_lock.png")
+    }
+
+    private fun renderWithoutScreenLock(): Fixture {
+        Shadow
+            .extract<ShadowBiometricManager>(context.getSystemService(BiometricManager::class.java))
+            .setCanAuthenticate(false)
+        return render(authenticator = null)
+    }
+
+    private fun assertScreenLockNoticeInDialog(
+        titleRes: Int,
+        actionRes: Int,
+    ) {
+        val title = context.getString(titleRes)
+        val notice = context.getString(R.string.toast_app_lock_screen_lock_required)
+        val region =
+            composeRule.onNode(
+                SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite) and
+                    hasAnyAncestor(isDialog()),
+                useUnmergedTree = true,
+            )
+        region.assertIsDisplayed().assert(hasText(title))
+        val regionId = region.fetchSemanticsNode().id
+
+        dialogButton(actionRes).performClick()
+
+        region.assertIsDisplayed().assert(hasContentDescription("$title\n$notice"))
+        assertEquals(regionId, region.fetchSemanticsNode().id)
+    }
 
     /** Raw export waits for a fresh challenge and ignores success after its consent is dismissed. */
     @Test
@@ -101,6 +172,66 @@ class AccountKeysExportDeliveryTest {
         export(false, KeyExportDestination.File)
         checkNotNull(pending).invoke()
         assertEquals(listOf(KeyExportDestination.File), exports)
+    }
+
+    /** Android 11 can deliver CreateDocument before the activity reaches STARTED. */
+    @Test
+    @Config(sdk = [30])
+    fun destinationDeliveredWhileStoppedWaitsForStart() = assertDeferredPickerReturn(lock = false, encrypted = false)
+
+    /** The real picker host outlives disposal of Account Keys while the lock owns the root. */
+    @Test
+    fun rawDestinationDeliveredUnderAppLockWaitsForUnlock() = assertDeferredPickerReturn(lock = true, encrypted = false)
+
+    @Test
+    fun encryptedPickerWaitsForUnlock() = assertDeferredPickerReturn(lock = true, encrypted = true)
+
+    private fun assertDeferredPickerReturn(
+        lock: Boolean,
+        encrypted: Boolean,
+    ) {
+        val fixture = render()
+        val uri = Uri.parse("content://key-export-test/deferred")
+        val bytes = ByteArrayOutputStream()
+        val opens = AtomicInteger()
+        shadowOf(context.contentResolver).registerOutputStreamSupplier(uri) {
+            opens.incrementAndGet()
+            bytes
+        }
+        beginExport(encrypted)
+        composeRule.waitUntil(TIMEOUT_MILLIS) { fixture.picker.launchCount == 1 }
+        composeRule.runOnIdle {
+            fixture.owner.stop()
+            if (lock) {
+                Shadow
+                    .extract<ShadowBiometricManager>(context.getSystemService(BiometricManager::class.java))
+                    .setCanAuthenticate(true)
+                fixture.appState.appLock.updateRequired(true)
+                fixture.owner.resume()
+                assertTrue(fixture.appState.appLock.screenVisible)
+            }
+        }
+        composeRule.runOnIdle { fixture.picker.deliver(uri) }
+        composeRule.waitForIdle()
+        assertEquals(0, opens.get())
+
+        composeRule.runOnIdle {
+            assertNotNull("The confirmed export must survive the stopped or locked shell", fixture.exportState.request)
+            assertEquals("The picker URI must stay queued", uri, fixture.exportState.destination)
+            if (lock) fixture.appState.appLock.markUnlockSucceeded(dismissRetainedVisibleConversation = false)
+            fixture.owner.resume()
+        }
+        composeRule.runOnIdle {
+            assertFalse("The fixture must finish unlocking", fixture.appState.appLock.screenVisible)
+            assertFalse("The fixture must finish evaluating App Lock", fixture.appState.appLock.evaluationPending)
+        }
+        composeRule.waitUntil("The unlocked host claims the queued URI", TIMEOUT_MILLIS) {
+            fixture.exportState.destination == null
+        }
+        composeRule.runOnIdle { assertNull("The confirmed export must still be valid", fixture.exportState.feedback) }
+        val expected = if (encrypted) ENCRYPTED_KEY else RAW_KEY
+        composeRule.waitUntil(TIMEOUT_MILLIS) { bytes.toString(Charsets.UTF_8.name()) == expected }
+        assertEquals(1, opens.get())
     }
 
     /** The actual save action cannot read the key or open a destination before authentication. */
@@ -282,9 +413,13 @@ class AccountKeysExportDeliveryTest {
     @Test
     fun encryptedPreviewCopiesExactSensitiveValueAndHidesWithoutPickingAFile() {
         val fixture = render()
+        fixture.recordSignUp()
         openBackupPreview()
         assertEquals(0, fixture.picker.launchCount)
+        // Only showing the backup saves nothing, so the chat list keeps reminding (#4279).
+        assertEquals(PrivateKeyReminderStage.Pending, fixture.reminderStage())
         dialogButton(R.string.copy).performClick()
+        composeRule.runOnIdle { assertEquals(PrivateKeyReminderStage.Saved, fixture.reminderStage()) }
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         composeRule.runOnIdle {
             val clip = requireNotNull(clipboard.primaryClip)
@@ -295,6 +430,28 @@ class AccountKeysExportDeliveryTest {
         dialogButton(R.string.hide).performClick()
         composeRule.onNodeWithTag("profile_keys.encrypted_backup").assertDoesNotExist()
         assertEquals(0, fixture.picker.launchCount)
+    }
+
+    /** Copying the plain private key retires the chat list's reminder to save it (#4279). */
+    @Test
+    fun copyingThePrivateKeyRetiresTheSaveKeyReminder() {
+        val fixture = render()
+        fixture.recordSignUp()
+        composeRule
+            .onNodeWithText(context.getString(R.string.copy_private_key))
+            .performScrollTo()
+            .performClick()
+        composeRule.waitUntil(TIMEOUT_MILLIS) { fixture.reminderStage() == PrivateKeyReminderStage.Saved }
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        composeRule.runOnIdle {
+            assertEquals(
+                RAW_KEY,
+                clipboard.primaryClip
+                    ?.getItemAt(0)
+                    ?.text
+                    ?.toString(),
+            )
+        }
     }
 
     /** The copied backup outlives the closed preview only until the clipboard deadline. */
@@ -421,6 +578,7 @@ class AccountKeysExportDeliveryTest {
     @Test
     fun rawShareMarksBothIntentAndPayloadSensitive() {
         val fixture = render()
+        fixture.recordSignUp()
         composeRule.onNodeWithTag("profile_keys.export_raw").performScrollTo().performClick()
         dialogButton(R.string.share).performClick()
         composeRule.waitUntil(TIMEOUT_MILLIS) { shadowOf(composeRule.activity).peekNextStartedActivity() != null }
@@ -436,6 +594,7 @@ class AccountKeysExportDeliveryTest {
         assertEquals(RAW_KEY, clip.getItemAt(0).text.toString())
         assertTrue(clip.description.extras?.getBoolean(ClipDescription.EXTRA_IS_SENSITIVE) == true)
         assertEquals(0, fixture.picker.launchCount)
+        composeRule.runOnIdle { assertEquals(PrivateKeyReminderStage.Pending, fixture.reminderStage()) }
     }
 
     /** The added share action follows the same generation guard as file export after cancellation. */
@@ -550,6 +709,7 @@ class AccountKeysExportDeliveryTest {
         blockedBy: Teardown?,
     ) {
         val fixture = render()
+        fixture.recordSignUp()
         val uri = Uri.parse("content://key-export-test/authorized-key")
         val bytes = ByteArrayOutputStream()
         val opens = AtomicInteger()
@@ -583,6 +743,9 @@ class AccountKeysExportDeliveryTest {
         }
         assertEquals(if (encrypted) 1 else 0, fixture.native.encryptedCalls.get())
         assertEquals(if (encrypted) 0 else 1, fixture.native.rawCalls.get())
+        // A written key file, plain or encrypted, retires the save-key reminder; a blocked one leaves it (#4279).
+        val stage = if (blockedBy == null) PrivateKeyReminderStage.Saved else PrivateKeyReminderStage.Pending
+        composeRule.waitUntil(TIMEOUT_MILLIS) { fixture.reminderStage() == stage }
     }
 
     /** Idles the main looper while waiting, because the save is launched there before it moves to IO. */
@@ -606,6 +769,11 @@ class AccountKeysExportDeliveryTest {
         encrypted: Boolean,
         encryptedAction: Int = R.string.export,
     ) {
+        openExportDialog(encrypted)
+        dialogButton(if (encrypted) encryptedAction else R.string.export_nsec).performClick()
+    }
+
+    private fun openExportDialog(encrypted: Boolean) {
         if (encrypted) {
             composeRule
                 .onNodeWithText(context.getString(R.string.export_encrypted_private_key))
@@ -613,10 +781,8 @@ class AccountKeysExportDeliveryTest {
                 .performClick()
             composeRule.onNodeWithTag("profile_keys.export_password").performTextInput(PASSPHRASE)
             composeRule.onNodeWithTag("profile_keys.export_confirmation").performTextInput(PASSPHRASE)
-            dialogButton(encryptedAction).performClick()
         } else {
             composeRule.onNodeWithTag("profile_keys.export_raw").performScrollTo().performClick()
-            dialogButton(R.string.export_nsec).performClick()
         }
     }
 
@@ -631,7 +797,7 @@ class AccountKeysExportDeliveryTest {
         deferRaw: Boolean = false,
         deferEncrypted: Boolean = false,
         failFirstEncryption: Boolean = false,
-        authenticator: RawKeyExportAuthentication = RawKeyExportAuthentication { authenticated -> authenticated() },
+        authenticator: RawKeyExportAuthentication? = RawKeyExportAuthentication { authenticated -> authenticated() },
     ): Fixture {
         val native = NativeExports(deferRaw, deferEncrypted, failFirstEncryption).also { currentNative = it }
         val appState =
@@ -645,21 +811,28 @@ class AccountKeysExportDeliveryTest {
             )
         val picker = RecordingPicker()
         val owner = composeRule.runOnIdle { ScreenLifecycle().apply { resume() } }
+        val fixture = Fixture(appState, picker, owner, native)
         composeRule.setContent {
             CompositionLocalProvider(
                 LocalActivityResultRegistryOwner provides picker,
                 LocalLifecycleOwner provides owner,
             ) {
                 WhiteNoiseTheme {
-                    AccountKeysScreen(
-                        appState = appState,
-                        onBack = {},
-                        rawExportAuthenticator = authenticator,
-                    )
+                    val fileExport = rememberKeyFileExport(appState)
+                    SideEffect { fixture.exportState = fileExport.state }
+                    CompositionLocalProvider(LocalKeyFileExportLauncher provides fileExport) {
+                        if (!appState.appLock.screenVisible) {
+                            AccountKeysScreen(
+                                appState = appState,
+                                onBack = {},
+                                rawExportAuthenticator = authenticator,
+                            )
+                        }
+                    }
                 }
             }
         }
-        return Fixture(appState, picker, owner, native)
+        return fixture
     }
 
     /** Locally signed account metadata only; the synthetic key is supplied by the injected native proxy. */
@@ -679,7 +852,16 @@ class AccountKeysExportDeliveryTest {
         val picker: RecordingPicker,
         val owner: ScreenLifecycle,
         val native: NativeExports,
-    )
+    ) {
+        lateinit var exportState: KeyFileExport
+
+        private val accountIdHex get() = checkNotNull(appState.activeAccount).accountIdHex
+
+        /** Marks the active account as created by Sign up on this device, as the chat list's reminder requires. */
+        fun recordSignUp() = appState.privateKeyReminders.recordSignUp(accountIdHex)
+
+        fun reminderStage() = appState.privateKeyReminders.stage(accountIdHex)
+    }
 
     private enum class Teardown { SignOut, Wipe }
 

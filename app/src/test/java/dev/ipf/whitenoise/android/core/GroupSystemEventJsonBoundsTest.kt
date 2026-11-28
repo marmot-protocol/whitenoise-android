@@ -45,6 +45,15 @@ class GroupSystemEventJsonBoundsTest {
         assertFalse(GroupSystemEventJson.withinResourceBounds(List(limit + 1) { "0" }.joinToString(",", "[", "]")))
     }
 
+    /** Agent-operation payloads reuse the scanner with a depth-only bound before org.json parses them. */
+    @Test
+    fun depthOnlyBoundAllowsLargeCollections() {
+        assertTrue(GroupSystemEventJson.nestingWithin(nested(64), 64))
+        assertFalse(GroupSystemEventJson.nestingWithin(nested(65), 64))
+        assertTrue(GroupSystemEventJson.nestingWithin("[" + (1..1_000).joinToString(",") + "]", 64))
+        assertFalse(GroupSystemEventJson.nestingWithin("""["]"/*]*/]""", 64))
+    }
+
     @Test
     fun lexicalExtensionsThatHideStructureAreRejected() {
         val deep = nested(GroupSystemEventJson.MAX_JSON_DEPTH + 4)

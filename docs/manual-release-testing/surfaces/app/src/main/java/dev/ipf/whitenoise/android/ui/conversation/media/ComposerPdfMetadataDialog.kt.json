@@ -1,0 +1,121 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfMetadataDialog.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ComposerPdfMetadataDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfMetadataDialog.kt",
+        "anchor": "fun ComposerPdfMetadataDialog(",
+        "test_ids": [
+          "MED-065"
+        ]
+      },
+      {
+        "surface": "ComposerPdfMetadataDialogContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfMetadataDialog.kt",
+        "anchor": "fun ComposerPdfMetadataDialogContent(",
+        "test_ids": [
+          "MED-065"
+        ]
+      },
+      {
+        "surface": "PDF metadata question title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfMetadataDialog.kt",
+        "anchor": "R.string.composer_pdf_metadata_dialog_title",
+        "test_ids": [
+          "MED-065"
+        ]
+      },
+      {
+        "surface": "Signed PDF metadata question",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfMetadataDialog.kt",
+        "anchor": "R.string.composer_pdf_metadata_dialog_signed",
+        "test_ids": [
+          "MED-065"
+        ]
+      },
+      {
+        "surface": "Protected PDF metadata question",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfMetadataDialog.kt",
+        "anchor": "R.string.composer_pdf_metadata_dialog_encrypted",
+        "test_ids": [
+          "MED-065"
+        ]
+      },
+      {
+        "surface": "Unsupported PDF metadata question",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfMetadataDialog.kt",
+        "anchor": "R.string.composer_pdf_metadata_dialog_unsupported",
+        "test_ids": [
+          "MED-065"
+        ]
+      },
+      {
+        "surface": "PDF metadata question consequence",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfMetadataDialog.kt",
+        "anchor": "R.string.composer_pdf_metadata_dialog_consequence",
+        "test_ids": [
+          "MED-065"
+        ]
+      },
+      {
+        "surface": "PDF metadata Send as is action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfMetadataDialog.kt",
+        "anchor": "R.string.composer_pdf_metadata_send_as_is",
+        "test_ids": [
+          "MED-065"
+        ]
+      },
+      {
+        "surface": "PDF metadata question cancel action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfMetadataDialog.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "MED-065"
+        ]
+      },
+      {
+        "surface": "ComposerPdfMetadataOptions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfMetadataDialog.kt",
+        "anchor": "fun ComposerPdfMetadataOptions(",
+        "test_ids": [
+          "MED-064"
+        ]
+      },
+      {
+        "surface": "PDF metadata options title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfMetadataDialog.kt",
+        "anchor": "R.string.composer_pdf_metadata_options",
+        "test_ids": [
+          "MED-064"
+        ]
+      },
+      {
+        "surface": "Keep metadata for the selected PDF",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfMetadataDialog.kt",
+        "anchor": "R.string.composer_pdf_keep_metadata",
+        "test_ids": [
+          "MED-064"
+        ]
+      },
+      {
+        "surface": "Remove metadata from the selected PDF",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfMetadataDialog.kt",
+        "anchor": "R.string.composer_pdf_remove_metadata",
+        "test_ids": [
+          "MED-064"
+        ]
+      },
+      {
+        "surface": "PDF metadata options explanation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfMetadataDialog.kt",
+        "anchor": "R.string.composer_pdf_metadata_options_body",
+        "test_ids": [
+          "MED-064"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

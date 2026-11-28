@@ -228,6 +228,14 @@
           "ONB-002",
           "ONB-003"
         ]
+      },
+      {
+        "surface": "About field grows with text",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpScreen.kt",
+        "anchor": ".testTag(\"onboarding.sign_up.about\")",
+        "test_ids": [
+          "ONB-003"
+        ]
       }
     ],
     "source_coverage": [

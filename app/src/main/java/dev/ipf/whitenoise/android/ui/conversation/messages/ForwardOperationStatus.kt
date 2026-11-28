@@ -16,7 +16,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -51,11 +50,13 @@ import dev.ipf.whitenoise.android.state.forwardTargetMembersRevision
 import dev.ipf.whitenoise.android.state.forwardTargets
 import dev.ipf.whitenoise.android.state.forwardTargetsRevision
 import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.CheckCircle
 import dev.ipf.whitenoise.android.ui.theme.Dimens
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseElevation
 import java.util.Locale
 
 internal const val FORWARD_OPERATION_STATUS_TEST_TAG = "forward-operation-status"
@@ -177,7 +178,7 @@ private fun ForwardOperationStatusBar(
     modifier: Modifier,
 ) {
     Surface(
-        tonalElevation = 3.dp,
+        tonalElevation = WhiteNoiseElevation.Docked,
         modifier =
             modifier
                 .fillMaxWidth()
@@ -267,6 +268,7 @@ private fun ForwardOperationStatusRow(
     }
 }
 
+/** Bottom sheet showing a forward's progress, with cancel, retry and dismiss actions. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Suppress("FunctionNaming")
@@ -280,7 +282,7 @@ private fun ForwardOperationDetailsSheet(
 ) {
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val terminal = rememberSheetTerminalMotion(sheet)
-    ModalBottomSheet(onDismissRequest = { terminal.close(onClose) }, sheetState = sheet) {
+    WhiteNoiseModalBottomSheet(onDismissRequest = { terminal.close(onClose) }, sheetState = sheet) {
         ForwardProgressContent(snapshot, targetTitles, Modifier.fillMaxWidth())
         ForwardOperationActions(
             snapshot = snapshot,

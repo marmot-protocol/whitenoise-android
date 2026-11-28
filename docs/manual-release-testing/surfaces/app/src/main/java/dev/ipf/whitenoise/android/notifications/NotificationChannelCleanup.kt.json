@@ -1,0 +1,57 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationChannelCleanup.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "notification_content_contracts": [
+      {
+        "surface": "a last-signer sweep remains pending until startup verifies shortcut and channel deletion",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationChannelCleanup.kt",
+        "anchor": "private fun updateOwnerStoreAfterAccountCleanup(",
+        "test_ids": [
+          "NTF-059"
+        ]
+      },
+      {
+        "surface": "the last signer records the legacy channel sweep before native account revocation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationChannelCleanup.kt",
+        "anchor": "internal fun recordConversationChannelOwners(",
+        "test_ids": [
+          "NTF-059"
+        ]
+      },
+      {
+        "surface": "account sign-out and wipe deletes owned profile and conversation notification channels",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationChannelCleanup.kt",
+        "anchor": "internal fun deleteAccountNotificationChannels(",
+        "test_ids": [
+          "NTF-059"
+        ]
+      },
+      {
+        "surface": "local conversation deletion deletes owned conversation notification channels",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationChannelCleanup.kt",
+        "anchor": "internal fun deleteConversationNotificationChannels(",
+        "test_ids": [
+          "NTF-059"
+        ]
+      },
+      {
+        "surface": "channels removed on sign-out, wipe or chat deletion are relabeled with the generic notifications name first",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationChannelCleanup.kt",
+        "anchor": "R.string.notifications",
+        "test_ids": [
+          "NTF-059"
+        ]
+      },
+      {
+        "surface": "channels removed on sign-out, wipe or chat deletion replace private descriptions with hidden-content copy first",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationChannelCleanup.kt",
+        "anchor": "R.string.notification_hidden_content",
+        "test_ids": [
+          "NTF-059"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

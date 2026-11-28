@@ -81,7 +81,7 @@ jobs:
 
       - name: Set up JDK 17
         if: steps.scope.outputs.should_fuzz == 'true'
-        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: '17'
@@ -97,7 +97,9 @@ jobs:
       # Activate the task-output cache restored by setup-gradle.
       - name: Lint, compile, and replay fuzz regression corpus
         if: steps.scope.outputs.should_fuzz == 'true'
-        run: ./gradlew :fuzz:ktlintCheck :fuzz:replayAllFuzzRegression --build-cache --profile --no-daemon
+        run: |
+          ./gradlew :fuzz:ktlintCheck :fuzz:replayAllFuzzRegression --max-workers=1 \
+            --build-cache --profile --no-daemon -Pkotlin.daemon.jvmargs=-Xmx5g
 
       # Keep task timings on successful runs too; wall-clock timeouts alone do
       # not show whether compilation, tests, or analysis is doing extra work.

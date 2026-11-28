@@ -26,6 +26,17 @@ import org.robolectric.annotation.Config
 class AccountSetupFindingContentTest {
     @get:Rule val composeRule = createComposeRule()
 
+    /** A native rate-limit finding identifies the affected relay and explains when to retry. */
+    @Test fun rateLimitedRelayShowsItsFinding() {
+        val snapshot = setupSnapshot(OnboardingStepFfi.RELAYS, listOf(OnboardingActionFfi.RETRY))
+        snapshot.steps.first { it.step == OnboardingStepFfi.RELAYS }.findings =
+            listOf(setupFinding(OnboardingIssueFfi.RATE_LIMITED, "wss://rate-limited.example"))
+
+        show(AccountSetupState(snapshot = snapshot))
+        composeRule.onNodeWithText("wss://rate-limited.example").assertExists()
+        composeRule.onNodeWithText("Too many requests. Try again shortly.").assertExists()
+    }
+
     /** The inline Remove shortcut cannot suppress the provenance of the finding that offered it. */
     @Test fun directRemovalRetainsNativeFindingEvidence() {
         val snapshot = setupSnapshot(OnboardingStepFfi.RELAYS, listOf(OnboardingActionFfi.EDIT_RELAYS))

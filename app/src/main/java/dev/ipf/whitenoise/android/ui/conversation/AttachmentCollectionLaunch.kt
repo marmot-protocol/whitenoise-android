@@ -4,9 +4,11 @@ import android.content.Context
 import android.net.Uri
 import dev.ipf.marmotkit.LocalSendStatusFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.media.captureSharedPlaintextWrite
 import dev.ipf.whitenoise.android.share.PrivateShareSendLease
 import dev.ipf.whitenoise.android.state.AttachmentCollectionOperation
 import dev.ipf.whitenoise.android.state.CollectionChunkState
+import dev.ipf.whitenoise.android.state.CollectionDraftSourceFiles
 import dev.ipf.whitenoise.android.state.CollectionItem
 import dev.ipf.whitenoise.android.state.CollectionItemKind
 import dev.ipf.whitenoise.android.state.CollectionItemState
@@ -15,23 +17,28 @@ import dev.ipf.whitenoise.android.state.DraftSendClearToken
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.state.PlannedCollectionItem
+import dev.ipf.whitenoise.android.state.UnverifiedStoredDraftPdf
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.attachmentCollections
 import dev.ipf.whitenoise.android.state.cancelUnaccepted
 import dev.ipf.whitenoise.android.state.claimCollectionResume
 import dev.ipf.whitenoise.android.state.collectionDocumentIds
+import dev.ipf.whitenoise.android.state.journalHash
 import dev.ipf.whitenoise.android.state.planAttachmentChunks
 import dev.ipf.whitenoise.android.state.releaseCollectionResume
 import dev.ipf.whitenoise.android.state.replanned
 import dev.ipf.whitenoise.android.state.resumedWithout
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
+import dev.ipf.whitenoise.android.state.shouldAcceptMediaUploadForAccount
 import dev.ipf.whitenoise.android.state.skipItems
 import dev.ipf.whitenoise.android.state.withChunkState
+import dev.ipf.whitenoise.android.state.withStoredDraftAdmission
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
 import dev.ipf.whitenoise.android.ui.conversation.media.queryContentSize
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
+import java.io.IOException
 import java.util.UUID
 
 /** What one Send hands to a collection operation; [caption] is already trimmed and null when blank. */
@@ -42,6 +49,7 @@ internal data class CollectionSendRequest(
     val preparedImages: Map<String, PendingAttachment> = emptyMap(),
     val preparedDocuments: Map<Uri, PendingAttachment> = emptyMap(),
     val draftClear: DraftSendClearToken? = null,
+    val keepPdfMetadata: Set<Uri> = emptySet(),
 )
 
 /** What MDK knows about a chunk token after the process that recorded it ended. */
@@ -64,9 +72,12 @@ internal fun WhiteNoiseAppState.mdkCollectionTokenStatus(
     { token ->
         runCatchingCancellable {
             when (marmotIo { localSendStatus(accountRef, groupIdHex, token) }) {
-                is LocalSendStatusFfi.Completed, LocalSendStatusFfi.Queued, LocalSendStatusFfi.EngineOwned ->
-                    CollectionTokenStatus.ACCEPTED
-                LocalSendStatusFfi.Rejected, null -> CollectionTokenStatus.NOT_ACCEPTED
+                is LocalSendStatusFfi.Completed,
+                is LocalSendStatusFfi.Queued,
+                is LocalSendStatusFfi.EngineOwned,
+                -> CollectionTokenStatus.ACCEPTED
+                LocalSendStatusFfi.Rejected, LocalSendStatusFfi.RefusedNewMembers, null ->
+                    CollectionTokenStatus.NOT_ACCEPTED
             }
         }.getOrDefault(CollectionTokenStatus.UNRESOLVED)
     }
@@ -77,6 +88,7 @@ internal fun WhiteNoiseAppState.mdkCollectionTokenStatus(
  * [onAfterSend] runs once, when the first chunk's bubble appears. [send] keeps the items' outgoing draft open
  * until the operation stops running here, so its later chunks and their thumbnails decode in that draft's worker.
  */
+@Suppress("LongMethod") // The journal and plaintext copies have one cancellation-safe admission.
 internal fun ConversationMediaSender.startCollectionSend(
     request: CollectionSendRequest,
     completion: StagedMediaSendCompletion,
@@ -88,9 +100,13 @@ internal fun ConversationMediaSender.startCollectionSend(
     val groupIdHex = controller.group.groupIdHex
     val sessionEpoch = appState.mediaUploadSessionEpoch()
     val sourceAccount = appState.accounts.firstOrNull { it.label == account }?.accountIdHex
+    val permit = captureSharedPlaintextWrite(account)
+    val registry = appState.attachmentCollections
+    val admission = registry.admissions.begin(account, groupIdHex)
     val original = this
     appState.launchMutation {
         var lease: PrivateShareSendLease? = null
+        var stagedOperation: AttachmentCollectionOperation? = null
         var started = false
         try {
             val uris = request.imageSlots.map { it.uri } + request.documentUris
@@ -101,9 +117,19 @@ internal fun ConversationMediaSender.startCollectionSend(
                 }
             val operation =
                 withContext(Dispatchers.IO) {
-                    planCollectionOperation(context, account, groupIdHex, request, appState.attachmentCollections.now())
+                    val plan = planCollectionOperation(context, account, groupIdHex, request, registry.now())
+                    stagedOperation = plan
+                    appState.copyStoredCollectionSources(context, plan, request, permit)
                 }
-            started = withContext(Dispatchers.IO) { appState.attachmentCollections.start(operation) }
+            // Record the handoff inside I/O so cancellation during return cannot delete a journal-owned source.
+            withContext(Dispatchers.IO) {
+                started =
+                    registry.start(operation, admission) {
+                        val active = appState.activeAccountRef
+                        val epoch = appState.mediaUploadSessionEpoch()
+                        shouldAcceptMediaUploadForAccount(account, sessionEpoch, active, epoch)
+                    }
+            }
             if (!started) return@launchMutation appState.present(R.string.share_import_storage)
             completion.accept()
             val run =
@@ -113,17 +139,34 @@ internal fun ConversationMediaSender.startCollectionSend(
                     groupIdHex,
                     sessionEpoch,
                     request.caption,
-                    request.preparedImages,
-                    request.preparedDocuments,
+                    request.preparedImages.withoutStoredFiles(),
+                    request.preparedDocuments.withoutStoredFiles(),
                     request.draftClear,
                     onAfterSend,
+                    keepPdfMetadata =
+                        request.documentUris
+                            .zip(operation.items.drop(request.imageSlots.size))
+                            .filter { (originalUri, _) -> originalUri in request.keepPdfMetadata }
+                            .mapTo(mutableSetOf()) { (_, item) -> Uri.parse(item.uri) },
                 )
             val held = lease.also { lease = null }
             AttachmentCollectionSender { latestCollectionSender(account, groupIdHex) ?: original }.drive(run, held)
+        } catch (_: UnverifiedStoredDraftPdf) {
+            appState.present(R.string.media_file_pdf_metadata_kept)
+        } catch (_: IOException) {
+            appState.present(R.string.share_import_storage)
         } finally {
+            registry.admissions.release(admission)
             controller.endOutgoingSend(send)
             lease?.let { withContext(NonCancellable + Dispatchers.IO) { it.release() } }
-            if (!started) completion.reject()
+            if (!started) {
+                stagedOperation?.let { plan ->
+                    withContext(NonCancellable + Dispatchers.IO) {
+                        CollectionDraftSourceFiles(context.cacheDir).deleteKey(journalHash(plan.id))
+                    }
+                }
+                completion.reject()
+            }
         }
     }
 }
@@ -204,8 +247,26 @@ internal suspend fun WhiteNoiseAppState.restoreCollectionOperations(
     readable: (String) -> Boolean,
     tokenStatus: suspend (String) -> CollectionTokenStatus? = mdkCollectionTokenStatus(accountRef, groupIdHex),
 ) {
+    withStoredDraftAdmission(accountRef, groupIdHex) {
+        val registry = attachmentCollections
+        registry.operations.value.values
+            .filter { it.accountRef == accountRef && it.groupIdHex == groupIdHex && it.needsStoredDraftCleanup }
+            .forEach { finishCollectionDraftCleanup(it.id) }
+        withContext(Dispatchers.IO) { registry.journaledFor(accountRef, groupIdHex) }.forEach { journaled ->
+            restoreCollectionOperation(journaled, readable, tokenStatus)
+        }
+    }
+}
+
+/** Reconciles the native send tokens and retains accepted records until any selected-draft cleanup succeeds. */
+private suspend fun WhiteNoiseAppState.restoreCollectionOperation(
+    journaled: AttachmentCollectionOperation,
+    readable: (String) -> Boolean,
+    tokenStatus: suspend (String) -> CollectionTokenStatus?,
+) {
     val registry = attachmentCollections
-    withContext(Dispatchers.IO) { registry.journaledFor(accountRef, groupIdHex) }.forEach { journaled ->
+    val admission = registry.admissions.begin(journaled.accountRef, journaled.groupIdHex)
+    try {
         val statuses = collectionTokenStatuses(journaled, { false }, tokenStatus)
         val reconciled = journaled.withTokenStatuses(statuses, registry.now())
         // A token MDK could not be asked about may already be sent, so its record is kept for another try.
@@ -216,12 +277,19 @@ internal suspend fun WhiteNoiseAppState.restoreCollectionOperations(
                     .filter { !it.state.isSettled && (it.uri.isBlank() || !readable(it.uri)) }
                     .mapTo(linkedSetOf()) { it.id }
             }
-        if (!unresolved && (reconciled.ownedByComposerDraft || reconciled.nextChunk == null)) {
-            withContext(Dispatchers.IO) { registry.adopt(reconciled) }
-            registry.discard(reconciled.id)
-        } else {
-            registry.adopt(reconciled.copy(paused = true, unrecoverableItemIds = unrecoverable))
+        val restored = reconciled.copy(paused = true, unrecoverableItemIds = unrecoverable)
+        if (!registry.adopt(restored, admission)) return
+        when {
+            reconciled.needsStoredDraftCleanup -> finishCollectionDraftCleanup(reconciled.id)
+            !unresolved && (reconciled.ownedByComposerDraft || reconciled.nextChunk == null) -> {
+                registry.discard(reconciled.id)
+                if (journaled.items.any { it.storedDraft != null }) {
+                    retainedConversationStates.recordNativeComposerCleanup(journaled.accountRef, journaled.groupIdHex)
+                }
+            }
         }
+    } finally {
+        registry.admissions.release(admission)
     }
 }
 
@@ -229,8 +297,10 @@ internal suspend fun WhiteNoiseAppState.restoreCollectionOperations(
  * Continues a paused operation with the same stable ids: MDK is asked about recorded tokens again, unreadable
  * items are skipped and named, and the remaining chunks are sent in order from their URIs.
  */
+@Suppress("LongMethod") // The claim spans token reconciliation, consent and journal admission.
 internal fun ConversationMediaSender.resumeCollection(
     operationId: String,
+    canAskForPdfConsent: () -> Boolean = { false },
     tokenStatus: (suspend (String) -> CollectionTokenStatus?)? = null,
 ) {
     val registry = appState.attachmentCollections
@@ -241,6 +311,7 @@ internal fun ConversationMediaSender.resumeCollection(
     val original = this
     appState.launchMutation {
         var skipped = 0
+        var keepPdfMetadata = emptySet<Uri>()
         val updated =
             try {
                 val optimistic = appState.optimisticMessages(paused.accountRef, paused.groupIdHex)
@@ -255,10 +326,27 @@ internal fun ConversationMediaSender.resumeCollection(
                     appState.present(R.string.error_try_again)
                     return@launchMutation
                 }
-                if (paused.withTokenStatuses(statuses, registry.now()).ownedByComposerDraft) {
+                val reconciled = paused.withTokenStatuses(statuses, registry.now())
+                if (reconciled.ownedByComposerDraft) {
                     // As on restore: with nothing accepted, the composer's draft still owns the selection, the
                     // caption and its clearing, so sending from here would lose the caption or duplicate the draft.
+                    registry.update(operationId) { it.withTokenStatuses(statuses, registry.now()) }
                     registry.discard(operationId)
+                    appState.retainedConversationStates.recordNativeComposerCleanup(
+                        paused.accountRef,
+                        paused.groupIdHex,
+                    )
+                    return@launchMutation
+                }
+                keepPdfMetadata = confirmResumedPdfMetadata(reconciled, canAskForPdfConsent) ?: return@launchMutation
+                if (!shouldAcceptMediaUploadForAccount(
+                        paused.accountRef,
+                        sessionEpoch,
+                        appState.activeAccountRef,
+                        appState.mediaUploadSessionEpoch(),
+                    ) ||
+                    registry.operations.value[operationId] != paused
+                ) {
                     return@launchMutation
                 }
                 withContext(Dispatchers.IO) {
@@ -273,6 +361,8 @@ internal fun ConversationMediaSender.resumeCollection(
                 releaseCollectionResume(operationId)
             }
         val resumed = updated ?: return@launchMutation
+        if (resumed.needsStoredDraftCleanup) appState.finishCollectionDraftCleanup(operationId)
+        if (resumed.nextChunk == null) return@launchMutation
         val sourceAccount = appState.accounts.firstOrNull { it.label == resumed.accountRef }?.accountIdHex
         val lease =
             acquireStagedSources(context, resumed.items.map { Uri.parse(it.uri) }, sourceAccount).getOrElse {
@@ -281,7 +371,7 @@ internal fun ConversationMediaSender.resumeCollection(
                 return@launchMutation appState.present(R.string.share_import_storage)
             }
         if (skipped > 0) appState.presentSkippedAttachments(skipped, R.string.attachment_collection_reselect)
-        driveResumedCollection(resumed, sessionEpoch, lease, original)
+        driveResumedCollection(resumed, sessionEpoch, lease, original, keepPdfMetadata)
     }
 }
 
@@ -338,6 +428,8 @@ internal suspend fun ConversationController.cancelCollection(operationId: String
     val registry = appState.attachmentCollections
     val before = registry.operations.value[operationId] ?: return
     val cancelled = registry.update(operationId) { it.cancelUnaccepted(registry.now()) }
+    // Whatever was cancelled stays in the native draft, so the shelf that was hiding it reads the draft again.
+    appState.showReleasedCollectionOriginals(before)
     if (before.paused || cancelled == null) return registry.discard(operationId)
     // Tokens come from the cancelled snapshot, so one recorded after `before` is withdrawn as well, and a chunk
     // MDK accepted meanwhile is never touched.

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="composer_pdf_pages">
+        <item quantity="one">PDF · %d страница</item>
+        <item quantity="few">PDF · %d страницы</item>
+        <item quantity="many">PDF · %d страниц</item>
+        <item quantity="other">PDF · %d страницы</item>
+    </plurals>
+    <string name="composer_pdf_metadata_options">Параметры метаданных PDF</string>
+    <string name="composer_pdf_keep_metadata">Сохранить метаданные</string>
+    <string name="composer_pdf_remove_metadata">Удалить метаданные</string>
+    <string name="composer_pdf_metadata_options_body">Получатели смогут увидеть автора, даты и другие свойства в исходной копии %1$s.</string>
+    <string name="composer_pdf_metadata_removed">Метаданные удалены</string>
+    <string name="composer_pdf_metadata_removed_on_send">Метаданные удалятся при отправке</string>
+    <string name="composer_pdf_metadata_signed">Подписан: метаданные остаются</string>
+    <string name="composer_pdf_metadata_encrypted">Защищён: метаданные остаются</string>
+    <string name="composer_pdf_metadata_unsupported">Метаданные не удалить</string>
+    <string name="composer_pdf_metadata_sending_as_is">Отправится с метаданными</string>
+    <string name="composer_pdf_metadata_dialog_title">Отправить с метаданными?</string>
+    <string name="composer_pdf_metadata_dialog_signed">%1$s подписан. Удаление метаданных нарушит подпись, поэтому его можно отправить только как есть.</string>
+    <string name="composer_pdf_metadata_dialog_encrypted">%1$s защищён паролем, поэтому его метаданные нельзя удалить.</string>
+    <string name="composer_pdf_metadata_dialog_unsupported">White Noise не может безопасно удалить метаданные из %1$s.</string>
+    <plurals name="composer_pdf_metadata_dialog_several">
+        <item quantity="one">Не удаётся удалить метаданные из %1$d PDF: %2$s.</item>
+        <item quantity="few">Не удаётся удалить метаданные из %1$d PDF: %2$s.</item>
+        <item quantity="many">Не удаётся удалить метаданные из %1$d PDF: %2$s.</item>
+        <item quantity="other">Не удаётся удалить метаданные из %1$d PDF: %2$s.</item>
+    </plurals>
+    <string name="composer_pdf_metadata_dialog_consequence">Все участники этого чата смогут увидеть такие сведения, как автор, приложения, в которых он создан, и время создания или изменения.</string>
+    <string name="composer_pdf_metadata_send_as_is">Отправить как есть</string>
+    <string name="media_file_pdf_metadata_kept">Этот PDF не отправлен, потому что не удалось удалить его метаданные. Отправьте его из поля сообщения, чтобы выбрать, отправлять ли его как есть.</string>
+</resources>

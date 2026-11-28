@@ -33,9 +33,10 @@ import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.isUsageDiagnosticsGranted
 import dev.ipf.whitenoise.android.ui.WhiteNoiseApp
-import dev.ipf.whitenoise.android.ui.navigation.MainSection
 import dev.ipf.whitenoise.android.ui.navigation.MainShellStateHolder
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
+import dev.ipf.whitenoise.android.ui.navigation.ShellNavEvent
+import dev.ipf.whitenoise.android.ui.navigation.dispatchShellNav
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -71,8 +72,7 @@ class DevicePrivacyScreenScreenshotTest {
                 .apply { isAccessible = true }
         try {
             composeRule.runOnIdle {
-                shell.sectionState.sectionName = MainSection.Settings.name
-                shell.sectionState.settingsDetailName = SettingsDetail.DevicePrivacy.name
+                shell.dispatchShellNav(ShellNavEvent.OpenSettings(SettingsDetail.DevicePrivacy))
             }
             composeRule.onNodeWithTag("privacy.device_protection.group").assertIsDisplayed()
             repeat(3) {
@@ -94,10 +94,10 @@ class DevicePrivacyScreenScreenshotTest {
         val state = privacyAppState(UsageDiagnosticsDecisionFfi.ACCEPTANCE_REQUIRED, hasAccount = false)
         runBlocking { state.refreshSecurityPrivacySettings() }
         val shell = presentBootstrappedApp(state, AppPhase.Onboarding)
-        composeRule.onNodeWithText("Sign Up").assertIsDisplayed()
+        composeRule.onNodeWithText("Sign up").assertIsDisplayed()
         composeRule.onNodeWithText("Help Improve White Noise").assertDoesNotExist()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/usage_diagnostics_welcome_deferred.png")
-        composeRule.onNodeWithText("Sign In").performClick()
+        composeRule.onNodeWithText("Sign in").performClick()
         composeRule
             .onNodeWithTag("onboarding.sign_in.private_key")
             .assertIsDisplayed()

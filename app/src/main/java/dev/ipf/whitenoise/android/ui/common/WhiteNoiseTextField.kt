@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicSecureTextField
 import androidx.compose.foundation.text.BasicTextField
@@ -32,14 +33,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.takeOrElse
+import androidx.compose.ui.layout.HorizontalAlignmentLine
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.ui.theme.Radii
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 
 /** Container fill a hosting surface hands to its fields, for example the lowest surface inside settings. */
 val LocalWhiteNoiseTextFieldContainerColor = staticCompositionLocalOf { Color.Unspecified }
+
+/** Lets an adjacent control align with the secure input surface below its label and above its help text. */
+internal val WhiteNoiseSecureInputCenter = HorizontalAlignmentLine(::minOf)
 
 private object WhiteNoiseTextFieldDefaults {
     /** Material's standard content inset for input, supporting text, and leading icon artwork. */
@@ -49,7 +56,7 @@ private object WhiteNoiseTextFieldDefaults {
     val AboveLabelAdditionalStartInset = 12.dp
 
     /** Keep the approved 28 dp form geometry local; production extra-large is currently 24 dp. */
-    val Shape = RoundedCornerShape(28.dp)
+    val Shape = RoundedCornerShape(Radii.xxl)
 
     /** A full-shape state ring replaces a persistent resting outline. */
     val StateRingWidth = 2.dp
@@ -88,6 +95,7 @@ internal fun WhiteNoiseTextField(
     onKeyboardAction: KeyboardActionHandler? = null,
     lineLimits: TextFieldLineLimits = TextFieldLineLimits.Default,
     emojiAction: Boolean = false,
+    emojiArtwork: Boolean = emojiAction,
 ) {
     val isError = errorMessage != null
     val interactionSource = remember { MutableInteractionSource() }
@@ -98,13 +106,23 @@ internal fun WhiteNoiseTextField(
             colors.textColorFor(enabled = enabled, isError = isError, focused = focused)
         }
     val emojiAnchor = rememberEmojiSheetFieldAnchor()
+    val useEmojiArtwork = emojiArtwork && outputTransformation == null
+    val artwork = rememberTextFieldEmojiArtwork(state, useEmojiArtwork)
+    val fieldInput = artwork.inputWith(inputTransformation)
+    val scrollState = rememberScrollState()
+    val textLayout = remember { TextLayoutHolder() }
+    val spokenValue = if (useEmojiArtwork) emojiEditableText(state, enabled, readOnly, textLayout) else Modifier
 
-    CompositionLocalProvider(LocalTextSelectionColors provides colors.textSelectionColors) {
+    CompositionLocalProvider(
+        LocalTextSelectionColors provides colors.textSelectionColors,
+        emojiFieldClipboard(useEmojiArtwork),
+    ) {
         BasicTextField(
             state = state,
             modifier =
                 modifier
                     .then(if (emojiAction) Modifier.emojiSheetFieldAnchor(emojiAnchor) else Modifier)
+                    .then(spokenValue)
                     .textFieldErrorSemantics(errorMessage)
                     .defaultMinSize(
                         minWidth = OutlinedTextFieldDefaults.MinWidth,
@@ -118,54 +136,69 @@ internal fun WhiteNoiseTextField(
             onKeyboardAction = onKeyboardAction,
             lineLimits = lineLimits,
             interactionSource = interactionSource,
-            inputTransformation = inputTransformation,
-            outputTransformation = outputTransformation,
+            inputTransformation = fieldInput,
+            outputTransformation = outputTransformation ?: artwork.output,
+            onTextLayout = { result -> textLayout.result = result },
+            scrollState = scrollState,
             decorator =
-                OutlinedTextFieldDefaults.decorator(
-                    state = state,
-                    enabled = enabled,
-                    lineLimits = lineLimits,
-                    outputTransformation = outputTransformation,
-                    interactionSource = interactionSource,
-                    labelPosition = TextFieldLabelPosition.Above(),
-                    label = label?.let(::insetLabel),
-                    placeholder = placeholder,
-                    leadingIcon =
-                        if (emojiAction) {
-                            {
-                                androidx.compose.runtime.key(state) {
-                                    TextEntryEmojiFieldAction(
-                                        androidx.compose.ui.text.input
-                                            .TextFieldValue(state.text.toString(), state.selection),
-                                        enabled && !readOnly,
-                                        anchor = emojiAnchor,
-                                    ) { value -> insertTextEntryEmoji(state, value, inputTransformation) }
+                OutlinedTextFieldDefaults
+                    .decorator(
+                        state = state,
+                        enabled = enabled,
+                        lineLimits = lineLimits,
+                        outputTransformation = outputTransformation ?: artwork.output,
+                        interactionSource = interactionSource,
+                        labelPosition = TextFieldLabelPosition.Above(),
+                        label = label?.let(::insetLabel),
+                        placeholder = placeholder,
+                        leadingIcon =
+                            if (emojiAction) {
+                                {
+                                    androidx.compose.runtime.key(state) {
+                                        TextEntryEmojiFieldAction(
+                                            androidx.compose.ui.text.input
+                                                .TextFieldValue(state.text.toString(), state.selection),
+                                            enabled && !readOnly,
+                                            anchor = emojiAnchor,
+                                        ) { value -> insertTextEntryEmoji(state, value, inputTransformation) }
+                                    }
                                 }
-                            }
-                        } else {
-                            leadingIcon
+                            } else {
+                                leadingIcon
+                            },
+                        trailingIcon = trailingIcon,
+                        supportingText = supportingText,
+                        isError = isError,
+                        colors = colors,
+                        contentPadding = whiteNoiseTextFieldContentPadding(),
+                        container = {
+                            WhiteNoiseTextFieldContainer(
+                                enabled = enabled,
+                                isError = isError,
+                                interactionSource = interactionSource,
+                                colors = colors,
+                            )
                         },
-                    trailingIcon = trailingIcon,
-                    supportingText = supportingText,
-                    isError = isError,
-                    colors = colors,
-                    contentPadding = whiteNoiseTextFieldContentPadding(),
-                    container = {
-                        WhiteNoiseTextFieldContainer(
-                            enabled = enabled,
-                            isError = isError,
-                            interactionSource = interactionSource,
-                            colors = colors,
-                        )
+                    ).let { decorator ->
+                        if (useEmojiArtwork) {
+                            artwork.decorate(
+                                decorator,
+                                { textLayout.result?.invoke() },
+                                scrollState,
+                                horizontal = lineLimits == TextFieldLineLimits.SingleLine,
+                            )
+                        } else {
+                            decorator
+                        }
                     },
-                ),
         )
     }
 }
 
 /**
  * Password variant of [WhiteNoiseTextField]: same 28 dp container, above label and inset, single line, obfuscated
- * input that reveals the last typed character.
+ * input that reveals the last typed character. [containerModifier] applies to the input surface alone, excluding its
+ * label and supporting text.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("FunctionNaming", "LongMethod", "LongParameterList")
@@ -186,6 +219,7 @@ internal fun WhiteNoiseSecureTextField(
     textObfuscationMode: TextObfuscationMode = TextObfuscationMode.RevealLastTyped,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     onKeyboardAction: KeyboardActionHandler? = null,
+    containerModifier: Modifier = Modifier,
 ) {
     val isError = errorMessage != null
     val interactionSource = remember { MutableInteractionSource() }
@@ -236,12 +270,22 @@ internal fun WhiteNoiseSecureTextField(
                             isError = isError,
                             interactionSource = interactionSource,
                             colors = colors,
+                            modifier = containerModifier.reportSecureInputCenter(),
                         )
                     },
                 ),
         )
     }
 }
+
+/** Reports the measured surface center through Material's field decoration to its parent row. */
+private fun Modifier.reportSecureInputCenter(): Modifier =
+    layout { measurable, constraints ->
+        val field = measurable.measure(constraints)
+        layout(field.width, field.height, mapOf(WhiteNoiseSecureInputCenter to field.height / 2)) {
+            field.placeRelative(0, 0)
+        }
+    }
 
 /** Resolve state colors from the active palette, including existing AMOLED contrast. */
 @Composable
@@ -268,11 +312,13 @@ private fun WhiteNoiseTextFieldContainer(
     isError: Boolean,
     interactionSource: MutableInteractionSource,
     colors: TextFieldColors,
+    modifier: Modifier = Modifier,
 ) {
     OutlinedTextFieldDefaults.Container(
         enabled = enabled,
         isError = isError,
         interactionSource = interactionSource,
+        modifier = modifier,
         colors = colors,
         shape = WhiteNoiseTextFieldDefaults.Shape,
         focusedBorderThickness = WhiteNoiseTextFieldDefaults.StateRingWidth,
@@ -299,7 +345,7 @@ private fun insetLabel(label: @Composable TextFieldLabelScope.() -> Unit): @Comp
     }
 
 /** Keep the spoken error tied to the same caller-owned message that enables error chrome. */
-private fun Modifier.textFieldErrorSemantics(errorMessage: String?): Modifier {
+internal fun Modifier.textFieldErrorSemantics(errorMessage: String?): Modifier {
     if (errorMessage == null) return this
     return semantics { error(errorMessage) }
 }

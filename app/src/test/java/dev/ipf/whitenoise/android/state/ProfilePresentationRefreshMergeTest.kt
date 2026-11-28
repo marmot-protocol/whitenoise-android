@@ -23,6 +23,18 @@ class ProfilePresentationRefreshMergeTest {
         )
     }
 
+    /** Without a profile MDK names a signer account by its label, the raw public key; that is never a name. */
+    @Test
+    fun publicKeyFallbackNamesNeverBecomeTheDisplayName() {
+        val hex = "a".repeat(64)
+        val empty = ProfilePresentation(displayName = null, avatarUrl = null)
+
+        assertEquals(empty, refreshedProfilePresentation(empty, profile = null, rawDisplayName = hex))
+        assertNull(accountSwitchProfileSeed(hex, profile = null, rawDisplayName = hex).displayName)
+        assertNull(accountSwitchProfileSeed(hex, profile = null, rawDisplayName = "npub1abc").displayName)
+        assertEquals("Alice", accountSwitchProfileSeed(hex, profile = null, rawDisplayName = "Alice").displayName)
+    }
+
     @Test
     fun explicitAuthoritativeRemovalClearsIdentityFields() {
         val current = ProfilePresentation(displayName = "Alice", avatarUrl = OLD_AVATAR)

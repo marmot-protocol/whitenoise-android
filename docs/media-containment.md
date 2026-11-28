@@ -42,7 +42,7 @@ Automatic A/V demuxing and decoding execute in the permissionless native worker.
 
 Playback speed is applied to raw PCM by the pinned Media3 1.11.1 Sonic processor. AudioTrack remains at unity speed and pitch. Each fixed-rate segment receives at most ten milliseconds of aligned PCM per input; its owned output must be consumed before another input or explicit end-of-input flush. A rate change drains the old segment before starting the latest requested rate on the same device. Position snapshots use cached source-time anchors and never resize or query the device from a UI getter. The source-derived maximum individual processor payload is 442,800 bytes; reachable payload plus one resize is below 2 MiB. Object headers, garbage awaiting collection and total process memory are outside that bound. A Media3 upgrade requires a new allocation proof.
 
-Preferred per-track reads retain one copied video frame and one PCM block suffix in the parent. They do not remove the native compressed-packet limit of 8 MiB or 512 packets. A file whose audio ends well before a long video-only tail can exceed that interleave budget while establishing real audio EOF and refuse. That bounded-skew case remains unqualified; no universal-format or long-tail playback guarantee is made. Real Sonic tiny-input tests, device progress and audible-output checks establish different facts. API 30 and current-device EOS, refill and audible-tail qualification require actual execution.
+Preferred per-track reads retain one pending copied video frame and one PCM block suffix in the parent. A seek can briefly hold two pending frames. When the next frame falls after the target, the parent displays the preceding frame immediately and schedules the next at its own timestamp. Video EOF also confirms the final frame's display interval. The native compressed queue remains bounded to 8 MiB and 512 packets, or up to 2048 packets during a frame-threaded video read with interleaved audio. A file whose audio ends well before a long video-only tail can exceed that interleave budget while establishing real audio EOF and refuse. That bounded-skew case remains unqualified; no universal-format or long-tail playback guarantee is made. Real Sonic tiny-input tests, device progress and audible-output checks establish different facts. API 30 and current-device EOS, refill and audible-tail qualification require actual execution.
 
 
 The host rechecks source ownership and cancellation when a provider returns a
@@ -60,8 +60,10 @@ decoder preparation. Closing the writer after successful decoder EOF completes
 the utterance. Decode/feed errors and unrecognized audio cannot
 produce a successful partial transcript. The provider owns its downloaded model;
 White Noise neither captures microphone audio nor falls back to another recognizer.
-Transcripts remain transient in-bubble state toggled from the side Transcribe disc and are cleared when toggled off, on background,
-source disposal or account/chat replacement. This path does not add MDK persistence
+Transcripts and their visibility choices are cached in memory per account and chat while the app is in the
+foreground. Backgrounding, App Lock and account replacement clear the cache. Removing a chat or ending membership clears its
+entries and rejects late recognition results for that chat. Turning the Transcribe disc off hides that message's text.
+This path does not add MDK persistence
 or claim isolation of the external recognition provider. Run `MED-038` against the exact provider
 and candidate APK; source contracts alone do not prove recognition compatibility.
 
@@ -84,7 +86,7 @@ Inline eligibility requires a visible row, a resumed lifecycle, focused window, 
 
 A startup timeout retains animation admission even before OPEN: an unconnected Android instance may still be starting. This favours the one-worker resource bound over automatic recovery from an unconfirmed startup. If Android never reports a connection or worker death, the animation lane can remain unavailable until app-process restart; the still-image lane remains independent.
 
-Received and picked video playback accepts local file/content inputs through the isolated decoder. Media3 supplies the existing player controls over a raw-output adapter. Voice playback shares the established voice focus owner; video has its own focus owner. Paused seeking uses an account-bound automatic poster request. Playback and transcription have distinct process-wide lanes, each retaining its resource and process retirement witness.
+Received and picked video playback accepts local file/content inputs through the isolated decoder. Media3 supplies the existing player controls over a raw-output adapter. Playback frames are converted no larger than the display's longest side (at least 1280 pixels). Voice playback shares the established voice focus owner; video has its own focus owner. Paused seeking uses an account-bound automatic poster request. Playback and transcription have distinct process-wide lanes, each retaining its resource and process retirement witness.
 
 An accepted playback or transcription binding that never connects retains its lane,
 even though OPEN was never sent. A binding exception also leaves creation uncertain.
@@ -99,7 +101,7 @@ until app-process restart; resetting an account or waiting out a deadline does
 not clear that hold. A definitive false bind or a failure before binding has no
 possible worker and follows the existing no-worker cleanup path.
 
-Referenced Nostr-event networking retains its existing ExoPlayer owner and explicit loading policy; it remains outside local attachment containment.
+Referenced Nostr-event video no longer streams into an app-process extractor. Play downloads the one public HTTPS resource through the validated media client into a private per-player directory under `cache/nostr_video`, refusing a declared or streamed size over the decoder input limit, then plays that file through the same isolated player as local attachments. Playlists are never expanded: HLS links and typed HLS variants are not offered for in-app playback and stay ordinary links. The download refuses to fill the app's disk reserve. Dismissal releases the player and deletes its directory; startup deletes directories left by earlier processes, and the session wipe covers the folder. No production source constructs ExoPlayer; `AttachmentMediaContainmentCoverageTest` scans every Kotlin and Java file in the main source set for platform audio, video and image parsers, ExoPlayer and Media3 extractors outside the isolated workers.
 
 ## Native audio/video policy
 
@@ -131,12 +133,11 @@ expiry, player release, account reset, a playback failure, or a run that ends
 in an exception. A paused worker can keep running code for that window, which an
 active worker of the same source could already do.
 
-After a seek, the worker drops decoded video frames before the target without
-converting them to RGBA, because the parent would discard them. It stops
-dropping while half of the compressed lookahead is queued, after 500 ms of
-its 1.5-second call deadline or after half of its read step budget, and then
-returns the frame for
-the parent's existing preroll handling.
+After a seek, the worker defers RGBA conversion of pre-target video and holds
+one reference to the most recent deferred frame. It returns that frame once when
+the next frame starts after the target or when video reaches EOF. It also yields a frame
+to the parent when half of the compressed lookahead is queued, after 500 ms of
+its 1.5-second call budget or after half of its read step budget.
 
 ## MDK boundary
 

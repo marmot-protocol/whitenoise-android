@@ -103,13 +103,13 @@ class LocalNotificationPresenter(
             interactions = interactions,
         )
     private val conversationVibrationPreferences = ConversationVibrationPreferences(context)
-    private val profileNotificationOverrides by lazy { ProfileNotificationOverridePreferences(context) }
-    private val profileNotificationChannels by lazy { ProfileNotificationChannels(context) }
+    internal val profileNotificationOverrides by lazy { ProfileNotificationOverridePreferences(context) }
+    internal val profileNotificationChannels by lazy { ProfileNotificationChannels(context) }
 
     // First used from show()'s Default-dispatcher routing block, so defer the
     // SharedPreferences-backed construction instead of adding disk-backed work
     // to AppState's main-thread initialization.
-    private val conversationNotificationRouting by lazy { ConversationNotificationRouting(context) }
+    internal val conversationNotificationRouting by lazy { ConversationNotificationRouting(context) }
     internal val publisher =
         NotificationCardPublisher(
             context,
@@ -142,11 +142,21 @@ class LocalNotificationPresenter(
 
     fun hideConversationShortcutsFromDirectShare() = conversationShortcuts.hideConversationShortcutsFromDirectShare()
 
-    /** Clears shortcut presentation under the caller's acknowledged credential-revocation fence. */
-    fun clearRevokedConversationShortcutsForAccount(
+    suspend fun clearRevokedConversationShortcutsForAccount(
         accountRef: String,
         includeUnscopedLegacy: Boolean,
-    ) = conversationShortcuts.clearRevokedConversationShortcutsForAccount(accountRef, includeUnscopedLegacy)
+        knownGroupIds: Collection<String> = emptySet(),
+    ) {
+        knownGroupIds.forEach { groupIdHex ->
+            retirement.dismissConversationMessages(accountRef, groupIdHex, Dispatchers.IO)
+        }
+        conversationShortcuts.clearRevokedConversationShortcutsForAccount(
+            accountRef,
+            includeUnscopedLegacy,
+            knownGroupIds,
+        )
+        groupReconciliation()
+    }
 
     /** Called off the main thread in the same publication-lock section as platform removal. */
     internal fun forgetConversationShortcut(
@@ -356,8 +366,10 @@ class LocalNotificationPresenter(
         replaceCurrentMessage: Boolean = false,
         onNotificationWritten: (() -> Unit)? = null,
         isPostStillAllowed: () -> Boolean = { true },
+        emojiLabel: (String) -> String = context.notificationEmojiLabelFormatter(),
         shortNpub: (String) -> String,
     ): Boolean {
+        val channelWriteEpoch = NotificationChannelWriteGuard.captureEpoch()
         val profileAllowsPost = { isPostStillAllowed() && !profileNotificationOverrides.isMuted(update) }
         if (!profileAllowsPost()) return false
         val previewToken = NotificationPreviewPreferences.capture(context)
@@ -371,6 +383,7 @@ class LocalNotificationPresenter(
                 mediaKind = mediaKind,
                 conversationTitleOverride = conversationTitleOverride,
                 useDirectLayout = useDirectLayout,
+                emojiLabel = emojiLabel,
                 shortNpub = shortNpub,
             )
         val formatterReturnedContent = formattedContent != null
@@ -584,29 +597,26 @@ class LocalNotificationPresenter(
                         } else {
                             ConversationVibrationPattern.SYSTEM_DEFAULT
                         }
+                    val channelWriteAllowed = {
+                        profileAllowsPost() &&
+                            showGenerationAllowsPost() &&
+                            NotificationChannelWriteGuard.isCurrent(
+                                channelWriteEpoch,
+                                update.accountRef,
+                                channelShortcutId,
+                            )
+                    }
                     val channelId =
-                        withContext(Dispatchers.Default) {
-                            existingCardChannel ?: profileNotificationSoundAuthor(update)?.let { author ->
-                                val selection = profileNotificationOverrides.get(update.accountRef, author)
-                                if (selection.mode == ProfileNotificationMode.CUSTOM) {
-                                    profileNotificationChannels.existing(
-                                        update.accountRef,
-                                        author,
-                                        selection.vibration,
-                                        senderNameOverride ?: update.sender.displayName,
-                                        redactContent,
-                                    )
-                                } else {
-                                    null
-                                }
-                            } ?: conversationNotificationRouting
-                                .resolveForPost(
-                                    channel = NotificationChannelSpec.forUpdate(update),
-                                    conversationShortcutId = channelShortcutId,
-                                    conversationTitle = conversationTitleOverride,
-                                    primaryVibrationPattern = vibrationPattern,
-                                ).channelId
-                        }
+                        resolvePostChannelId(
+                            update = update,
+                            existingCardChannel = existingCardChannel,
+                            channelShortcutId = channelShortcutId,
+                            conversationTitleOverride = conversationTitleOverride,
+                            senderNameOverride = senderNameOverride,
+                            redactContent = redactContent,
+                            vibrationPattern = vibrationPattern,
+                            isWriteAllowed = channelWriteAllowed,
+                        ) ?: return@withRegisteredShow false
                     val quietChannel =
                         runCatching {
                             context
@@ -657,7 +667,7 @@ class LocalNotificationPresenter(
                             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
                     // Name the recipient identity in the header when multi-account (#836).
                     if (!redactContent && !recipientAccountSubtext.isNullOrBlank()) {
-                        builder.setSubText(recipientAccountSubtext)
+                        builder.setSubText(emojiLabel(recipientAccountSubtext))
                     }
                     if (
                         decision.style == NotificationStyleChoice.Plain ||
@@ -731,7 +741,7 @@ class LocalNotificationPresenter(
                                 builder.setConversationIdentityImage(
                                     notificationContent.identityImage(
                                         seed = messagingShortcutId ?: notificationContent.notificationTag,
-                                        titleOverride = conversationTitleOverride,
+                                        titleOverride = null,
                                         conversationAvatar = resolvedConversationAvatarBitmap,
                                         senderAvatar = resolvedSenderAvatarBitmap,
                                         contact = identityContact,
@@ -760,30 +770,17 @@ class LocalNotificationPresenter(
                                 NotificationActions
                                     .targetFromUpdate(update, notificationContent.notificationTag, notificationContent.notificationId)
                                     ?.let { actionTarget ->
-                                        decision.actions.forEach { action ->
-                                            when (action) {
-                                                NotificationActionKind.REPLY ->
-                                                    builder.addAction(
-                                                        interactions.replyNotificationAction(
-                                                            actionTarget,
-                                                            quickReactions,
-                                                        ),
-                                                    )
-                                                // Reaction choices ride on Reply's RemoteInput so SystemUI
-                                                // can render them inline.
-                                                NotificationActionKind.REACT -> Unit
-                                                NotificationActionKind.MARK_READ ->
-                                                    builder.addAction(
-                                                        interactions.markReadNotificationAction(actionTarget),
-                                                    )
-                                            }
-                                        }
+                                        interactions.addMessageActions(
+                                            builder,
+                                            actionTarget,
+                                            decision.actions,
+                                            quickReactions,
+                                        )
                                     }
                             }
                             messagingPost =
                                 MessagingPostContext(
                                     sender = sender,
-                                    conversationTitleOverride = if (redactContent) null else conversationTitleOverride,
                                     shortcutId = messagingShortcutId,
                                     conversationAvatarUrl = conversationAvatarUrl,
                                     conversationAvatarBitmap = resolvedConversationAvatarBitmap,
@@ -814,11 +811,12 @@ class LocalNotificationPresenter(
                     // the one first post. Redacted and hidden-preview posts keep only the generic shortcut.
                     val heldShortcutId =
                         messagingPost?.takeIf { !redactContent && previewToken.allowed }?.let { messaging ->
+                            // The channel write's cleanup check covers this shortcut, so cleanup cannot be undone.
                             publishShortcutBeforePost(update, notificationContent, messaging, directShareEligible) {
-                                profileAllowsPost() && showGenerationAllowsPost()
+                                channelWriteAllowed()
                             }
                         } ?: reactorIdentity?.let {
-                            publishReactionShortcutBeforePost(update, notificationContent) {
+                            publishReactionShortcutBeforePost(update, notificationContent, channelWriteEpoch) {
                                 profileAllowsPost() && showGenerationAllowsPost()
                             }?.also(builder::setShortcutId)
                         }
@@ -903,7 +901,6 @@ class LocalNotificationPresenter(
                                         builder.setStyle(
                                             cardContent.messagingStyle(
                                                 notificationContent,
-                                                messaging.conversationTitleOverride,
                                                 decision.historyCap,
                                                 carried,
                                                 messaging.sender,
@@ -960,7 +957,10 @@ class LocalNotificationPresenter(
                                                 notificationContent.notificationTag,
                                                 notificationContent.notificationId,
                                             )
-                                            if (carried.isNullOrEmpty() && emojiArtifact == null) {
+                                            if (carried.isNullOrEmpty() &&
+                                                emojiArtifact == null &&
+                                                !notification.extras.containsKey(EXTRA_QUICK_REACTION_CHIPS)
+                                            ) {
                                                 false
                                             } else {
                                                 if (!profileAllowsPost() || !showGenerationAllowsPost()) {
@@ -969,7 +969,6 @@ class LocalNotificationPresenter(
                                                 builder.setStyle(
                                                     cardContent.messagingStyle(
                                                         notificationContent,
-                                                        messaging.conversationTitleOverride,
                                                         decision.historyCap,
                                                         carriedHistory = null,
                                                         sender = messaging.sender,
@@ -978,6 +977,8 @@ class LocalNotificationPresenter(
                                                         messageIdHex = update.messageIdHex,
                                                     ),
                                                 )
+                                                builder.extras.remove(EXTRA_QUICK_REACTION_CHIPS)
+                                                builder.extras.remove(EXTRA_QUICK_REACTION_TARGET)
                                                 val cleanNotification = buildSettled(true)
                                                 val retryResult =
                                                     publisher.postNotificationSafely(
@@ -1397,7 +1398,6 @@ class LocalNotificationPresenter(
 
 internal data class MessagingPostContext(
     val sender: Person,
-    val conversationTitleOverride: String?,
     val shortcutId: String?,
     val conversationAvatarUrl: String?,
     val conversationAvatarBitmap: Bitmap?,

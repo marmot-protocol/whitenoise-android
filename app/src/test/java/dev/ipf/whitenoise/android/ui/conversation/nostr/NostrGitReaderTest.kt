@@ -1,10 +1,8 @@
 package dev.ipf.whitenoise.android.ui.conversation.nostr
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.platform.ClipEntry
-import androidx.compose.ui.platform.Clipboard
-import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -30,28 +28,27 @@ class NostrGitReaderTest {
     @Test
     fun patchWithMarkdownLinkSyntaxIsShownAsPlainText() {
         val patch = "Subject: [PATCH] Fix\n\n[open me](https://example.org/x) and **bold** text"
-        val writes = mutableListOf<String>()
-        setReader(event(kind = 1617, content = patch), writes)
+        systemClipboard().setPrimaryClip(ClipData.newPlainText("sentinel", "keep this"))
+        setReader(event(kind = 1617, content = patch))
 
         composeRule.onNodeWithText(patch, substring = true).assertIsDisplayed()
         composeRule.onNodeWithText("open me", substring = true).assertIsDisplayed()
-        composeRule.runOnIdle { assertEquals(emptyList<String>(), writes) }
+        composeRule.runOnIdle { assertEquals("keep this", clipText()) }
     }
 
     @Test
     fun namedNostrCloneUrlIsCopiedExactly() {
         val clone = "nostr://alice@example.org/relay.example.org/parser"
-        val writes = mutableListOf<String>()
-        setReader(event(kind = 30617, tags = listOf(listOf("d", "parser"), listOf("clone", clone))), writes)
+        setReader(event(kind = 30617, tags = listOf(listOf("d", "parser"), listOf("clone", clone))))
 
         composeRule.onNodeWithText(string(R.string.nostr_git_copy_url, clone)).performClick()
-        composeRule.runOnIdle { assertEquals(listOf(clone), writes) }
+        composeRule.runOnIdle { assertEquals(clone, clipText()) }
     }
 
     @Test
     fun httpsRepositoryLinkRequiresConfirmationAndCanBeCancelled() {
         val link = "https://example.org/parser"
-        setReader(event(kind = 30617, tags = listOf(listOf("d", "parser"), listOf("web", link))), mutableListOf())
+        setReader(event(kind = 30617, tags = listOf(listOf("d", "parser"), listOf("web", link))))
 
         composeRule.onNodeWithText(string(R.string.nostr_git_open_url, link)).performClick()
         composeRule.onNodeWithText(string(R.string.link_confirm_title)).assertIsDisplayed()
@@ -60,37 +57,44 @@ class NostrGitReaderTest {
         composeRule.onNodeWithText(string(R.string.link_confirm_title)).assertDoesNotExist()
     }
 
-    private fun setReader(
-        event: NostrEvent,
-        writes: MutableList<String>,
-    ) {
-        val clipboard =
-            object : Clipboard {
-                override suspend fun getClipEntry(): ClipEntry? = null
+    /** An https link a shell would expand, such as a web link with a query, can be opened but is never copied. */
+    @Test
+    fun shellUnsafeHttpsLinkCanBeOpenedButNotCopied() {
+        val unsafe = "https://example.org/parser?tab=readme,files"
+        val safe = "https://example.org/parser.git"
+        val tags = listOf(listOf("d", "parser"), listOf("clone", safe), listOf("web", unsafe))
+        setReader(event(kind = 30617, tags = tags))
 
-                override suspend fun setClipEntry(clipEntry: ClipEntry?) {
-                    writes +=
-                        requireNotNull(clipEntry)
-                            .clipData
-                            .getItemAt(0)
-                            .text
-                            .toString()
-                }
-            }
+        composeRule.onNodeWithText(string(R.string.nostr_git_open_url, unsafe)).assertIsDisplayed()
+        composeRule.onNodeWithText(string(R.string.nostr_git_copy_url, unsafe)).assertDoesNotExist()
+        composeRule.onNodeWithText(string(R.string.nostr_git_copy_url, safe)).assertIsDisplayed()
+    }
+
+    private fun systemClipboard(): ClipboardManager {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        return context.getSystemService(ClipboardManager::class.java)
+    }
+
+    private fun clipText(): String? =
+        systemClipboard()
+            .primaryClip
+            ?.getItemAt(0)
+            ?.text
+            ?.toString()
+
+    private fun setReader(event: NostrEvent) {
         val card = event.toCardModel()
         composeRule.setContent {
-            CompositionLocalProvider(LocalClipboard provides clipboard) {
-                WhiteNoiseTheme {
-                    NostrEventReaderScreen(
-                        card = card,
-                        document = null,
-                        parsing = false,
-                        authorDisplayName = { "Alex" },
-                        mentionDisplayName = { null },
-                        onNostrProfileTap = {},
-                        onDismiss = {},
-                    )
-                }
+            WhiteNoiseTheme {
+                NostrEventReaderScreen(
+                    card = card,
+                    document = null,
+                    parsing = false,
+                    authorDisplayName = { "Alex" },
+                    mentionDisplayName = { null },
+                    onNostrProfileTap = {},
+                    onDismiss = {},
+                )
             }
         }
     }

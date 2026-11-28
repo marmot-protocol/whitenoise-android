@@ -182,7 +182,7 @@ class ConversationNotificationRoutingTest {
     @Test
     fun missingPreferenceTreatsALegacyChildAsAnActiveOverrideAcrossRestart() {
         val descriptor = descriptor("conversation-legacy")
-        val category = OverridableConversationNotificationCategory.AGENT_ACTIVITY
+        val category = OverridableConversationNotificationCategory.INVITES
         val legacyChild =
             ConversationNotificationChannels.ensureConversationChannel(
                 context = context,

@@ -8,9 +8,11 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.material3.Icon
@@ -66,9 +68,11 @@ import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.MarkdownTimestampStyleFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.DateTimeFormatState
-import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
+import dev.ipf.whitenoise.android.ui.common.shapedPressFeedback
 import dev.ipf.whitenoise.android.ui.design.rememberPopupSurfaceMotion
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseElevation
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
@@ -341,10 +345,16 @@ private fun rememberTimestampClocks(
         ranges.associate { range ->
             TIMESTAMP_CLOCK_PREFIX + range.item to
                 InlineTextContent(Placeholder(1.em, 1.em, PlaceholderVerticalAlign.TextCenter)) {
+                    // The whole glyph box takes the tap; only the press highlight is round.
+                    val press = remember { MutableInteractionSource() }
                     Icon(
                         painterResource(R.drawable.ic_schedule),
                         contentDescription = timestampDisclosure(range.item),
-                        modifier = Modifier.fillMaxSize().clickable { state.tapped = range.item },
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .clickable(interactionSource = press, indication = null) { state.tapped = range.item }
+                                .shapedPressFeedback(press, CircleShape),
                     )
                 }
         }
@@ -397,7 +407,7 @@ private fun TimestampOverlays(
     val tokens = text.getStringAnnotations(TIMESTAMP_TAG, 0, text.length).map { it.item }
     key(tokens) { TimestampHoverTooltip(state, tokens) }
     state.tapped?.let { token ->
-        AnimatedAlertDialog(
+        WhiteNoiseAlertDialog(
             modifier = Modifier.testTag("timestamp.disclosure").exposePerformanceTestTags(),
             onDismissRequest = { state.tapped = null },
             text = { Text(timestampDisclosure(token)) },
@@ -441,7 +451,7 @@ private fun TimestampHoverTooltip(
             Surface(
                 modifier = Modifier.then(surface.modifier()).testTag("timestamp.hover").exposePerformanceTestTags(),
                 shape = MaterialTheme.shapes.small,
-                tonalElevation = 4.dp,
+                tonalElevation = WhiteNoiseElevation.Menu,
             ) {
                 Text(
                     hoverFrame.first,

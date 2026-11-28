@@ -32,6 +32,12 @@ internal interface VoiceReviewPlayback {
 
     /** Reports playback ownership so a tap can toggle pause safely. */
     fun isPlaying(key: String): Boolean
+
+    /** Moves the named take's loaded preview; false when another clip owns the player. */
+    fun seekTo(
+        key: String,
+        positionMs: Int,
+    ): Boolean = false
 }
 
 /** Uses the existing app-wide player, audio focus arbitration and cancellation-safe preparation. */
@@ -54,6 +60,12 @@ internal object NativeVoiceReviewPlayback : VoiceReviewPlayback {
         if (VoicePlaybackController.state.value.key == key) VoicePlaybackController.stop()
     }
 
+    /** Seeks only while this preview owns its native key. */
+    override fun seekTo(
+        key: String,
+        positionMs: Int,
+    ): Boolean = VoicePlaybackController.seekTo(key, positionMs)
+
     /** Reads the native playing state without treating another clip as this review. */
     override fun isPlaying(key: String): Boolean {
         val state = VoicePlaybackController.state.value
@@ -64,10 +76,11 @@ internal object NativeVoiceReviewPlayback : VoiceReviewPlayback {
 /**
  * Owns unsent recordings and their callbacks until explicit Send or disposal. Captured actions are
  * admitted by clip identity and the live account/runtime predicate; disposal can also revoke a Send
- * while the native sender reads the file, before it queues an attachment.
+ * while the native sender reads the file, before it queues an attachment. Once the sender seeds the
+ * optimistic row, that row owns the take and this review lets go of it in the same turn.
  */
 @Stable
-@Suppress("LongParameterList")
+@Suppress("LongParameterList", "TooManyFunctions") // Review state owns playback and send actions.
 internal class VoiceRecordingReview(
     private val scope: CoroutineScope,
     private val ownerIsCurrent: () -> Boolean,
@@ -75,15 +88,19 @@ internal class VoiceRecordingReview(
     private val onSendFailure: () -> Unit = {},
     private val onPlaybackFailure: () -> Unit = {},
     private val playback: VoiceReviewPlayback = NativeVoiceReviewPlayback,
-    private val deleteFile: (File) -> Unit = { file -> runCatching { file.delete() } },
+    private val deleteFile: (File) -> Boolean = { file ->
+        runCatching { file.delete() || !file.exists() }.getOrDefault(false)
+    },
     private val onReviewPresenceChanged: (Boolean) -> Unit = {},
+    private val onSendInterrupted: () -> Unit = {},
+    private val onDiscardFailure: () -> Unit = {},
+    private val onAcceptedFile: (File) -> Unit = { deleteFile(it) },
 ) {
     var clip: VoiceReviewClip? by mutableStateOf(null)
         private set
     var isSending: Boolean by mutableStateOf(false)
         private set
     private var pendingSend: Any? = null
-    private var latestCompletion: Any? = null
     private var released = false
     private var playbackJob: Job? = null
 
@@ -99,6 +116,23 @@ internal class VoiceRecordingReview(
         clip?.let { discard(it) }
         clip = VoiceReviewClip(file, durationMs)
         onReviewPresenceChanged(true)
+        return true
+    }
+
+    /**
+     * Presents a draft kept by the process-level owner. The owner keeps the file: adopting never deletes it, and an
+     * owner change or disposal only stops presenting it.
+     */
+    fun adopt(
+        file: File,
+        durationMs: Long,
+    ): Boolean {
+        if (!isCurrent() || durationMs <= 0L) return false
+        if (clip?.file != file) {
+            clip?.let(::clearClip)
+            clip = VoiceReviewClip(file, durationMs)
+            onReviewPresenceChanged(true)
+        }
         return true
     }
 
@@ -122,18 +156,50 @@ internal class VoiceRecordingReview(
             }
     }
 
+    /** Moves this take's loaded preview to [fraction] of its length. */
+    fun seek(
+        expected: VoiceReviewClip,
+        fraction: Float,
+    ) {
+        if (!owns(expected) || isSending) return
+        playback.seekTo(expected.key, (fraction.coerceIn(0f, 1f) * expected.durationMs).toInt())
+    }
+
     /** Discards this exact take, leaving any replacement take untouched. */
     fun discard(expected: VoiceReviewClip): Boolean {
         if (clip !== expected) return false
-        stopPlayback(expected)
-        pendingSend = null
-        latestCompletion = null
-        isSending = false
-        clip = null
-        // Disposal deletes private audio but retains the non-sensitive recreation warning.
-        if (!released) onReviewPresenceChanged(false)
+        clearClip(expected)
         deleteFile(expected.file)
         return true
+    }
+
+    /** Revokes presentation of a take that has already left the process-level owner. */
+    fun clearAdopted() {
+        clip?.let(::clearClip)
+    }
+
+    /** Drops the visible take and revokes its pending playback and Send callbacks. */
+    private fun clearClip(expected: VoiceReviewClip) {
+        stopPlayback(expected)
+        pendingSend = null
+        isSending = false
+        clip = null
+        // Disposal retains the non-sensitive recreation warning.
+        if (!released) onReviewPresenceChanged(false)
+    }
+
+    /** A user discard clears the clip only after the exact take has been durably consumed. */
+    fun discardByUser(expected: VoiceReviewClip): Boolean {
+        val discarded = !isSending && owns(expected) && commitDiscard(expected)
+        if (discarded) clearClip(expected)
+        return discarded
+    }
+
+    /** Report a storage refusal while the user can still retry the same clip. */
+    private fun commitDiscard(expected: VoiceReviewClip): Boolean {
+        val discarded = deleteFile(expected.file)
+        if (!discarded) onDiscardFailure()
+        return discarded
     }
 
     /** Starts a fresh native locked recording only after discarding the current review. */
@@ -141,17 +207,16 @@ internal class VoiceRecordingReview(
         expected: VoiceReviewClip,
         start: () -> Unit,
     ) {
-        if (owns(expected) && !isSending && discard(expected)) start()
+        if (discardByUser(expected)) start()
     }
 
-    /** Retains the take until native queue acceptance; rejection leaves the same recording ready to retry. */
+    /** Retains the take until the native queue seeds it; rejection leaves the same recording ready to retry. */
     @Suppress("TooGenericExceptionCaught") // Dispatch can fail synchronously; retain the take and rethrow cancellation.
     fun send(expected: VoiceReviewClip): Boolean {
         if (!owns(expected) || isSending) return false
         stopPlayback(expected)
         val token = Any()
         pendingSend = token
-        latestCompletion = token
         isSending = true
         try {
             send(
@@ -167,24 +232,19 @@ internal class VoiceRecordingReview(
         return true
     }
 
-    /**
-     * Rejection releases preparation, but the same logical send may later settle through bubble Retry.
-     * Only the latest attempt for this exact clip can consume it; replacement clips and newer sends win.
-     */
+    /** Settles only the attempt that is still pending for this exact clip; replacements and newer sends win. */
     private fun finishSend(
         expected: VoiceReviewClip,
         token: Any,
         accepted: Boolean,
     ) {
-        if (latestCompletion !== token || clip !== expected) return
-        if (!accepted && pendingSend !== token) return
+        if (pendingSend !== token || clip !== expected) return
         pendingSend = null
         isSending = false
         if (accepted) {
-            latestCompletion = null
             clip = null
             onReviewPresenceChanged(false)
-            deleteFile(expected.file)
+            onAcceptedFile(expected.file)
         } else if (isCurrent()) {
             onSendFailure()
         }
@@ -195,11 +255,31 @@ internal class VoiceRecordingReview(
         clip?.let { discard(it) }
     }
 
-    /** Revokes callbacks immediately, then removes the unsent private file and its player. */
+    /**
+     * Revokes callbacks immediately, then removes the unsent private file and its player. A Send still
+     * preparing is revoked too, so the user hears that it was not sent.
+     */
     fun release() {
         if (released) return
+        if (isSending && ownerIsCurrent()) onSendInterrupted()
         released = true
         clip?.let { discard(it) }
+        playbackJob?.cancel()
+        playbackJob = null
+    }
+
+    /**
+     * The chat closed while its draft lives on with the process-level owner: revoke callbacks and a preparing Send
+     * (saying so) and stop playback, but keep the file for the next visit.
+     */
+    fun detach() {
+        if (released) return
+        if (isSending && ownerIsCurrent()) onSendInterrupted()
+        released = true
+        clip?.let(::stopPlayback)
+        pendingSend = null
+        isSending = false
+        clip = null
         playbackJob?.cancel()
         playbackJob = null
     }

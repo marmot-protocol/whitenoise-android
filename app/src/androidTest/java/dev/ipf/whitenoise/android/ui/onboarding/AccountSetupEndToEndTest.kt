@@ -64,7 +64,10 @@ class AccountSetupEndToEndTest {
         click(OnboardingActionFfi.EDIT_PROFILE)
         composeRule.waitUntil(30_000) { setup.state.value.editor != null && !setup.state.value.busy }
         composeRule.onNodeWithText(context.getString(R.string.setup_display_name)).performTextInput("Onboarding test")
-        composeRule.onNodeWithText(context.getString(R.string.setup_review_changes)).performScrollTo().performClick()
+        composeRule
+            .onNodeWithText(context.getString(R.string.setup_review_changes))
+            .scrollToIfScrollable()
+            .performClick()
         composeRule.waitUntil(30_000) {
             setup.state.value.snapshot
                 ?.proposal != null &&
@@ -113,8 +116,8 @@ class AccountSetupEndToEndTest {
         composeRule.onNodeWithTag("setup-step-${step.name}").performScrollTo().performClick()
     }
 
-    /** Scrolls to the native action button before tapping it through the real Compose surface. */
+    /** Brings the native action button into view, pinned or scrolled, before tapping it through the real surface. */
     private fun click(action: OnboardingActionFfi) {
-        composeRule.onNodeWithTag("setup-action-${action.name}").performScrollTo().performClick()
+        composeRule.onNodeWithTag("setup-action-${action.name}").scrollToIfScrollable().performClick()
     }
 }

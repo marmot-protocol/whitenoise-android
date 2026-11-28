@@ -79,7 +79,10 @@ internal fun hideConversationShortcutsFromDirectShare(context: Context) {
 /**
  * Select shortcuts that are provably owned by [accountRef]. Legacy shortcuts
  * lack an owner stamp, so [includeUnscopedLegacy] is safe only when no other
- * signed-in account remains and therefore cannot own one of those entries.
+ * signing account remains and therefore cannot own one of those entries.
+ * Read-only accounts are excluded: without a signer they cannot decrypt
+ * messages, so they post no notifications and own no conversation shortcuts
+ * or channels.
  */
 internal fun conversationShortcutIdsForAccount(
     shortcuts: List<ShortcutInfoCompat>,
@@ -110,37 +113,72 @@ internal fun accountConversationShortcutCleanupPlan(
     )
 }
 
-/** Removes platform entries after the caller has durably revoked and fenced account credentials. */
+/**
+ * Removes platform shortcuts and owned notification channels after the caller has durably revoked
+ * and fenced account credentials.
+ */
 internal fun clearRevokedConversationShortcutsForAccount(
     context: Context,
     accountRef: String,
     includeUnscopedLegacy: Boolean,
+    additionalShortcutIds: Collection<String> = emptySet(),
+    knownGroupIds: Collection<String> = emptySet(),
 ) {
     synchronized(UserEventNotificationGroup.mutationLock) {
+        val shortcuts =
+            runCatching {
+                ShortcutManagerCompat.getShortcuts(
+                    context,
+                    ShortcutManagerCompat.FLAG_MATCH_DYNAMIC or
+                        ShortcutManagerCompat.FLAG_MATCH_CACHED or
+                        ShortcutManagerCompat.FLAG_MATCH_PINNED,
+                )
+            }.getOrElse {
+                runCatching { ShortcutManagerCompat.getDynamicShortcuts(context) }.getOrDefault(emptyList())
+            }
         val plan =
             accountConversationShortcutCleanupPlan(
-                shortcuts =
-                    runCatching {
-                        ShortcutManagerCompat.getShortcuts(
-                            context,
-                            ShortcutManagerCompat.FLAG_MATCH_DYNAMIC or
-                                ShortcutManagerCompat.FLAG_MATCH_CACHED or
-                                ShortcutManagerCompat.FLAG_MATCH_PINNED,
-                        )
-                    }.getOrElse {
-                        ShortcutManagerCompat.getDynamicShortcuts(context)
-                    },
+                shortcuts = shortcuts,
                 accountRef = accountRef,
                 includeUnscopedLegacy = includeUnscopedLegacy,
             )
-        if (plan.disabledIds.isNotEmpty()) {
-            runCatching { ShortcutManagerCompat.disableShortcuts(context, plan.disabledIds, "") }
+        // Redact and delete channels before removing shortcuts: Android can soft-delete a linked
+        // channel on shortcut removal, keeping its private name and hiding it from enumeration.
+        val channelsCleared =
+            runCatching {
+                deleteAccountNotificationChannels(
+                    context = context,
+                    accountRef = accountRef,
+                    shortcuts = shortcuts,
+                    accountShortcutIds = plan.longLivedIds + additionalShortcutIds,
+                    includeUnscopedLegacy = includeUnscopedLegacy,
+                    knownGroupIds = knownGroupIds,
+                )
+            }.getOrDefault(false)
+        // Pinned shortcuts can remain on the launcher after disablement, so redact their labels first.
+        val affected = plan.disabledIds.toSet()
+        val relabeled =
+            shortcuts
+                .filter { it.id in affected && (!channelsCleared || it.isPinned) }
+                .map { genericNotificationShortcut(context, it) }
+        val redacted =
+            relabeled.isEmpty() ||
+                runCatching { ShortcutManagerCompat.updateShortcuts(context, relabeled) }.getOrDefault(false)
+        if (!channelsCleared) return@synchronized
+        // A pinned shortcut keeps its label on the launcher, so it is touched only once redacted. When redaction
+        // fails, the pinned copies stay for the launcher scan in retention to retry, and the rest still go now.
+        val unredactedPins = if (redacted) emptySet() else relabeled.map { it.id }.toSet()
+        val disabledIds = plan.disabledIds - unredactedPins
+        val dynamicIds = plan.dynamicIds - unredactedPins
+        val longLivedIds = plan.longLivedIds - unredactedPins
+        if (disabledIds.isNotEmpty()) {
+            runCatching { ShortcutManagerCompat.disableShortcuts(context, disabledIds, "") }
         }
-        if (plan.dynamicIds.isNotEmpty()) {
-            runCatching { ShortcutManagerCompat.removeDynamicShortcuts(context, plan.dynamicIds) }
+        if (dynamicIds.isNotEmpty()) {
+            runCatching { ShortcutManagerCompat.removeDynamicShortcuts(context, dynamicIds) }
         }
-        if (plan.longLivedIds.isNotEmpty()) {
-            runCatching { ShortcutManagerCompat.removeLongLivedShortcuts(context, plan.longLivedIds) }
+        if (longLivedIds.isNotEmpty()) {
+            runCatching { ShortcutManagerCompat.removeLongLivedShortcuts(context, longLivedIds) }
         }
     }
 }

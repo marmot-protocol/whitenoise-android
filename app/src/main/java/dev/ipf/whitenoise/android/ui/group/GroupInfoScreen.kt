@@ -10,12 +10,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.ClipboardManager
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
+import dev.ipf.whitenoise.android.ui.common.ClipboardCopier
 import dev.ipf.whitenoise.android.ui.common.CopyableValueRow
+import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
 import dev.ipf.whitenoise.android.ui.settings.SettingsPanel
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
@@ -30,7 +30,7 @@ internal fun GroupInfoScreen(
     nostrGroupIdHex: String,
     onBack: () -> Unit,
 ) {
-    val clipboard = LocalClipboardManager.current
+    val clipboard = rememberClipboardCopier()
     SettingsScaffold(title = stringResource(R.string.developer_tools), onBack = onBack) {
         Column(
             modifier =
@@ -49,7 +49,7 @@ internal fun GroupInfoScreen(
 private fun GroupIdentifierGroup(
     groupIdHex: String,
     nostrGroupIdHex: String,
-    clipboard: ClipboardManager,
+    clipboard: ClipboardCopier,
 ) {
     SettingsSection(stringResource(R.string.group_identifiers))
     SettingsPanel(destination = "group-info", surface = "group-identifiers") {

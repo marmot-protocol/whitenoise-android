@@ -17,16 +17,20 @@
           "represented_by": "Account.share_connect"
         },
         {
-          "declaration": "\"sign_out\"",
-          "represented_by": "Home.sign_out"
-        },
-        {
           "declaration": "\"switch_profile\"",
           "represented_by": "Home.switch_profile"
         },
         {
           "declaration": "entry.name",
           "represented_by": "home.Appearance"
+        }
+      ]
+    },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSignOutGroup.kt": {
+      "controls": [
+        {
+          "declaration": "\"sign_out\"",
+          "represented_by": "Home.sign_out"
         }
       ]
     },
@@ -384,6 +388,10 @@
     },
     "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt": {
       "controls": [
+        {
+          "declaration": "\"history_backups\"",
+          "represented_by": "home.HistoryBackups"
+        },
         {
           "declaration": "\"manage_storage\"",
           "represented_by": "Data.manage_storage"
@@ -764,6 +772,10 @@
     "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt": {
       "controls": [
         {
+          "declaration": "\"learn_white_noise\"",
+          "represented_by": "home.LearnWhiteNoise"
+        },
+        {
           "declaration": "\"profile\"",
           "represented_by": "home.Profile"
         },
@@ -812,6 +824,10 @@
           "represented_by": "VoiceLanguage.language"
         },
         {
+          "declaration": "\"voice_notes\"",
+          "represented_by": "home.VoiceNotes"
+        },
+        {
           "declaration": "\"read_aloud\"",
           "represented_by": "home.ReadAloud"
         },
@@ -846,6 +862,34 @@
         {
           "declaration": "\"app_updates\"",
           "represented_by": "Home.update_controls"
+        }
+      ]
+    },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt": {
+      "controls": [
+        {
+          "declaration": "\"status\"",
+          "represented_by": "home.HistoryBackups"
+        },
+        {
+          "declaration": "\"new_words\"",
+          "represented_by": "home.HistoryBackups"
+        },
+        {
+          "declaration": "\"retry\"",
+          "represented_by": "home.HistoryBackups"
+        }
+      ]
+    },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/VoiceNoteSettingsScreen.kt": {
+      "controls": [
+        {
+          "declaration": "\"voice_send_on_release\"",
+          "represented_by": "VoiceNotes.voice_send_on_release"
+        },
+        {
+          "declaration": "\"voice_transcribe_automatically\"",
+          "represented_by": "VoiceNotes.voice_transcribe_automatically"
         }
       ]
     }
@@ -963,11 +1007,20 @@
     "HelpSupport": {
       "catalog_id": "home.HelpSupport"
     },
+    "LearnWhiteNoise": {
+      "catalog_id": "home.LearnWhiteNoise"
+    },
     "NotificationSounds": {
       "catalog_id": "home.NotificationSounds"
     },
     "NotificationDelivery": {
       "catalog_id": "home.NotificationDelivery"
+    },
+    "HistoryBackups": {
+      "catalog_id": "home.HistoryBackups"
+    },
+    "VoiceNotes": {
+      "catalog_id": "home.VoiceNotes"
     }
   },
   "exclusions": {

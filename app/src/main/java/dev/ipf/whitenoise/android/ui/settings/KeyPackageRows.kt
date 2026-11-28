@@ -8,14 +8,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.AnnotatedString
 import dev.ipf.marmotkit.AccountKeyPackageFfi
 import dev.ipf.marmotkit.AccountKeyPackageLocalStateFfi
 import dev.ipf.whitenoise.android.R
@@ -24,6 +22,7 @@ import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.currentDateTimeDisplay
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
+import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
 import java.time.format.FormatStyle
 import java.util.Locale
 
@@ -210,7 +209,7 @@ private fun KeyPackageCopyValue(
     @DrawableRes icon: Int,
     explanation: String,
 ) {
-    val clipboard = LocalClipboardManager.current
+    val clipboard = rememberClipboardCopier()
     val label = stringResource(R.string.copy)
     SettingsValue(
         context,
@@ -218,7 +217,7 @@ private fun KeyPackageCopyValue(
         IdentityFormatter.short(value),
         modifier =
             Modifier.clickable(onClickLabel = label, role = Role.Button) {
-                clipboard.setText(AnnotatedString(value))
+                clipboard.copy(value)
             },
         leading = { SettingsLeadingIcon(icon) },
         explanation = explanation,

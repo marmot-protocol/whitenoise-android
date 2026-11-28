@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalCursorBlinkEnabled
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
@@ -22,7 +23,9 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.Density
 import androidx.test.espresso.Espresso
+import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.state.ChatsController
+import dev.ipf.whitenoise.android.ui.common.WHITE_NOISE_TOP_BAR_BACK_TAG
 import dev.ipf.whitenoise.android.ui.share.ACCOUNT_HEX
 import dev.ipf.whitenoise.android.ui.share.ACCOUNT_REF
 import dev.ipf.whitenoise.android.ui.share.GROUP_A
@@ -32,6 +35,7 @@ import dev.ipf.whitenoise.android.ui.share.PEER_B
 import dev.ipf.whitenoise.android.ui.share.appStateWithDirectChats
 import dev.ipf.whitenoise.android.ui.share.applyLocalDirectChat
 import dev.ipf.whitenoise.android.ui.share.chatRow
+import dev.ipf.whitenoise.android.ui.share.completeRetainedChatList
 import dev.ipf.whitenoise.android.ui.share.emptyAppState
 import dev.ipf.whitenoise.android.ui.share.profile
 import dev.ipf.whitenoise.android.ui.share.testAccount
@@ -115,11 +119,11 @@ class ForwardMessagePickerInteractionTest {
         }
     }
 
+    /** The bar's Close leaves the picker even while search is open; only system Back closes the search first. */
     @Test
-    fun searchOpensInTheBarAndCloseClearsItWhileSingleAccountAvatarIsNotAnAction() {
-        val groupId = "20".repeat(32)
-        val peerId = "40".repeat(32)
-        val state = appStateWithDirectChats(groupId to peerId, profiles = mutableMapOf(peerId to profile("Alice")))
+    fun barCloseDismissesThePickerEvenWithSearchOpen() {
+        val state = appStateWithDirectChats("20".repeat(32) to "40".repeat(32))
+        var dismissed = 0
         composeRule.setContent {
             WhiteNoiseTheme {
                 ForwardMessagePickerContent(
@@ -128,9 +132,43 @@ class ForwardMessagePickerInteractionTest {
                     attachmentCount = 0,
                     originGroupIdHex = "ff".repeat(32),
                     sourceAccountRef = ACCOUNT_REF,
-                    onDismiss = {},
+                    onDismiss = { dismissed++ },
                     onForward = { _, _ -> true },
                 )
+            }
+        }
+        composeRule.onNodeWithContentDescription("Search chats").performClick()
+        composeRule.onNodeWithTag("forward.searchField").assertExists()
+        composeRule.onNodeWithTag(WHITE_NOISE_TOP_BAR_BACK_TAG).performClick()
+        composeRule.waitForIdle()
+        org.junit.Assert.assertEquals(1, dismissed)
+    }
+
+    @Test
+    fun searchOpensInTheBarAndCloseClearsItWhileSingleAccountAvatarIsNotAnAction() {
+        val groupId = "20".repeat(32)
+        val peerId = "40".repeat(32)
+        val state =
+            appStateWithDirectChats(
+                groupId to peerId,
+                profiles = mutableMapOf(peerId to profile("Alice")),
+                chatListSubscriptions = completeRetainedChatList(),
+            )
+        // Seeding retained rows does not finish the controller's initial load.
+        requireNotNull(state.chatsController).isLoading = false
+        composeRule.setContent {
+            CompositionLocalProvider(LocalCursorBlinkEnabled provides false) {
+                WhiteNoiseTheme {
+                    ForwardMessagePickerContent(
+                        appState = state,
+                        messageCount = 1,
+                        attachmentCount = 0,
+                        originGroupIdHex = "ff".repeat(32),
+                        sourceAccountRef = ACCOUNT_REF,
+                        onDismiss = {},
+                        onForward = { _, _ -> true },
+                    )
+                }
             }
         }
         composeRule.onNodeWithTag("forward.selectAll").assertDoesNotExist()
@@ -141,8 +179,16 @@ class ForwardMessagePickerInteractionTest {
         org.junit.Assert.assertTrue("avatar keeps its 48dp target", (avatar.right - avatar.left).value >= 48f)
         composeRule.onNodeWithContentDescription("Search chats").performClick()
         composeRule.onNodeWithTag("forward.searchField").performTextInput("missing")
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodes(hasText("No matches")).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithText("No matches").assertIsDisplayed()
         composeRule.onNodeWithText("Alice").assertDoesNotExist()
         composeRule.onNodeWithTag("forward.selectAll").assertIsNotEnabled()
+        composeRule.onNodeWithText("Retry").assertDoesNotExist()
+        composeRule
+            .onNodeWithTag(FORWARD_CHAT_PICKER_SCREEN_TEST_TAG)
+            .captureRoboImage("src/test/snapshots/forward_message_picker_no_matches.png")
         Espresso.pressBack()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("forward.searchField").assertDoesNotExist()

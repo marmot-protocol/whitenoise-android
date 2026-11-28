@@ -296,6 +296,34 @@ projection, acceptance and publication metrics provide the deeper breakdown.
 Do not add their percentiles to these overlapping host measurements. Existing
 Perfetto slices and the local WNPerf toggle remain independent of export consent.
 
+## Group create and commit latency
+
+Use two release-like builds with the same MarmotKit pin on the same dedicated
+fixture. Interleave baseline and candidate runs, and repeat each action at least
+30 times per build and condition. Use separate groups or restore the same roster
+shape between runs. Start the next trial after delivery settles. Separate
+founding with no recipients from founding with recipients, invites with ordinary
+members from invites with initial admins, and warm directory state from cold
+directory state. Keep online and delayed-relay runs in separate buckets.
+
+Time from the final confirmation input to the first usable conversation frame
+for creation, the committed roster for invite and removal, and the new title
+after save for rename. Use a fixture that keeps the roster visible for the
+membership interaction, or capture the first committed confirmation and verify
+the roster separately. A pending row can be timed separately using
+`group_membership_pending`. Count partial invites, failures, and retries
+separately. Report median and p90 for successful actions with the sample and
+failure counts. Compare paired traces before attributing a speedup.
+
+With the app category enabled in Perfetto, the asynchronous
+`WhiteNoise.marmot.*` slices bracket the bridge calls for `createGroup`,
+`createdGroupDetails`, `inviteMembers`, `removeMembers`, and
+`updateGroupProfile`. Compare them to the full interaction. Create/open
+diagnostics also report the create and projection phases separately. In
+delayed-relay trials, track recipient join or the remote roster/title separately
+from the sender UI. Verify one commit per action, canonical state after process
+restart, and the existing refusal flow when delivery is stalled.
+
 ## Prepare a physical-device fixture
 
 Use a dedicated API 34+ device with animations disabled and a stable power and
@@ -489,6 +517,15 @@ ANDROID_SERIAL=<device-serial> \
   scripts/run-performance-benchmarks.sh "$GROUP_NAME"
 ```
 
+For startup scoring, set `STARTUP_GROUP_NAME` to a fixture group visible without
+scrolling after a fresh launcher start. The cold Macrobenchmarks record both the platform's
+first draw and the launch-to-visible-row checkpoint
+(`startupLocalCheckpointMs`). The checkpoint includes accessibility observation
+overhead and validates the named row. Without that startup-specific argument the cold
+benchmark only checks that the chat-list action is visible. Inspect Perfetto for
+work that overlaps, including the first local chat-list and profile reads.
+Overlapping phase durations cannot be added to estimate startup time.
+
 The script builds the normal dev and release-like APKs, replaces the dev app in
 place, invokes only the startup and group-open before/after methods, and pulls
 JSON plus Perfetto output into `benchmark/build/outputs/manual/`. Its exit trap
@@ -556,6 +593,42 @@ attribution: the operating system and radio transition are part of the sample.
 Compare repeated runs on the same device, build, fixture, brightness, battery,
 network, and thermal state. Do not compare absolute values across devices, and
 do not set a fleet-wide threshold until representative baselines exist.
+
+#### Local-first responsiveness comparison
+
+Use one physical device, one synthetic account and the same fixture for both
+revisions. Keep the Android build variant, compilation mode, theme, window
+size, font scale, refresh rate and network state fixed. Put a DM and an
+encrypted group with distinct, previously downloaded pictures at the top of
+the list. Give each a recognizable title and last message. Include an
+image-free chat and a genuinely missing picture to exercise valid fallbacks.
+Repeat with a large account and use the same target group in every run.
+
+Compare force-stop cold startup, ordinary process death, warm resume and opening
+a visible conversation. Use the populated offline test above to verify that a
+retained row opens before a relay is reachable. Repeat online with pending
+catch-up so that contention is represented. Keep single-pane and expanded
+layouts in separate measurements. Alternate baseline and candidate in blocks
+of ten launches and retain raw samples, p50 and p90. Use the same compilation
+mode for each comparison and record the APK digest, MDK revision and device
+build. Treat package replacement as a distinct journey.
+
+Inspect frames in a separate visual pass. Use a fixed camera or screen
+recording at the highest available frame rate, with the settled offline
+screen as a reference. Inspect the first app surface after the system splash
+and the first frame containing the fixture rows. Record intermediate startup
+or recovery screens, the visible titles and previews, and whether each of the
+two locally stored pictures is already present. Check the same properties
+on first conversation entry, after Back, and after account switch. Use an
+account with different pictures to detect stale pixels crossing accounts.
+Accessibility timing and the startup log cannot prove which pixels were drawn.
+
+Accept a change only when the useful screen keeps the right local data and
+pictures, or uses the expected fallback for absent data, and the measured gain
+repeats across blocks. Track startup surfaces and avatar misses per journey
+alongside the latency distributions. Use frame overrun and transcript-open
+latency to detect work shifted into the user's first interaction. Preserve
+app-lock, onboarding and startup error coverage as separate fixture cases.
 
 ### Idle background-delivery baselines and push-burst power
 
@@ -994,7 +1067,12 @@ APK in place.
 
 `BaselineProfileGenerator` collects on the
 [prepared device](#prepare-a-physical-device-fixture), whose `GROUP_NAME`
-conversation must hold enough history to scroll several screens. Only cold launch-to-surface rules (populated startup to the
+conversation must hold enough history to scroll several screens. Open the fixture
+chat list with a downloaded group picture among its first rows and let the
+picture load. Cold-launch the app again to let it build the startup pack from
+the saved picture before generating the profile. The generator checks that a
+cold launch restores a group picture from the pack.
+Only cold launch-to-surface rules (populated startup to the
 chat list and a cold share to the recipient picker) enter the Startup Profile.
 Chat open, conversation scroll, member roster and warm share delivery remain in
 the Baseline Profile so they cannot crowd startup code out of the primary DEX,

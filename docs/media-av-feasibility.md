@@ -7,8 +7,8 @@ baseline. The current implementation is documented in
 [Multimedia containment](media-containment.md): automatic output, local attachment
 playback, voice playback and transcription now use isolated software decoders.
 Media3 controls operate over raw output; historical app-process parser entries
-below do not describe the new local-attachment path. Remote Nostr network
-playback retains its separate platform path. What has been measured on the
+below do not describe the new local-attachment path. Referenced Nostr video
+now downloads first and plays through the same isolated player. What has been measured on the
 current playback code is listed under
 [Measured playback timing](#measured-playback-timing).
 

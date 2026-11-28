@@ -165,10 +165,16 @@
     "Chats": [
       "settings-chats"
     ],
+    "VoiceNotes": [
+      "settings-voice-language"
+    ],
     "VoiceLanguage": [
       "settings-voice-language"
     ],
     "HelpSupport": [
+      "settings-help-support"
+    ],
+    "LearnWhiteNoise": [
       "settings-help-support"
     ],
     "NotificationSounds": [
@@ -179,6 +185,9 @@
     ],
     "EmojiSets": [
       "advanced-emoji-sets"
+    ],
+    "HistoryBackups": [
+      "settings-history-backups"
     ]
   },
   "main_routes": {

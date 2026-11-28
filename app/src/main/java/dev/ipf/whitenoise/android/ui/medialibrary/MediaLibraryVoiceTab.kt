@@ -4,6 +4,7 @@ package dev.ipf.whitenoise.android.ui.medialibrary
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,6 +44,7 @@ import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.voicePlaybackSource
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.pressFeedbackInsideClip
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeVoiceAttachment
 import dev.ipf.whitenoise.android.ui.conversation.media.validatedAttachmentCacheFile
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
@@ -209,13 +211,15 @@ internal fun VoiceLibraryRow(
         // starting a clip here pauses any clip playing elsewhere (single
         // playback). The tap target is isolated from the row's jump-to-message
         // click so the two affordances don't collide.
+        val playPress = remember { MutableInteractionSource() }
         Surface(
             color = MaterialTheme.colorScheme.surfaceContainer,
             shape = CircleShape,
             modifier =
                 Modifier
                     .size(48.dp)
-                    .clickable(enabled = !loading && actionReady) {
+                    // The highlight is drawn inside the Surface's circle, not on the square around it.
+                    .clickable(interactionSource = playPress, indication = null, enabled = !loading && actionReady) {
                         if (isPlayingThis) {
                             VoicePlaybackController.pause()
                             return@clickable
@@ -258,7 +262,9 @@ internal fun VoiceLibraryRow(
                         }
                     },
         ) {
-            if (actionReady) VoiceLibraryActionIcon(loading = loading, playable = playable, playing = isPlayingThis)
+            Box(Modifier.pressFeedbackInsideClip(playPress), propagateMinConstraints = true) {
+                if (actionReady) VoiceLibraryActionIcon(loading = loading, playable = playable, playing = isPlayingThis)
+            }
         }
         SenderAvatar(sender = row.sender, appState = appState)
         Column(modifier = Modifier.weight(1f)) {
@@ -294,5 +300,6 @@ private fun SenderAvatar(
         size = 36.dp,
         pictureUrl = appState.contactAvatarSource(sender),
         pictureDomain = AvatarImageLoader.publicProfiles(),
+        followedAccount = sender,
     )
 }

@@ -367,7 +367,15 @@ class AttachmentCollectionOperationLifecycleIntegrationTest {
                     id = "unknown-first-token",
                     accountRef = account,
                     groupIdHex = group,
-                    items = planned.map { CollectionItem(it.id, "content://collection.test/doc/${it.id}", it.kind) },
+                    items =
+                        planned.map {
+                            CollectionItem(
+                                it.id,
+                                "content://collection.test/doc/${it.id}",
+                                it.kind,
+                                storedDraft = CollectionStoredDraft("native-${it.id}", 1, "application/example"),
+                            )
+                        },
                     chunks = planAttachmentChunks("unknown-first-token", planned),
                     createdAtMs = System.currentTimeMillis(),
                     updatedAtMs = System.currentTimeMillis(),
@@ -393,6 +401,8 @@ class AttachmentCollectionOperationLifecycleIntegrationTest {
                     ?.phase,
             )
 
+            fixture.registry.discard("unknown-first-token")
+            assertTrue("the unresolved token keeps its draft IDs", fixture.operation != null)
             fixture.sender.resumeCollection("unknown-first-token") { CollectionTokenStatus.NOT_ACCEPTED }
             awaitUntil("the operation is handed back") {
                 fixture.registry.operations.value

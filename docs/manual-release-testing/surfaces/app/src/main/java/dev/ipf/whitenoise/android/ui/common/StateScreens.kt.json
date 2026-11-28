@@ -20,14 +20,6 @@
         ]
       },
       {
-        "surface": "InlineErrorBanner",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StateScreens.kt",
-        "anchor": "fun InlineErrorBanner(",
-        "test_ids": [
-          "AXY-001"
-        ]
-      },
-      {
         "surface": "LoadingScreen",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StateScreens.kt",
         "anchor": "fun LoadingScreen(",
@@ -58,6 +50,26 @@
         "anchor": "R.string.copy",
         "test_ids": [
           "AXY-001"
+        ]
+      },
+      {
+        "surface": "R.string.dismiss",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StateScreens.kt",
+        "anchor": "R.string.dismiss",
+        "test_ids": [
+          "CON-034",
+          "AXY-001"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StateScreens.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "AXY-001",
+          "INT-004"
         ]
       }
     ]

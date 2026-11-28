@@ -1,0 +1,47 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-pdfmeta-send
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- tapOn:
+    text: Open fixture PDF options
+- assertVisible:
+    text: PDF metadata options
+- assertVisible:
+    text: Keep metadata
+- tapOn:
+    text: Keep metadata
+- assertNotVisible:
+    text: PDF metadata options
+- tapOn:
+    text: Open fixture PDF options
+- assertVisible:
+    text: PDF metadata options
+- assertVisible:
+    text: Remove metadata
+- tapOn:
+    text: Remove metadata
+- tapOn:
+    text: Send fixture PDF
+- assertVisible:
+    text: Send with metadata\?
+- assertVisible:
+    text: Signed lease\.pdf is signed\. Removing its metadata would break the signature, so it can only be sent as it is\.
+- tapOn:
+    text: Cancel
+- assertNotVisible:
+    text: Send with metadata\?
+- tapOn:
+    text: Send fixture PDF
+- assertVisible:
+    text: Send with metadata\?
+- back
+- assertNotVisible:
+    text: Send with metadata\?
+- tapOn:
+    text: Send fixture PDF
+- assertVisible:
+    text: Send with metadata\?
+- tapOn:
+    text: Send as is
+- assertVisible:
+    id: presentation.complete

@@ -44,9 +44,10 @@ internal fun ConversationController.presentRosterChanged(
 internal suspend fun ConversationController.resolveCanonicalInviteRefs(
     memberRefs: List<String>,
     diagnostic: DmCreationAttempt? = null,
+    resolve: suspend (String) -> String? = appState::resolveAccountIdHex,
 ): List<String>? =
     try {
-        canonicalGroupInviteRefs(memberRefs, appState::resolveAccountIdHex)
+        canonicalGroupInviteRefs(memberRefs, resolve)
     } catch (throwable: Throwable) {
         diagnostic?.failed(DmCreationPhase.RECIPIENTS, throwable)
         throwable.rethrowIfCancellation()
@@ -139,7 +140,13 @@ internal suspend fun ConversationController.publishInitialAdminInviteResult(
 internal fun ConversationController.presentInviteAccepted(skipped: AppText?) {
     val account = conversationAccountRef ?: return
     val title = if (skipped == null) R.string.toast_invite_sent else R.string.toast_some_members_not_added
-    appState.presentConversationTransient(account, group.groupIdHex, title, skipped)
+    appState.presentConversationTransient(
+        account,
+        group.groupIdHex,
+        title,
+        skipped,
+        kind = if (skipped == null) TransientNoticeKind.Confirmation else TransientNoticeKind.Partial,
+    )
 }
 
 /** These typed key, routing, lookup and admission rejections happen before the native membership commit. */

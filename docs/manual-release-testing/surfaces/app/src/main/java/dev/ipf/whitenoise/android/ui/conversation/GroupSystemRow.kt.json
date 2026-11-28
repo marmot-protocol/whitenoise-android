@@ -23,7 +23,7 @@
         ]
       },
       {
-        "surface": "Affected member's name links to their profile in add/remove history",
+        "surface": "Added rows link the actor and the added member; removed rows link the removed member",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
         "anchor": "internal fun groupSystemSummaryText(",
         "test_ids": [

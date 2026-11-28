@@ -8,6 +8,8 @@ import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.share.ForeignContentSource
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.isCollectionDraftSource
+import dev.ipf.whitenoise.android.ui.conversation.nostr.sweepOrphanedNostrVideoFiles
 import java.io.File
 
 // Persist a multi-pick selection across rotation / process death. Empty list
@@ -163,7 +165,7 @@ internal fun sweepStaleSharedMedia(
             val dir = java.io.File(context.cacheDir, name)
             if (!dir.isDirectory) return@forEach
             dir.listFiles()?.forEach { entry ->
-                if (entry.isFile && entry.lastModified() < cutoff) {
+                if (entry.isFile && entry.lastModified() < cutoff && !isCollectionDraftSource(entry.name)) {
                     runCatching { entry.delete() }
                 }
             }
@@ -174,6 +176,7 @@ internal fun sweepStaleSharedMedia(
     // Run on its own so a failure above cannot leave hundreds of MiB of plaintext behind.
     runCatching { sweepOrphanedUploadSources(context.cacheDir) }
     runCatching { sweepOrphanedDocumentReaderFiles(context.cacheDir) }
+    runCatching { sweepOrphanedNostrVideoFiles(context.cacheDir) }
 }
 
 /** Files in `shared_media` older than this are considered safe to delete —

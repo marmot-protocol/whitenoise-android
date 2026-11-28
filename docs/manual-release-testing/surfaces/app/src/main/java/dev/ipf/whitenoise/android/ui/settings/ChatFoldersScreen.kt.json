@@ -4,14 +4,6 @@
   "categories": {
     "composable_surfaces": [
       {
-        "surface": "Authored emoji prompt: ChatFoldersScreen",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFoldersScreen.kt",
-        "anchor": "EmojiLabel(",
-        "test_ids": [
-          "MSG-037"
-        ]
-      },
-      {
         "surface": "ChatFolderDeleteDialog",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFoldersScreen.kt",
         "anchor": "fun ChatFolderDeleteDialog(",
@@ -72,7 +64,8 @@
           "SET-009",
           "FLD-001",
           "FLD-002",
-          "ACC-017"
+          "ACC-017",
+          "FLD-011"
         ]
       },
       {
@@ -101,17 +94,6 @@
         "surface": "setting:archived",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFoldersScreen.kt",
         "anchor": "R.string.archived",
-        "test_ids": [
-          "SET-009",
-          "FLD-001",
-          "FLD-002",
-          "ACC-017"
-        ]
-      },
-      {
-        "surface": "setting:cancel",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFoldersScreen.kt",
-        "anchor": "R.string.cancel",
         "test_ids": [
           "SET-009",
           "FLD-001",

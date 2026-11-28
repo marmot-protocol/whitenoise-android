@@ -28,13 +28,11 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -49,8 +47,11 @@ import dev.ipf.whitenoise.android.ui.account.AccountAvatarButton
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
+import dev.ipf.whitenoise.android.ui.emojiPlainText
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.ArrowForward
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSizes
 
 /** Frozen destination identity for reviewing a group action. */
 internal data class MemberReviewGroup(
@@ -270,6 +271,7 @@ private fun GroupReviewActingAvatar(
 ) {
     val account = appState.accounts.firstOrNull { it.label == actingAccount } ?: return
     val name = appState.accountDisplayNameCached(account.accountIdHex)
+    val spokenName = emojiPlainText(name)
     val role = stringResource(R.string.group_action_acting_account)
     val npub = appState.npubForDisplay(account.accountIdHex)
     if (npub.isBlank()) {
@@ -278,7 +280,7 @@ private fun GroupReviewActingAvatar(
                 .offset(x = GroupReviewActorTargetInset)
                 .size(48.dp)
                 .testTag("group.action.acting_account")
-                .semantics { contentDescription = "$role, $name" },
+                .semantics { contentDescription = "$role, $spokenName" },
             contentAlignment = Alignment.Center,
         ) {
             Avatar(
@@ -291,16 +293,16 @@ private fun GroupReviewActingAvatar(
         }
         return
     }
-    val clipboard = LocalClipboardManager.current
+    val clipboard = rememberClipboardCopier()
     AccountAvatarButton(
         title = name,
         seed = account.accountIdHex,
         pictureUrl = appState.avatarUrl(account.accountIdHex),
-        size = 32.dp,
+        size = WhiteNoiseSizes.AvatarSmall,
         touchTargetSize = 48.dp,
         actionDescription = role,
         onClickLabel = stringResource(R.string.copy),
-        onClick = { clipboard.setText(AnnotatedString(npub)) },
+        onClick = { clipboard.copy(npub) },
         modifier = Modifier.offset(x = GroupReviewActorTargetInset).testTag("group.action.acting_account"),
     )
 }
@@ -393,7 +395,7 @@ private fun GroupReviewDestinations(groups: List<MemberReviewGroup>) {
 private const val GROUP_REVIEW_LARGE_FONT_SCALE = 1.3f
 
 /** Destination and member pictures share one size and gap so their names start on the same line. */
-internal val GroupReviewAvatarSize = 40.dp
+internal val GroupReviewAvatarSize = WhiteNoiseSizes.AvatarCompact
 internal val GroupReviewAvatarGap = 12.dp
 
 /** The actor's 32dp picture sits in a 48dp target; this pulls the picture flush with the trailing switches. */

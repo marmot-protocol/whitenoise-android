@@ -20,6 +20,15 @@ class ConversationEmptyStateTest {
         )
     }
 
+    /** A policy past `Long.MAX_VALUE` reads as the longest duration, never a negative one. */
+    @Test
+    fun aPolicyBeyondLongRangeNeverReadsNegative() {
+        assertEquals(
+            ConversationEmptyState.DisappearingMessages(retentionSeconds = Long.MAX_VALUE),
+            conversationEmptyState(ULong.MAX_VALUE),
+        )
+    }
+
     /**
      * The engine writes zero for "retention off". Reading that as a policy would tell the reader
      * their messages vanish instantly, which is both wrong and alarming.

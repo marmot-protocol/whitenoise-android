@@ -6,6 +6,6 @@ name: presentation-text-dialog-ready
     text: Fixture decoded.txt
 - assertVisible:
     text: Fixture decoded first line.*
-- tapOn: Back
+- tapOn: Close
 - assertVisible:
     id: presentation.complete

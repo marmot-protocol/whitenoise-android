@@ -7,8 +7,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.rememberUpdatedState
 import dev.ipf.whitenoise.android.state.ConversationController
-import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.updateMessageRetention
 
 /** Whether this person may change the group's settings, including the disappearing-messages timer. */
 internal val ConversationController.canEditGroupSettings: Boolean
@@ -42,15 +40,15 @@ internal fun disappearingPickOutcome(
     }
 
 /**
- * The disappearing-messages sheet, shared by chat details and the header timer. A pick that prunes history asks
- * inside the same sheet; everything else applies on tap. [onApply] runs the retention mutation; [resetKeys] drop
- * the open sheet and any pending confirmation on account/runtime change.
+ * The disappearing-messages sheet for chat details. A pick that prunes history asks inside the same sheet;
+ * everything else applies on tap. [onApply] runs the retention mutation; [resetKeys] drop the open sheet and
+ * any pending confirmation on account/runtime change. [currentSecs] is the group's protocol value.
  */
 @Composable
 @Suppress("LongParameterList")
 internal fun DisappearingTimerEditor(
     open: Boolean,
-    currentSecs: Long,
+    currentSecs: ULong,
     editable: Boolean,
     identity: (@Composable () -> Unit)?,
     resetKeys: Array<out Any?>,
@@ -61,37 +59,24 @@ internal fun DisappearingTimerEditor(
     val currentEditable by rememberUpdatedState(editable)
     val currentOnApply by rememberUpdatedState(onApply)
     if (open) {
+        // The raw protocol value keys a pending choice, since timers past Long.MAX_VALUE clamp to one shown value.
         key(resetKeys.toList(), currentSecs) {
+            val shownSecs = currentSecs.clampedDisappearingSecs()
             DisappearingMessagesPickerSheet(
-                currentSecs = currentSecs,
+                currentSecs = shownSecs,
                 onDismiss = onDismiss,
                 onPick = { secs ->
                     // A changed timer invalidates any choice made against the previous value.
-                    if (currentEditable && latestSecs == currentSecs && secs != currentSecs) {
+                    if (currentEditable && latestSecs == currentSecs && secs != shownSecs) {
                         currentOnApply(secs)
                     }
                 },
                 requiresConfirmation = { secs ->
-                    disappearingPickOutcome(currentSecs, secs) == DisappearingPick.Confirm
+                    disappearingPickOutcome(shownSecs, secs) == DisappearingPick.Confirm
                 },
                 confirmIdentity = identity,
                 confirmEnabled = editable,
             )
         }
     }
-}
-
-/**
- * Header timer apply path: the same retention command details runs, behind the same lock and owner fences.
- * Does nothing when another mutation or an account/runtime change makes the pick stale.
- */
-internal fun ConversationController.applyDisappearingTimer(
-    appState: WhiteNoiseAppState,
-    reviewedRuntime: Int,
-    secs: Long,
-) {
-    if (mutationInFlight || !isCurrentGroupMutationOwner(appState, reviewedRuntime)) return
-    clearLastMutationError()
-    val controller = this
-    appState.launchMutation { controller.updateMessageRetention(secs.toULong()) }
 }

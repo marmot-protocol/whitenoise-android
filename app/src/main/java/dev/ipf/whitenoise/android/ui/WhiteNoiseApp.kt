@@ -12,8 +12,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -36,7 +34,6 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
@@ -61,6 +58,7 @@ import dev.ipf.whitenoise.android.state.TransientNotice
 import dev.ipf.whitenoise.android.state.WarmResumeRenderedSurface
 import dev.ipf.whitenoise.android.state.WarmResumeTrace
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.attachmentCollections
 import dev.ipf.whitenoise.android.state.randomProfilePseudonym
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.ui.common.AppLockScreen
@@ -68,16 +66,16 @@ import dev.ipf.whitenoise.android.ui.common.ExplanationSheetHost
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.LocalExplanationHost
 import dev.ipf.whitenoise.android.ui.common.LocalTopNoticeHost
+import dev.ipf.whitenoise.android.ui.common.RootToastSnackbarEffect
 import dev.ipf.whitenoise.android.ui.common.StartupFailureScreen
 import dev.ipf.whitenoise.android.ui.common.StartupLoadingScreen
 import dev.ipf.whitenoise.android.ui.common.StartupLocalProjectionScreen
-import dev.ipf.whitenoise.android.ui.common.ToastSnackbarVisuals
 import dev.ipf.whitenoise.android.ui.common.TopNoticeHost
 import dev.ipf.whitenoise.android.ui.common.TopNoticeRegion
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSnackbarTimeoutEffect
 import dev.ipf.whitenoise.android.ui.common.WarmResumeUsefulSurface
-import dev.ipf.whitenoise.android.ui.common.finishLocalDeleteSnackbar
+import dev.ipf.whitenoise.android.ui.common.followedPeopleFor
 import dev.ipf.whitenoise.android.ui.common.rememberExplanationHostState
 import dev.ipf.whitenoise.android.ui.common.rememberTopNoticeSlot
 import dev.ipf.whitenoise.android.ui.conversation.media.LocalPendingCameraCaptureFiles
@@ -96,19 +94,18 @@ import dev.ipf.whitenoise.android.ui.navigation.warmResumeFirstUsefulSurface
 import dev.ipf.whitenoise.android.ui.onboarding.OnboardingScreen
 import dev.ipf.whitenoise.android.ui.onboarding.setup.AccountSetupScreen
 import dev.ipf.whitenoise.android.ui.settings.DictationProviderChooser
+import dev.ipf.whitenoise.android.ui.settings.LocalKeyFileExportLauncher
 import dev.ipf.whitenoise.android.ui.settings.StartupUsageDiagnosticsPrompt
 import dev.ipf.whitenoise.android.ui.settings.WipeOutcomeSheet
 import dev.ipf.whitenoise.android.ui.settings.WipeProgressSheet
+import dev.ipf.whitenoise.android.ui.settings.rememberKeyFileExport
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import dev.ipf.whitenoise.android.updates.AppSelfUpdateState
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
-internal const val TRANSIENT_NOTICE_DURATION_MILLIS = 2_000L
 
 /** Keeps exactly one dictation control visible without duplicating the origin composer. */
 internal fun shouldShowConversationDictationPersistentControl(
@@ -136,19 +133,6 @@ internal fun shouldShowConversationDictationPersistentControl(
             -> false
         }
 
-@Composable
-@Suppress("FunctionNaming")
-internal fun TransientNoticeTimeoutEffect(
-    notice: TransientNotice?,
-    onClear: (TransientNotice) -> Unit,
-) {
-    LaunchedEffect(notice) {
-        notice ?: return@LaunchedEffect
-        delay(TRANSIENT_NOTICE_DURATION_MILLIS)
-        onClear(notice)
-    }
-}
-
 /**
  * Notice layout (#3312): persistent top strips, temporary-banner slot, destination, then durable bottom controls.
  * Destinations with no slot below their bars use the top slot; bottom chrome and keyboard handling stay stable.
@@ -175,6 +159,7 @@ internal fun ShellTransientNoticeLayout(
             slot = slot,
             notice = notice,
             scope = null,
+            confirmationNeedsStatusInset = !persistentTopContentConsumesStatusBars,
             modifier = if (bannerOwnsStatusBar) Modifier.statusBarsPadding() else Modifier,
         )
         Box(
@@ -228,21 +213,21 @@ internal fun WhiteNoiseApp(
     val profileEntryTicket = remember(inboundProfilePayload) { appState.diagnostics.observations.ticket() }
     val notificationEntryTicket = remember(inboundNotificationRequestId) { appState.diagnostics.observations.ticket() }
     val shareEntryTicket = remember(inboundShareRequest) { appState.diagnostics.observations.ticket() }
-
     val diagnosticsPromptOwner = mainShellStateHolder.startupDiagnosticsPrompt(appState.runtimeGeneration)
     val diagnosticsPromptOpen = diagnosticsPromptOwner.prompt.visible || diagnosticsPromptOwner.busy
     val diagnosticsEligible = appState.phase == AppPhase.Ready && appState.activeAccountRef != null
 
-    // One owner decides which top slot shows the app's temporary banners; under app lock none does.
     val topNoticeHost =
         remember(appState, snackbarHostState) {
             TopNoticeHost(
                 snackbarHostState = snackbarHostState,
                 notice = { appState.transientNotice },
+                partial = appState::currentPartialNotice,
+                dismissNotice = appState::clearTransientNotice,
                 presentationAllowed = { !appState.appLock.screenVisible },
+                present = { titleRes, kind -> appState.presentTransient(titleRes, kind = kind) },
             )
         }
-    val toast = appState.toast
     val transientNotice = appState.transientNotice
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -260,7 +245,6 @@ internal fun WhiteNoiseApp(
     val dictationState = dictation.state
     val dictationPermissionRequestId = dictation.permissionRequestId
     val dictationProviderActivityRequestId = dictation.providerActivityRequestId
-    val density = LocalDensity.current
     var firstUsefulFrameRecorded by remember(warmResumeTraceToken, warmResumeEpoch) { mutableStateOf(false) }
     val visibleShareRequest = mainShellStateHolder.visibleShareRequest
     val visibleShareDirectGroupId =
@@ -282,8 +266,7 @@ internal fun WhiteNoiseApp(
         !inboundRoutePending &&
             appState.pendingWipeReport == null &&
             appState.appSelfUpdateState == AppSelfUpdateState.Idle
-    val dictationImeVisible =
-        WindowInsets.ime.getBottom(density) > WindowInsets.navigationBars.getBottom(density)
+    val dictationImeVisible = rememberDictationImeVisible()
     val firstUsefulFrameReady =
         mainShellStateHolder.prepareFirstUsefulFrame(
             phase = appState.phase,
@@ -378,12 +361,9 @@ internal fun WhiteNoiseApp(
 
     LaunchedEffect(Unit) {
         appState.bootstrap()
-        // Stale share-temp janitor. Runs once per process start, off the
-        // main thread because directory walks on cold cache can take a
-        // moment. Files in `shared_media` from earlier sessions that
-        // any external reader has long since finished with are deleted.
         withContext(Dispatchers.IO) {
             sweepStaleSharedMedia(context, SHARED_MEDIA_MAX_AGE_MS)
+            appState.attachmentCollections.sweepExpired()
         }
     }
     LaunchedEffect(
@@ -402,6 +382,16 @@ internal fun WhiteNoiseApp(
             localProjectionAvailable = localProjectionAvailable,
         )
     }
+    LaunchedEffect(appState.phase, appState.activeAccountRef) {
+        if (appState.phase == AppPhase.Ready && appState.activeAccountRef != null) {
+            appState.notificationAskMoment.noteReady()
+        }
+    }
+    val notificationChoiceReady =
+        !diagnosticsPromptOpen &&
+            !appState.diagnostics.requiresChoice &&
+            !appState.auditUploadConsentRequired &&
+            appState.diagnostics.snapshot != null
     LaunchedEffect(
         appState.phase,
         appState.activeAccountRef,
@@ -410,58 +400,16 @@ internal fun WhiteNoiseApp(
         appState.localNotificationSettings?.localNotificationsEnabled,
         appState.runtimeGeneration,
         appState.appLock.screenVisible,
-        diagnosticsPromptOpen,
-        appState.diagnostics.requiresChoice,
-        appState.auditUploadConsentRequired,
-        appState.diagnostics.snapshot,
+        notificationChoiceReady,
     ) {
-        if (diagnosticsPromptOpen || appState.diagnostics.requiresChoice || appState.auditUploadConsentRequired) {
+        if (!notificationChoiceReady || appState.phase != AppPhase.Ready || appState.appLock.screenVisible) {
             return@LaunchedEffect
         }
-        if (appState.diagnostics.snapshot == null) return@LaunchedEffect
-        if (appState.phase != AppPhase.Ready || appState.appLock.screenVisible) return@LaunchedEffect
         appState.refreshLocalNotificationPermission()
         appState.refreshLocalNotificationSettings()
-        if (appState.shouldRequestDefaultNotificationPermission()) {
-            appState.markDefaultNotificationPermissionPromptLaunched()
-            notificationPermissionTicket = appState.diagnostics.observations.ticket()
-            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-        } else {
-            appState.enableDefaultNotificationsIfReady()
-        }
+        appState.enableDefaultNotificationsIfReady()
     }
-    val deletionRetryLabel = stringResource(R.string.retry)
-    LaunchedEffect(toast, deletionRetryLabel) {
-        if (toast != null) {
-            val deletion = toast.localDeleteNotice
-            val result =
-                snackbarHostState.showSnackbar(
-                    ToastSnackbarVisuals(
-                        message =
-                            if (deletion != null) {
-                                toast.title.resolve(context)
-                            } else {
-                                listOfNotNull(
-                                    toast.title.resolve(context),
-                                    toast.detail?.resolve(context),
-                                ).joinToString("\n")
-                            },
-                        copyable = toast.copyable,
-                        tier = toast.tier,
-                        copyText = toast.diagnosticReport,
-                        details =
-                            deletion?.let {
-                                listOfNotNull(
-                                    toast.detail?.resolve(context),
-                                    toast.diagnosticReport,
-                                ).joinToString("\n\n")
-                            },
-                        actionLabel = deletion?.retry?.let { deletionRetryLabel },
-                    ),
-                )
-            finishLocalDeleteSnackbar(appState, toast, result)
-        }
-    }
+    RootToastSnackbarEffect(appState, snackbarHostState, retryLabel = stringResource(R.string.retry))
     TransientNoticeTimeoutEffect(transientNotice, appState::clearTransientNotice)
     // Snackbars time out here, at the root, so a slot that is hidden by app lock or replaced by a modal
     // cannot pause the clock and show a confirmation for its full length a second time.
@@ -497,29 +445,14 @@ internal fun WhiteNoiseApp(
                 chatTitle = { groupIdHex -> appState.activeAccountRef?.let { appState.chatTitle(it, groupIdHex) } },
             )
         }
-    LaunchedEffect(
+    InboundLinkEffect(
         inboundProfilePayload,
-        appState.phase,
-        appState.appLock.screenVisible,
-        appState.appLock.evaluationPending,
-    ) {
-        val payload = inboundProfilePayload ?: return@LaunchedEffect
-        if (appState.phase != AppPhase.Ready) return@LaunchedEffect
-        val chatLink = ChatLink.parse(payload)
-        if (chatLink != ChatLinkParse.NotChatLink) {
-            // A chat link reads which accounts hold the chat and may say so; neither happens under app lock (#3658).
-            // A key change cancels this read, so a late result cannot act on a newer link or a locked app.
-            if (appState.appLock.screenVisible || appState.appLock.evaluationPending) return@LaunchedEffect
-            val outcome = resolveChatLinkOutcome(chatLink, appState) ?: return@LaunchedEffect
-            showChatLinkOutcome(outcome)
-            onProfilePayloadHandled(payload)
-            return@LaunchedEffect onChatLinkResolved(payload, (outcome as? ChatLinkOutcome.Open)?.target)
-        }
-        if (appState.presentProfilePayload(payload)) {
-            appState.recordProductObservation(ProductObservation.PROFILE_ENTRY, profileEntryTicket)
-            onProfilePayloadHandled(payload)
-        }
-    }
+        appState,
+        profileEntryTicket,
+        onProfilePayloadHandled,
+        onChatLinkResolved,
+        showChatLinkOutcome,
+    )
     chatLinkChoice?.takeUnless { appState.appLock.screenVisible }?.let { choice ->
         ChatLinkAccountChooserDialog(
             choice = choice,
@@ -582,7 +515,6 @@ internal fun WhiteNoiseApp(
             dictation.cancel()
         }
     }
-
     val explanationHost = rememberExplanationHostState()
     // Privacy hardening (#405): when "Force incognito keyboard" is on, wrap the
     // whole app UI so every descendant text field requests incognito mode from
@@ -591,10 +523,12 @@ internal fun WhiteNoiseApp(
         CompositionLocalProvider(
             LocalPendingCameraCaptureFiles provides mainShellStateHolder.pendingCameraCaptureFiles,
             LocalTopNoticeHost provides topNoticeHost,
+            LocalKeyFileExportLauncher provides rememberKeyFileExport(appState),
             LocalCustomEmoji provides rememberCustomEmojiStore(context).emoji,
             LocalHiddenBuiltinEmojiSets provides rememberBuiltinEmojiSetChoices(context).pickerHidden,
             LocalInAppLinkHandler provides inAppLinkHandler,
             LocalExplanationHost provides explanationHost,
+            followedPeopleFor(appState),
         ) {
             // Holding a control explains it; the lock drops any open explanation.
             ExplanationSheetHost(explanationHost, visible = !appState.appLock.screenVisible)
@@ -645,7 +579,7 @@ internal fun WhiteNoiseApp(
                         AppSelfUpdateDialog(appState = appState)
                         val setupController = appState.accountSetup.controller
                         if (setupController != null) {
-                            AccountSetupScreen(setupController, appState::randomProfilePseudonym) {
+                            AccountSetupScreen(setupController, appState::randomProfilePseudonym, appState.appLock) {
                                 appState.launchMutation { appState.accountSetup.later() }
                             }
                         } else if (appState.profileSignUpForPresentation != null) {
@@ -836,7 +770,7 @@ internal fun WhiteNoiseApp(
             }
         }
         // Inside the scope, so the device-name field of a link request also honours the incognito keyboard.
-        AppQuestionHosts(appState)
+        AppQuestionHosts(appState, topNoticeHost)
     }
     if (!appState.appLock.screenVisible && dictationState is ConversationDictationState.ProviderSelectionRequired) {
         DictationProviderChooser(appState, onSelected = dictation::onProviderSelected, onDismiss = dictation::cancel)
@@ -849,6 +783,10 @@ internal fun WhiteNoiseApp(
             onConfirm = { dictation.acceptDisclosure(dictationState) },
             onDismiss = { if (dictation.state === dictationState) dictation.cancel() },
         )
+    }
+    NotificationAskHost(appState, suppressed = !protectedPhaseReady || !notificationChoiceReady) {
+        notificationPermissionTicket = appState.diagnostics.observations.ticket()
+        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 }
 

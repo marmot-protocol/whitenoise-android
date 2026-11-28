@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -26,13 +27,14 @@ import dev.ipf.whitenoise.android.notifications.NotificationProfileDuration
 import dev.ipf.whitenoise.android.notifications.notificationProfileManualUntilMs
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.notificationProfiles
+import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseChoiceRow
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseFilledTonalButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.settings.SettingsAction
-import dev.ipf.whitenoise.android.ui.settings.SettingsChoice
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.settings.SettingsSection
@@ -129,7 +131,7 @@ internal fun ColumnScope.NotificationProfileQuickSheetContent(
         if (active != null) {
             ActiveProfileSummary(active, zone, actions.onTurnOff)
         } else {
-            ProfileChoices(profiles, active = null, selectedId = selectedId, zone = zone, onSelect = actions.onSelect)
+            ProfileChoices(profiles, selectedId, zone, actions.onSelect)
             profiles.firstOrNull { it.id == selectedId }?.let { profile ->
                 SettingsSection(stringResource(R.string.notification_profile_turn_on))
                 DurationChoices(profile, tapClock, actions.onTurnOn)
@@ -154,7 +156,7 @@ private fun ActiveProfileSummary(
             ).padding(top = WhiteNoiseSpacing.Related),
         verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
     ) {
-        Text(notificationProfileActiveLabel(active, zone), style = MaterialTheme.typography.titleMedium)
+        EmojiLabel(notificationProfileActiveLabel(active, zone), style = MaterialTheme.typography.titleMedium)
         Text(
             notificationProfileActiveDetail(active.profile),
             style = MaterialTheme.typography.bodyMedium,
@@ -168,7 +170,7 @@ private fun ActiveProfileSummary(
                     .padding(
                         top = WhiteNoiseSpacing.Related,
                     ).testTag("notificationProfile.turnOff"),
-        ) { Text(stringResource(R.string.notification_profile_turn_off_named, active.profile.label)) }
+        ) { EmojiLabel(stringResource(R.string.notification_profile_turn_off_named, active.profile.label)) }
     }
 }
 
@@ -177,23 +179,24 @@ private fun ActiveProfileSummary(
 @Composable
 private fun ProfileChoices(
     profiles: List<NotificationProfile>,
-    active: ActiveNotificationProfile?,
     selectedId: String?,
     zone: ZoneId,
     onSelect: (String) -> Unit,
 ) {
-    SettingsGroup {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = WhiteNoiseSpacing.Related)
+            .selectableGroup(),
+    ) {
         profiles.forEach { profile ->
-            row(profile.id) { context ->
-                SettingsChoice(
-                    context = context,
-                    title = profile.label,
-                    subtitle = notificationProfileStatus(profile, active, zone),
-                    selected = profile.id == selectedId,
-                    onClick = { onSelect(profile.id) },
-                    modifier = Modifier.testTag("notificationProfile.choice.${profile.id}"),
-                )
-            }
+            WhiteNoiseChoiceRow(
+                title = profile.label,
+                subtitle = notificationProfileStatus(profile, active = null, zone = zone),
+                selected = profile.id == selectedId,
+                onClick = { onSelect(profile.id) },
+                modifier = Modifier.testTag("notificationProfile.choice.${profile.id}"),
+            )
         }
     }
 }

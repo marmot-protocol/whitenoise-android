@@ -141,6 +141,7 @@ internal class NativeManageStorageAccess(
                                 bytes = it.byteCount.toSaturatedLong(),
                                 mediaType = it.mediaType,
                                 receivedAtSeconds = it.receivedAt.toSaturatedLong(),
+                                fileName = it.fileName,
                             )
                         },
                     next = page.nextCursor?.let(::StorageCursor),
@@ -213,7 +214,13 @@ internal class NativeManageStorageAccess(
     override suspend fun clearCaches() {
         admitted {
             native { clearAvatarCache(account) }
-            appState.clearDecryptedAttachmentCopies()
+            val displayClear = runCatching { appState.clearDisplayAvatarAccount(account) }
+            val attachmentClear = runCatching { appState.clearDecryptedAttachmentCopies() }
+            displayClear
+                .onFailure { failure ->
+                    attachmentClear.exceptionOrNull()?.takeIf { it !== failure }?.let(failure::addSuppressed)
+                }.getOrThrow()
+            attachmentClear.getOrThrow()
         }
     }
 

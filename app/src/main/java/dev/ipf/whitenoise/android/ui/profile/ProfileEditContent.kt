@@ -9,6 +9,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -57,13 +58,15 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.ui.common.AnimatedProfileAvatarOverlay
+import dev.ipf.whitenoise.android.ui.common.IdentityHeader
+import dev.ipf.whitenoise.android.ui.common.IdentityMonogram
 import dev.ipf.whitenoise.android.ui.common.RandomProfileNameButton
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
 import dev.ipf.whitenoise.android.ui.common.rememberRecoverableAvatar
+import dev.ipf.whitenoise.android.ui.common.shapedPressFeedback
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
 import dev.ipf.whitenoise.android.ui.settings.SettingsBottomAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
@@ -144,17 +147,17 @@ internal fun ProfileEditContent(
         },
         bottomBar = {
             if (editing && hasAccount) {
-                SettingsBottomAction(tonalElevation = 0.dp) {
-                    WhiteNoiseButton(
-                        onClick = onSave,
+                SettingsBottomAction(elevated = false) {
+                    ProfileSaveButton(
                         enabled = saveEnabled,
-                        loading = busy,
-                        loadingLabel =
+                        busy = busy,
+                        onSave = onSave,
+                        busyLabel =
                             stringResource(
                                 if (lightningChecking) R.string.profile_lightning_checking else R.string.profile_saving,
                             ),
-                        modifier = Modifier.fillMaxWidth().testTag("profile.save"),
-                    ) { Text(stringResource(R.string.save)) }
+                        modifier = Modifier.testTag("profile.save"),
+                    )
                 }
             }
         },
@@ -172,66 +175,84 @@ internal fun ProfileEditContent(
                 Text(stringResource(R.string.no_active_account_period))
                 return@Column
             }
-            if (bannerUrl != null) {
-                ProfileBanner(bannerUrl, onOpen = onOpenBanner, enabled = ready && !busy)
-            }
-            if (editing) {
-                ProfileImageActions(
-                    seed,
-                    ProfileImageTarget.Banner,
-                    bannerPresent,
-                    imageActionsReady && !busy && !bannerUploading,
-                    bannerUploading,
-                    onPickImage,
-                    onEditBanner,
-                    onRemoveImage,
-                )
-                if (!bannerValid) {
-                    Text(
-                        stringResource(R.string.profile_banner_invalid),
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-            }
-            Box(
-                Modifier
-                    .size(120.dp)
-                    .then(
-                        if (pictureUrl != null) {
-                            Modifier.clickable(
-                                role = Role.Button,
-                                onClick = onOpenPicture,
+            IdentityHeader(
+                outerInset = WhiteNoiseSpacing.CompactScreenMargin,
+                top = {
+                    if (bannerUrl != null) {
+                        ProfileBanner(bannerUrl, onOpen = onOpenBanner, enabled = ready && !busy)
+                    }
+                    if (editing) {
+                        ProfileImageActions(
+                            seed,
+                            ProfileImageTarget.Banner,
+                            bannerPresent,
+                            imageActionsReady && !busy && !bannerUploading,
+                            bannerUploading,
+                            onPickImage,
+                            onEditBanner,
+                            onRemoveImage,
+                        )
+                        if (!bannerValid) {
+                            Text(
+                                stringResource(R.string.profile_banner_invalid),
+                                color = MaterialTheme.colorScheme.error,
                             )
+                        }
+                    }
+                },
+                avatar = { avatarSize ->
+                    val avatarPress = remember { MutableInteractionSource() }
+                    Box(
+                        Modifier
+                            .size(avatarSize)
+                            .then(
+                                if (pictureUrl != null) {
+                                    Modifier.clickable(
+                                        interactionSource = avatarPress,
+                                        indication = null,
+                                        role = Role.Button,
+                                        onClick = onOpenPicture,
+                                    )
+                                } else {
+                                    Modifier
+                                },
+                            ).testTag("profile.avatar"),
+                    ) {
+                        if (ready) {
+                            ProfileAvatar(fields.name.text.toString(), seed, pictureUrl)
                         } else {
-                            Modifier
-                        },
-                    ).testTag("profile.avatar"),
+                            CircularProgressIndicator(
+                                Modifier.align(Alignment.Center).testTag(PROFILE_HERO_LOADING_TAG),
+                            )
+                        }
+                        // The highlight is drawn over the round avatar, which clips itself, so nothing is clipped
+                        // twice.
+                        Box(Modifier.matchParentSize().shapedPressFeedback(avatarPress, CircleShape))
+                    }
+                },
             ) {
-                if (ready) {
-                    ProfileAvatar(fields.name.text.toString(), seed, pictureUrl)
-                } else {
-                    CircularProgressIndicator(Modifier.align(Alignment.Center).testTag(PROFILE_HERO_LOADING_TAG))
+                if (editing) {
+                    ProfileImageActions(
+                        seed,
+                        ProfileImageTarget.Picture,
+                        picturePresent,
+                        imageActionsReady && !busy && !pictureUploading,
+                        pictureUploading,
+                        onPickImage,
+                        onEditPicture,
+                        onRemoveImage,
+                        expandOnEntry = openPictureActionsOnEntry,
+                        onEntryExpanded = onPictureActionsOpened,
+                    )
+                    if (!pictureValid) {
+                        Text(
+                            stringResource(R.string.profile_picture_invalid),
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
                 }
             }
             if (editing) {
-                ProfileImageActions(
-                    seed,
-                    ProfileImageTarget.Picture,
-                    picturePresent,
-                    imageActionsReady && !busy && !pictureUploading,
-                    pictureUploading,
-                    onPickImage,
-                    onEditPicture,
-                    onRemoveImage,
-                    expandOnEntry = openPictureActionsOnEntry,
-                    onEntryExpanded = onPictureActionsOpened,
-                )
-                if (!pictureValid) {
-                    Text(
-                        stringResource(R.string.profile_picture_invalid),
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
                 WhiteNoiseCallout(
                     title = stringResource(R.string.profile_is_public),
                     text = stringResource(R.string.profile_public_description),
@@ -393,7 +414,7 @@ internal fun ProfileAvatar(
             )
             AnimatedProfileAvatarOverlay(url, image, Modifier.fillMaxSize())
         } else {
-            Text(name.trim().firstOrNull()?.uppercase() ?: "?", style = MaterialTheme.typography.headlineMedium)
+            IdentityMonogram(name, style = MaterialTheme.typography.headlineMedium, blank = "?")
         }
     }
 }

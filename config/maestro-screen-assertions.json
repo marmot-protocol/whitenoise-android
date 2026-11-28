@@ -428,6 +428,27 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchRecentStrip.kt",
+      "symbol": "GlobalSearchRecentTile",
+      "bindings": [
+        {
+          "case": "presentation-extra-search-recent-remove",
+          "selector": {
+            "text": "Remove from recent"
+          },
+          "scope": "Recent search row with fixed entries; long press opens the tile menu and Remove dispatches removal of that profile only.",
+          "entry_assertion": {
+            "text": "Remove from recent"
+          },
+          "opened_by": {
+            "longPressOn": {
+              "text": "Fixture Alice"
+            }
+          }
+        }
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/NotificationProfileQuickSheet.kt",
       "symbol": "ColumnScope.NotificationProfileQuickSheetContent",
       "bindings": [
@@ -828,11 +849,11 @@
         {
           "case": "presentation-group-ui-entity-empty",
           "selector": {
-            "text": "No results"
+            "text": "No matches"
           },
           "scope": "entity picker renders empty, disabled or selectable state and verifies selected stable identity; no group membership mutation.",
           "entry_assertion": {
-            "text": "No results"
+            "text": "No matches"
           },
           "visible_on_entry": true
         },
@@ -1167,6 +1188,26 @@
           "scope": "published native poll vote sheet asserts transparency copy, Alice and selected option."
         }
       ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
+      "symbol": "TtsMessageMenu",
+      "bindings": [
+        {
+          "case": "presentation-selection-transport-rate",
+          "selector": {
+            "text": "Next message"
+          },
+          "scope": "Paused transport fixture opens More options, dismisses with Back, and dispatches both message callbacks on selection.",
+          "entry_assertion": {
+            "text": "Previous message"
+          },
+          "opened_by": {
+            "text": "More options"
+          }
+        }
+      ],
+      "remaining": "Native speech queue movement, disabled navigation while loading, and device accessibility require separate execution."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportRatePicker.kt",
@@ -1847,14 +1888,33 @@
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDeleteDialog.kt",
-      "symbol": "BatchMessageDeleteDialogContent",
+      "symbol": "MessageDeleteConfirmationDialog",
       "bindings": [
         {
           "case": "actions-batch-delete-cancel",
           "selector": {
             "text": "Delete 1 message\\?"
           },
-          "scope": "bulk confirmation body rendered by its app dialog."
+          "scope": "bulk confirmation body rendered by its app dialog.",
+          "entry_assertion": {
+            "text": "Delete 1 message\\?"
+          },
+          "opened_by": {
+            "text": "Delete selected messages"
+          }
+        },
+        {
+          "case": "actions-delete-cancel",
+          "selector": {
+            "text": "Delete for me"
+          },
+          "scope": "content rendered inside MessageDeleteDialog; device and everyone choices retain cancellation.",
+          "entry_assertion": {
+            "text": "Delete message\\?"
+          },
+          "opened_by": {
+            "text": "Delete"
+          }
         }
       ]
     },
@@ -1874,19 +1934,6 @@
           "opened_by": {
             "text": "Delete"
           }
-        }
-      ]
-    },
-    {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDeleteDialog.kt",
-      "symbol": "MessageDeleteDialogContent",
-      "bindings": [
-        {
-          "case": "actions-delete-cancel",
-          "selector": {
-            "text": "Delete for me"
-          },
-          "scope": "content rendered inside MessageDeleteDialog; device and everyone choices retain cancellation."
         }
       ]
     },
@@ -1985,7 +2032,7 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventViewers.kt",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrVideoPlayer.kt",
       "symbol": "NostrVideoPlayerDialog",
       "bindings": [
         {
@@ -1993,7 +2040,7 @@
           "selector": {
             "text": "Couldn’t play this video\\."
           },
-          "scope": "ExoPlayer local missing-file failure and Close; no successful playback claim.",
+          "scope": "Refused non-HTTPS video source failure and Close; no successful playback claim.",
           "entry_assertion": {
             "text": "Couldn’t play this video\\."
           },
@@ -2153,11 +2200,25 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestHost.kt",
-      "symbol": "ActiveProfileLinkRequest",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestNotice.kt",
+      "symbol": "DeviceLinkDevicesWindow",
       "bindings": [],
-      "remaining": "This request appears only when a second installation of the same account asks to link, which the single-emulator runner cannot provide. Its states, choices, duplicate-tap and close-without-answer behavior are covered by JVM tests and manual SET-061; add a direct assertion when the runner can seed a second device.",
-      "second_device": ["SET-061"]
+      "remaining": "Opening Devices from a link request requires a second installation. SET-075 covers the repeated warning and return to Chats. SET-079 covers the consent report handoff.",
+      "second_device": ["SET-075", "SET-079"]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/CompromiseAlert.kt",
+      "symbol": "CompromiseAlert",
+      "bindings": [],
+      "remaining": "Showing the compromise alert requires a native warning. SET-078 covers the alert, follow-up actions and dismissal.",
+      "second_device": ["SET-078"]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkConsent.kt",
+      "symbol": "DeviceLinkConsentDialog",
+      "bindings": [],
+      "remaining": "The dialog requires a link from another installation. SET-061 covers link choices and dismissal; SET-079 covers consent, phone unlock and report feedback.",
+      "second_device": ["SET-061", "SET-079"]
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestHost.kt",
@@ -2805,14 +2866,14 @@
         {
           "case": "presentation-surface-addprofile-welcome",
           "selector": {
-            "text": "Sign Up"
+            "text": "Sign up"
           },
           "scope": "shared Add Profile content shown inside secure dialog."
         },
         {
           "case": "presentation-surface-addprofile-signin",
           "selector": {
-            "text": "Sign Up"
+            "text": "Sign up"
           },
           "scope": "shared Add Profile content shown inside secure dialog."
         }
@@ -2825,22 +2886,22 @@
         {
           "case": "presentation-surface-addprofile-welcome",
           "selector": {
-            "text": "Sign Up"
+            "text": "Sign up"
           },
           "scope": "secure Add Profile wrapper and shared welcome/sign-in content cancel without creating or importing an account.",
           "entry_assertion": {
-            "text": "Sign Up"
+            "text": "Sign up"
           },
           "visible_on_entry": true
         },
         {
           "case": "presentation-surface-addprofile-signin",
           "selector": {
-            "text": "Sign Up"
+            "text": "Sign up"
           },
           "scope": "secure Add Profile wrapper and shared welcome/sign-in content cancel without creating or importing an account.",
           "entry_assertion": {
-            "text": "Sign Up"
+            "text": "Sign up"
           },
           "visible_on_entry": true
         }
@@ -3079,7 +3140,7 @@
         {
           "case": "qr-permission-deny-close",
           "selector": {
-            "text": "^Camera Access Needed$"
+            "text": "^Camera access needed$"
           },
           "scope": "scanner QrScannerSheetContent renders denied-permission recovery state and closes; no QR decode or camera capture claim."
         }
@@ -3120,7 +3181,7 @@
         {
           "case": "qr-permission-deny-close",
           "selector": {
-            "text": "^Camera Access Needed$"
+            "text": "^Camera access needed$"
           },
           "scope": "scanner QrScannerSheet renders denied-permission recovery state and closes; no QR decode or camera capture claim.",
           "entry_assertion": {
@@ -3524,7 +3585,7 @@
           "selector": {
             "id": "bubble_colors.mine.picker"
           },
-          "scope": "Save both colors, Reset to default through overflow, Save and reopen with both brand defaults under their own picker ancestors. UI reopening only; no process-death or other-account proof. Generation-private preference cleanup remains required."
+          "scope": "Save both colors, inline Reset to default, Save and reopen with both brand defaults under their own picker ancestors. UI reopening only; no process-death or other-account proof. Generation-private preference cleanup remains required."
         },
         {
           "case": "preferences-bubble-colors-cancel",
@@ -3573,7 +3634,7 @@
           "selector": {
             "id": "bubble_colors.mine.picker"
           },
-          "scope": "Invalidate both bubble fields, Reset through overflow and verify both default payloads. Change only mine to valid: enabled Save proves both stale invalid flags cleared. Back/reopen retains both defaults. UI reopening only; no process-death or cross-account proof. Generation-private preference cleanup remains required."
+          "scope": "Invalidate both bubble fields, inline Reset and verify both default payloads. Change only mine to valid: enabled Save proves both stale invalid flags cleared. Back/reopen retains both defaults. UI reopening only; no process-death or cross-account proof. Generation-private preference cleanup remains required."
         }
       ]
     },
@@ -4535,6 +4596,38 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
+      "symbol": "HistoryBackupsScreen",
+      "bindings": [
+        {
+          "case": "settings-history-backups",
+          "selector": {
+            "id": "history_backups.list"
+          },
+          "scope": "generated-account history backups destination; status only, no recovery words generated."
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
+      "symbol": "HistoryBackupsContent",
+      "bindings": [
+        {
+          "case": "settings-history-backups",
+          "selector": {
+            "id": "history_backups.status"
+          },
+          "scope": "generated-account history backups status row; the turn-off confirmation is not opened.",
+          "entry_assertion": {
+            "id": "history_backups.list"
+          },
+          "opened_by": {
+            "text": "History backups"
+          }
+        }
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
       "symbol": "QuarantinedGroupsScreen",
       "bindings": [
@@ -4662,13 +4755,13 @@
           },
           "scope": "Settings route and home child opened from avatar, System Back restores Chats.",
           "opened_by": {
-            "text": "Settings"
+            "id": "chats.switchProfile"
           }
         }
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreenHost.kt",
       "symbol": "SettingsScreen",
       "bindings": [
         {
@@ -4678,7 +4771,7 @@
           },
           "scope": "Settings route and home child opened from avatar, System Back restores Chats.",
           "opened_by": {
-            "text": "Settings"
+            "id": "chats.switchProfile"
           }
         }
       ]
@@ -5041,6 +5134,25 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/NotificationAskDialog.kt",
+      "symbol": "NotificationAskDialog",
+      "bindings": [
+        {
+          "case": "consent-default-close",
+          "selector": {
+            "text": "Know when someone replies"
+          },
+          "scope": "Actual notification explanation after the usage choice closes on a returning install; Turn on notifications opens Android's prompt, which is denied.",
+          "entry_assertion": {
+            "text": "Know when someone replies"
+          },
+          "opened_by": {
+            "text": "Close"
+          }
+        }
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WebLinkConfirmation.kt",
       "symbol": "WebLinkConfirmation",
       "bindings": [
@@ -5177,11 +5289,11 @@
         {
           "case": "presentation-modal-departure-review-abandon",
           "selector": {
-            "text": "Abandon the selected chats on this device\\?"
+            "text": "Abandon chats on this device\\?"
           },
           "scope": "Actual bulk abandonment review with group, direct chat and acting-account identities, Cancel/Back/reopen and bounded confirm; the batch progress and native forget remain separate.",
           "entry_assertion": {
-            "text": "Abandon the selected chats on this device\\?"
+            "text": "Abandon chats on this device\\?"
           },
           "visible_on_entry": true
         }
@@ -5237,6 +5349,24 @@
           }
         }
       ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceDiscardConfirmation.kt",
+      "symbol": "VoiceDiscardConfirmation",
+      "bindings": [
+        {
+          "case": "presentation-modal-voice-discard",
+          "selector": {
+            "text": "Discard voice message\\?"
+          },
+          "scope": "Production confirmation dialog with Cancel and Discard callbacks from supplied review state.",
+          "entry_assertion": {
+            "text": "Discard voice message\\?"
+          },
+          "visible_on_entry": true
+        }
+      ],
+      "remaining": "Exercise recording, draft retention after Cancel, and draft deletion after Discard on a device."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceReviewRecoveryMarker.kt",
@@ -5509,11 +5639,11 @@
         {
           "case": "presentation-modal-group-control-reset",
           "selector": {
-            "text": "Reset this group on this device\\?"
+            "text": "Reset this group\\?"
           },
           "scope": "Actual reset dialog Cancel/Back/reopen and bounded reset dispatch; direct/invitation/busy guards have separate cases, no history or encryption deletion.",
           "entry_assertion": {
-            "text": "Reset this group on this device\\?"
+            "text": "Reset this group\\?"
           },
           "opened_by": {
             "text": "Reset and wait for a new invite"
@@ -5528,11 +5658,11 @@
         {
           "case": "presentation-modal-group-control-reset",
           "selector": {
-            "text": "Reset this group on this device\\?"
+            "text": "Reset this group\\?"
           },
           "scope": "The shared single-chat abandonment review opened from the group reset control; the same reset fixture covers its Cancel/Back/reopen and bounded confirm dispatch, no history or encryption deletion.",
           "entry_assertion": {
-            "text": "Reset this group on this device\\?"
+            "text": "Reset this group\\?"
           },
           "opened_by": {
             "text": "Reset and wait for a new invite"
@@ -5609,6 +5739,25 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/CivilDatePickerDialog.kt",
+      "symbol": "CivilDatePickerDialog",
+      "bindings": [
+        {
+          "case": "presentation-extra-media-date-jump",
+          "selector": {
+            "text": "Cancel"
+          },
+          "scope": "Actual Jump to date calendar opens on loaded media days and hands the chosen day over once; no attachment history read or grid movement.",
+          "entry_assertion": {
+            "text": "Show"
+          },
+          "opened_by": {
+            "text": "Jump to date"
+          }
+        }
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingSavedAccountUi.kt",
       "symbol": "OnboardingSavedAccountActions",
       "bindings": [
@@ -5623,38 +5772,6 @@
           },
           "opened_by": {
             "id": "onboarding-saved-account"
-          }
-        }
-      ]
-    },
-    {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInKeyField.kt",
-      "symbol": "SignInKeyField",
-      "bindings": [
-        {
-          "case": "presentation-modal-scan-invalid",
-          "selector": {
-            "id": "onboarding.sign_in.scan_error"
-          },
-          "scope": "Actual decoded-scan rejection dialog leaves original field unchanged, can reopen, rejects stale session callback; supplied decoded result, no camera or native login.",
-          "entry_assertion": {
-            "id": "onboarding.sign_in.scan_error"
-          },
-          "opened_by": {
-            "text": "Deliver decoded result"
-          }
-        },
-        {
-          "case": "presentation-modal-scan-public",
-          "selector": {
-            "id": "onboarding.sign_in.scan_error"
-          },
-          "scope": "Actual decoded-scan rejection dialog leaves original field unchanged, can reopen, rejects stale session callback; supplied decoded result, no camera or native login.",
-          "entry_assertion": {
-            "id": "onboarding.sign_in.scan_error"
-          },
-          "opened_by": {
-            "text": "Deliver decoded result"
           }
         }
       ]
@@ -6033,27 +6150,8 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
-      "symbol": "ChatBubbleColorEditor",
-      "bindings": [
-        {
-          "case": "preferences-bubble-colors-reset",
-          "selector": {
-            "text": "Reset to default"
-          },
-          "scope": "Actual bubble color overflow Reset is opened and dispatched; subsequent Save/reopen asserts scoped default values with generation-private cleanup.",
-          "entry_assertion": {
-            "text": "Reset to default"
-          },
-          "opened_by": {
-            "id": "bubble_colors.menu"
-          }
-        }
-      ]
-    },
-    {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditScreen.kt",
-      "symbol": "ChatFolderEditSession",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditParts.kt",
+      "symbol": "ChatFolderDiscardDialog",
       "bindings": [
         {
           "case": "folders-description-keep-editing",
@@ -6390,14 +6488,14 @@
         {
           "case": "advanced-gestures",
           "selector": {
-            "id": "speech.choice.0"
+            "id": "gestures.picker"
           },
           "scope": "Audited production owner and distinctive asserted child; controlled presentation and real Android entrypoint/engine/launcher proof remain separately qualified.",
           "opened_by": {
             "id": "gestures.MessageLeft"
           },
           "entry_assertion": {
-            "id": "speech.choice.0"
+            "id": "gestures.picker"
           }
         }
       ]
@@ -6427,9 +6525,9 @@
           "selector": {
             "text": "German"
           },
-          "scope": "Audited production owner and distinctive asserted child; controlled presentation and real Android entrypoint/engine/launcher proof remain separately qualified.",
+          "scope": "Audited production owner and distinctive asserted child; Translate settings opens it from its Target language link row. Controlled presentation and real Android entrypoint/engine/launcher proof remain separately qualified.",
           "opened_by": {
-            "text": "Target language: English"
+            "id": "translation.target"
           },
           "entry_assertion": {
             "text": "Search languages"
@@ -6494,6 +6592,19 @@
       "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationLanguageSheet.kt",
       "symbol": "TranslationLanguagePickerSheet",
       "bindings": [
+        {
+          "case": "settings-translation",
+          "selector": {
+            "text": "German"
+          },
+          "scope": "Translate settings' Target language row opens the production language sheet and its distinctive search field and German choice are asserted; real engine and launcher proof remain separately qualified.",
+          "opened_by": {
+            "id": "translation.target"
+          },
+          "entry_assertion": {
+            "text": "Search languages"
+          }
+        },
         {
           "case": "presentation-modal-translation-composer",
           "selector": {
@@ -6650,6 +6761,25 @@
           },
           "opened_by": {
             "text": "Chats"
+          }
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/VoiceNoteSettingsScreen.kt",
+      "symbol": "VoiceNoteSettingsScreen",
+      "bindings": [
+        {
+          "case": "settings-voice-language",
+          "selector": {
+            "id": "settings.voice_notes.group"
+          },
+          "scope": "Voice notes page shows both switches and Back returns to Voice & language.",
+          "entry_assertion": {
+            "id": "settings.voice_notes.group"
+          },
+          "opened_by": {
+            "text": "Voice notes"
           }
         }
       ]
@@ -7032,7 +7162,7 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewDialog.kt",
       "symbol": "SignInReviewDialog",
       "bindings": [],
       "remaining": "This surface opens only for an account with a second installation or linked device, which the single-emulator runner cannot provide. Its states and actions are covered by JVM tests and the linked-devices manual scenarios; add a direct assertion when the runner can seed a second device.",
@@ -7097,6 +7227,115 @@
         }
       ],
       "remaining": "Video mode, recording, the microphone prompt and a real capture need a camera-backed emulator; ConversationCameraContentTest, ConversationCameraCaptureKindTest and a manual emulator run cover them."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
+      "symbol": "LearnWhiteNoiseScreen",
+      "bindings": [
+        {
+          "case": "settings-help-support",
+          "selector": {
+            "text": "Share your profile"
+          },
+          "scope": "Help hub navigation to the first visible control.",
+          "opened_by": {
+            "text": "Learn White Noise"
+          }
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerScreen.kt",
+      "symbol": "RemoteSignerScreen",
+      "bindings": [
+        {
+          "case": "presentation-surface-onboarding-signin",
+          "selector": {
+            "id": "remote_signer.method.link"
+          },
+          "scope": "Sign-in entry opens the production remote-signer method picker before native pairing.",
+          "opened_by": {
+            "id": "onboarding.sign_in.remote_signer"
+          }
+        }
+      ],
+      "remaining": "Exercise both pairing directions against a cooperative remote signer, including permission review, browser approval and successful sign-in (ONB-027 and ONB-028)."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RemoteSignerAccountSection.kt",
+      "symbol": "RemoteSignerAccountDialogs",
+      "bindings": [
+        {
+          "case": "presentation-surface-remote-signer-disconnect",
+          "selector": {
+            "id": "confirmation.confirm"
+          },
+          "scope": "Disconnect confirmation is visible and Cancel dispatches dismissal on fixture state.",
+          "entry_assertion": {
+            "text": "Disconnect the signer\\?"
+          },
+          "visible_on_entry": true
+        }
+      ],
+      "remaining": "Exercise the permission review and disconnect dialogs with a paired account, and confirm disconnect keeps the account on the device (ONB-029)."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfMetadataDialog.kt",
+      "symbol": "ComposerPdfMetadataDialog",
+      "bindings": [
+        {
+          "case": "presentation-modal-pdfmeta-send",
+          "selector": {
+            "text": "Send with metadata\\?"
+          },
+          "scope": "Actual composer PDF metadata question from fixture choices with one signed PDF: Cancel, Back and reopen keep the send waiting; Send as is dispatches once. No file is read and nothing is uploaded.",
+          "entry_assertion": {
+            "text": "Send with metadata\\?"
+          },
+          "opened_by": {
+            "text": "Send fixture PDF"
+          }
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfMetadataDialog.kt",
+      "symbol": "ComposerPdfMetadataDialogContent",
+      "bindings": [
+        {
+          "case": "presentation-modal-pdfmeta-send",
+          "selector": {
+            "text": "Send with metadata\\?"
+          },
+          "scope": "Actual composer PDF metadata question from fixture choices with one signed PDF: Cancel, Back and reopen keep the send waiting; Send as is dispatches once. No file is read and nothing is uploaded.",
+          "entry_assertion": {
+            "text": "Send with metadata\\?"
+          },
+          "opened_by": {
+            "text": "Send fixture PDF"
+          }
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfMetadataDialog.kt",
+      "symbol": "ComposerPdfMetadataOptions",
+      "bindings": [
+        {
+          "case": "presentation-modal-pdfmeta-send",
+          "selector": {
+            "text": "Keep metadata"
+          },
+          "scope": "The production options dialog defaults to removing metadata, then offers Remove metadata after Keep metadata is chosen for the fixture invoice.",
+          "entry_assertion": {
+            "text": "PDF metadata options"
+          },
+          "opened_by": {
+            "text": "Open fixture PDF options"
+          }
+        }
+      ],
+      "remaining": "Send a real PDF with this setting and verify the recipient gets the original bytes (MED-064)."
     }
   ]
 }

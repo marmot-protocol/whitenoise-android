@@ -5,6 +5,7 @@ import android.app.Application
 import android.app.Notification
 import android.app.NotificationManager
 import android.graphics.Bitmap
+import android.graphics.Color
 import android.graphics.drawable.BitmapDrawable
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.app.NotificationCompat
@@ -32,6 +33,8 @@ import dev.ipf.whitenoise.android.notifications.ConversationCardPostSynchronizer
 import dev.ipf.whitenoise.android.notifications.ConversationCardTestHook
 import dev.ipf.whitenoise.android.notifications.LocalNotificationFormatter
 import dev.ipf.whitenoise.android.notifications.LocalNotificationPresenter
+import dev.ipf.whitenoise.android.notifications.emojiPlainText
+import dev.ipf.whitenoise.android.ui.CustomEmojiStore
 import dev.ipf.whitenoise.android.ui.chats.AvatarScreenshotFixtures
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -125,6 +128,54 @@ class NotificationFirstPostIntegrationTest {
                     assertFalse(fixture.activeNotification().contentText().contains(MENTION_NPUB))
                     assertEquals(1, writes.get())
                 }
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /** Blink-free first draw resolves device emoji in the same snapshot used by the late correction. */
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun coldDeviceEmojiIsLoadedWithinTheFirstPostProjection() =
+        runBlocking {
+            val authored = "Alice :office_parrot:"
+            val readable = "Alice office parrot"
+            val directory = context.filesDir.resolve(CustomEmojiStore.DIRECTORY).apply { mkdirs() }
+            val bitmap = Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.RED) }
+            directory.resolve("office_parrot.png").outputStream().use {
+                check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
+            }
+            assertEquals(authored, context.emojiPlainText(authored))
+            val events = CopyOnWriteArrayList<NotificationFirstPostTimingEvent>()
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    notificationUsersHaveDisplayNames = false,
+                    localDisplayName = authored,
+                    notificationFirstPostTimingObserver = events::add,
+                    emitStartupNotification = false,
+                )
+            try {
+                fixture.bootstrap()
+                fixture.emitNotification(fixture.update.copy(groupName = "Work :office_parrot:"))
+                fixture.awaitNotificationPosted(
+                    advanceMainClock = { events.any { it.stage == NotificationFirstPostTimingStage.ContentComplete } },
+                )
+                delay(NO_ADDITIONAL_WRITE_WINDOW_MS)
+
+                val styles =
+                    FirstPostRecordingNotificationManager.posts.mapNotNull { notification ->
+                        NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(notification)
+                    }
+                val published = styles.single()
+                assertEquals(
+                    readable,
+                    published.messages
+                        .single()
+                        .person
+                        ?.name,
+                )
+                assertEquals("Work office parrot", published.conversationTitle)
             } finally {
                 fixture.close()
             }
@@ -740,6 +791,8 @@ class NotificationFirstPostIntegrationTest {
         tags: List<MessageTagFfi> = emptyList(),
     ): TimelineMessageRecordFfi =
         TimelineMessageRecordFfi(
+            agentItem = null,
+            agentItemFirstEventMissing = false,
             clientToken = null,
             messageIdHex = "message-a",
             sourceMessageIdHex = null,
@@ -756,7 +809,7 @@ class NotificationFirstPostIntegrationTest {
             replyPreview = null,
             mediaJson = null,
             media = emptyList(),
-            agentTextStreamJson = null,
+            thread = null,
             poll = null,
             groupSystem = groupSystem,
             hasReports = false,

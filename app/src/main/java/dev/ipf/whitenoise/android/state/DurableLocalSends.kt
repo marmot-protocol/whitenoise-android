@@ -9,6 +9,7 @@ import dev.ipf.marmotkit.MediaFileUploadRequestFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.MediaUploadResultFfi
 import dev.ipf.marmotkit.MediaUploadSubmissionFfi
+import dev.ipf.marmotkit.MessageDraftRevisionFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
@@ -36,6 +37,10 @@ internal suspend fun ConversationController.publishDurableComposerText(
 internal fun pendingLocalSend(messageIds: List<String> = emptyList()): SendSummaryFfi =
     SendSummaryFfi(0u, messageIds, SendAcceptDispositionFfi.ACCEPTED_PENDING, SendMaintenanceDispositionFfi.READY)
 
+/** Whether MDK refused this token permanently, including a send fenced by new membership. */
+internal val LocalSendStatusFfi?.isTerminalLocalSendFailure: Boolean
+    get() = this == LocalSendStatusFfi.Rejected || this == LocalSendStatusFfi.RefusedNewMembers
+
 /** Queries native ownership before a retry; no Android send ledger is introduced. */
 internal fun MarmotInterface.recoveredLocalSend(
     account: String,
@@ -44,8 +49,9 @@ internal fun MarmotInterface.recoveredLocalSend(
 ): SendSummaryFfi? =
     when (val status = localSendStatus(account, group, token)) {
         is LocalSendStatusFfi.Completed -> status.summary
-        LocalSendStatusFfi.Queued, LocalSendStatusFfi.EngineOwned -> pendingLocalSend()
-        LocalSendStatusFfi.Rejected -> error("local submission rejected; a new deliberate submission is required")
+        is LocalSendStatusFfi.Queued, is LocalSendStatusFfi.EngineOwned -> pendingLocalSend()
+        LocalSendStatusFfi.Rejected, LocalSendStatusFfi.RefusedNewMembers ->
+            error("local submission rejected; a new deliberate submission is required")
         null -> null
     }
 
@@ -108,26 +114,28 @@ internal data class DurableComposerMediaUpload(
     val upload: MediaUploadResultFfi,
     val acceptance: SendSummaryFfi?,
     val recoveredWithoutUpload: Boolean,
+    // The draft revision stored draft files uploaded under; their admission must use it.
+    val draftRevision: MessageDraftRevisionFfi? = null,
 )
 
 /**
  * Uses draft admission when MDK owns matching staged bytes, otherwise asks the
  * token-aware upload call to admit draft-less non-reply voice notes and contact cards.
- * A captured reply is always upload-only until its original revision can be admitted.
+ * Captured replies and explicit composer selections upload separately from their native admission.
  */
 internal suspend fun MarmotInterface.uploadOrAdmitComposerMediaWithToken(
     account: String,
     group: String,
     request: MediaUploadRequestFfi,
     token: String,
-    capturedReply: Boolean = false,
+    forceUploadOnly: Boolean = false,
 ): DurableComposerMediaUpload {
     require(!request.send) { "controller request must begin as upload-only" }
     return uploadOrAdmitComposerSubmission(
         account = account,
         group = group,
         token = token,
-        capturedReply = capturedReply,
+        forceUploadOnly = forceUploadOnly,
         descriptors = request.attachments.map { it.fileName to it.mediaType },
     ) { send -> uploadMediaWithClientToken(account, group, request.copy(send = send), token) }
 }
@@ -137,19 +145,21 @@ internal suspend fun MarmotInterface.uploadOrAdmitComposerMediaWithToken(
  * MDK snapshots every source path before its first upload; [control] cancels that work before admission.
  * Captured replies never reach this path because native reply drafts hold attachment bytes.
  */
+@Suppress("LongParameterList") // The cancellable file transfer and its admission policy travel with the token.
 internal suspend fun MarmotInterface.uploadOrAdmitComposerMediaFilesWithToken(
     account: String,
     group: String,
     request: MediaFileUploadRequestFfi,
     control: MediaFileTransferControlFfi,
     token: String,
+    forceUploadOnly: Boolean = false,
 ): DurableComposerMediaUpload {
     require(!request.send) { "controller request must begin as upload-only" }
     return uploadOrAdmitComposerSubmission(
         account = account,
         group = group,
         token = token,
-        capturedReply = false,
+        forceUploadOnly = forceUploadOnly,
         descriptors = request.attachments.map { it.fileName to it.mediaType },
     ) { send -> uploadMediaFilesWithClientToken(account, group, request.copy(send = send), control, token) }
 }
@@ -162,22 +172,13 @@ private suspend fun MarmotInterface.uploadOrAdmitComposerSubmission(
     account: String,
     group: String,
     token: String,
-    capturedReply: Boolean,
+    forceUploadOnly: Boolean,
     descriptors: List<Pair<String, String>>,
     upload: suspend (send: Boolean) -> MediaUploadSubmissionFfi,
 ): DurableComposerMediaUpload {
-    recoveredLocalSend(account, group, token)?.let { recovered ->
-        return DurableComposerMediaUpload(
-            upload = MediaUploadResultFfi(emptyList(), null),
-            // The completed native send owns its projection, but an interrupted
-            // upload return did not give Android the references needed to build
-            // a truthful sent bridge. Keep the bubble pending until that echo.
-            acceptance = pendingLocalSend(recovered.messageIds),
-            recoveredWithoutUpload = true,
-        )
-    }
+    recoveredLocalSend(account, group, token)?.let { recovered -> return recoveredComposerUpload(recovered) }
     val draftBacked =
-        capturedReply ||
+        forceUploadOnly ||
             selectedDraftOrNull(account, group)
                 ?.draft
                 ?.let { it.replyToMessageIdHex == null && draftDescribesUpload(it, descriptors) } == true
@@ -194,3 +195,15 @@ private suspend fun MarmotInterface.uploadOrAdmitComposerSubmission(
         recoveredWithoutUpload = false,
     )
 }
+
+/**
+ * The outcome for a submission MDK already owns. The completed native send owns its projection, but an interrupted
+ * upload return did not give Android the references needed to build a truthful sent bridge, so the bubble stays
+ * pending until that echo.
+ */
+internal fun recoveredComposerUpload(recovered: SendSummaryFfi) =
+    DurableComposerMediaUpload(
+        upload = MediaUploadResultFfi(emptyList(), null),
+        acceptance = pendingLocalSend(recovered.messageIds),
+        recoveredWithoutUpload = true,
+    )

@@ -157,14 +157,6 @@
         ]
       },
       {
-        "surface": "string:notification_channel_agent_activity",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
-        "anchor": "R.string.notification_channel_agent_activity",
-        "test_ids": [
-          "NTF-005"
-        ]
-      },
-      {
         "surface": "string:notification_channel_app_updates",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
         "anchor": "R.string.notification_channel_app_updates",
@@ -580,6 +572,24 @@
         "anchor": "R.string.explanation_privacy_notif_sounds",
         "test_ids": [
           "SET-055"
+        ]
+      },
+      {
+        "surface": "Sign-in alerts: R.string.notification_channel_account_security",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.notification_channel_account_security",
+        "test_ids": [
+          "SET-077",
+          "SET-078"
+        ]
+      },
+      {
+        "surface": "Sign-in alerts: R.string.sign_in_alert_badge_review",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.sign_in_alert_badge_review",
+        "test_ids": [
+          "SET-077",
+          "SET-078"
         ]
       }
     ]

@@ -4,17 +4,16 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import dev.ipf.whitenoise.android.ui.theme.amoledRowSeamColor
+import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 
-/**
- * The canonical horizontal separator. One color choice — `outlineVariant`,
- * Material 3's own divider token — so separators read subtle-but-visible in
- * Light, Dark, and AMOLED (where it is the same dim token the AMOLED surface
- * borders use) instead of each call site re-deriving contrast by eye.
- * Markdown-rendered rules inside message bubbles stay content-relative and are
- * deliberately not migrated: they sit on bubble container colors, not chrome.
- */
+/** Horizontal separator for app chrome, with the same muted AMOLED color as connected rows. */
 @Suppress("FunctionNaming")
 @Composable
-internal fun AppDivider(modifier: Modifier = Modifier) {
-    HorizontalDivider(modifier = modifier, color = MaterialTheme.colorScheme.outlineVariant)
+internal fun AppDivider(
+    modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.outlineVariant,
+) {
+    HorizontalDivider(modifier = modifier, color = if (isAmoledSurfaceTheme()) amoledRowSeamColor(color) else color)
 }

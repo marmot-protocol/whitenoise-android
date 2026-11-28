@@ -3,28 +3,28 @@ name: presentation-modal-departure-review-abandon
 ---
 - runFlow: ../fixtures/emulator-interruption.yaml
 - assertVisible:
-    text: Abandon the selected chats on this device\?
+    text: Abandon chats on this device\?
 - assertVisible:
     text: 'Group: Fixture group'
 - assertVisible:
     text: 'Direct chat: Fixture direct chat'
 - assertVisible:
-    text: 'Your account: Fixture account'
+    id: group.action.acting_account
 - tapOn:
     text: Cancel
 - assertNotVisible:
-    text: Abandon the selected chats on this device\?
+    text: Abandon chats on this device\?
 - tapOn:
     text: Reopen abandonment review
 - assertVisible:
-    text: Abandon the selected chats on this device\?
+    text: Abandon chats on this device\?
 - back
 - assertNotVisible:
-    text: Abandon the selected chats on this device\?
+    text: Abandon chats on this device\?
 - tapOn:
     text: Reopen abandonment review
 - assertVisible:
-    text: Abandon the selected chats on this device\?
+    text: Abandon chats on this device\?
 - tapOn:
     id: group.abandon.confirm
 - assertVisible:

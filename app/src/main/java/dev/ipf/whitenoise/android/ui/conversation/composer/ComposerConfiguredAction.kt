@@ -5,7 +5,6 @@ package dev.ipf.whitenoise.android.ui.conversation.composer
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
@@ -21,11 +20,12 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntRect
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ComposerShortcut
+import dev.ipf.whitenoise.android.ui.common.SlotIconButton
 import dev.ipf.whitenoise.android.ui.common.SystemPasteIconButton
 import dev.ipf.whitenoise.android.ui.common.TextEntryEmojiAction
+import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.common.rememberSystemPasteGuard
 import dev.ipf.whitenoise.android.ui.navigation.dictationLauncherOrigin
-import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 import kotlin.math.roundToInt
 
 private const val DISABLED_VOICE_OPACITY = 0.38f
@@ -84,7 +84,7 @@ internal fun ComposerConfiguredAction(
                     )
                 },
             ) {
-                IconButton(
+                SlotIconButton(
                     onClick = { if (bindings.canActivate()) onMore() },
                     enabled = enabled,
                     modifier = modifier,
@@ -130,7 +130,7 @@ internal fun ComposerConfiguredAction(
         // The real held-pointer node has one stable call site in ComposerBar, positioned over this slot.
         ComposerShortcut.VoiceNote -> {
             if (!bindings.voiceLauncherVisible) {
-                IconButton(onClick = {}, enabled = false, modifier = modifier) {
+                SlotIconButton(onClick = {}, enabled = false, modifier = modifier) {
                     Box(Modifier.semantics { contentDescription = voiceLabel }) {
                         MiniWaveformGlyph(
                             MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = DISABLED_VOICE_OPACITY),
@@ -154,7 +154,7 @@ private fun ComposerTranslateAction(
     enabled: Boolean,
 ) {
     val toggle = bindings.translate
-    IconButton(
+    SlotIconButton(
         onClick = { if (bindings.canActivate()) toggle?.onToggle?.invoke() },
         enabled = enabled && toggle != null,
         modifier = modifier.testTag("composer.translate").semantics { selected = toggle?.active == true },
@@ -194,7 +194,7 @@ private fun ComposerOptionalShortcutAction(
                 }
             }
         }
-    IconButton(
+    SlotIconButton(
         onClick = activate,
         enabled = shortcutEnabled,
         modifier =

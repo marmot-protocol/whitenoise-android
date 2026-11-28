@@ -21,6 +21,7 @@ import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppProtocolProfileFfi
 import dev.ipf.marmotkit.AvatarAssetFfi
 import dev.ipf.marmotkit.AvatarBytesFfi
+import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListPageDirectionFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ChatListViewFfi
@@ -35,8 +36,10 @@ import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.ChatListLiveSubscriptions
 import dev.ipf.whitenoise.android.state.ChatListWindowHandle
 import dev.ipf.whitenoise.android.state.ChatsSubscriptionHandle
+import dev.ipf.whitenoise.android.state.ConversationLiveSubscriptions
 import dev.ipf.whitenoise.android.state.ConversationTimelineTestIds
 import dev.ipf.whitenoise.android.state.MarmotWindowTestFakes
+import dev.ipf.whitenoise.android.state.ScriptedConversationGroupStateSubscription
 import dev.ipf.whitenoise.android.state.ScriptedConversationLiveSubscriptions
 import dev.ipf.whitenoise.android.state.ScriptedConversationTimelineSubscription
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -50,6 +53,7 @@ import dev.ipf.whitenoise.android.ui.chats.CHAT_LIST_HEAD_INPUT_GATE_MILLIS
 import dev.ipf.whitenoise.android.ui.chats.CHAT_LIST_ROW_PLACEMENT_MILLIS
 import dev.ipf.whitenoise.android.ui.chats.performUnreadFilterAction
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.channels.Channel
 import org.junit.Assert.assertEquals
@@ -337,21 +341,36 @@ internal class ReturnFixture(
     private val readAvatars: suspend (List<String>) -> List<AvatarBytesFfi> = { emptyList() },
     private val unreadTarget: Boolean = false,
     additionalAccounts: List<AccountSummaryFfi> = emptyList(),
+    rowCount: Int = 6,
     customizeRow: (Int, ChatListRowFfi) -> ChatListRowFfi = { _, row -> row },
+    /** When given, opening any chat other than [target] waits for this signal before its timeline opens. */
+    otherChatTimelineGate: CompletableDeferred<Unit>? = null,
+    /** One script per conversation open, in open order; the default opens a single ready conversation. */
+    timelineScripts: List<ScriptedConversationTimelineSubscription> =
+        listOf(ScriptedConversationTimelineSubscription(emptyTimelinePage())),
+    /** Gives every row its own group, so a second open cannot reuse the first conversation's warm timeline. */
+    private val distinctGroupsPerRow: Boolean = false,
+    /** Runs before the nth timeline open answers; a test suspends here to keep that conversation preparing. */
+    private val beforeTimelineOpen: suspend (Int) -> Unit = {},
 ) {
     val unreadSnapshotReads = AtomicInteger()
     val avatarReads = AtomicInteger()
     val avatarRequests = AtomicInteger()
     val rows =
-        (0..5).map { index ->
+        (0 until rowCount).map { index ->
+            val groupId =
+                if (index == rowCount - 1) {
+                    ConversationTimelineTestIds.GROUP_ID
+                } else {
+                    "%02x".format(index + 10).repeat(16)
+                }
             customizeRow(
                 index,
                 notificationChatListRow().copy(
-                    groupIdHex =
-                        if (index == 5) ConversationTimelineTestIds.GROUP_ID else "%02x".format(index + 10).repeat(16),
+                    groupIdHex = groupId,
                     title = "Return chat $index",
                     groupName = "Return chat $index",
-                    activitySortAt = (10 - index).toULong(),
+                    activitySortAt = (rowCount + 4 - index).toULong(),
                     unreadCount = if (unreadTarget && index == 5) 1uL else 0uL,
                     hasUnread = unreadTarget && index == 5,
                 ),
@@ -359,14 +378,40 @@ internal class ReturnFixture(
         }
     val target = rows.last()
     val activeWindow = ReturnWindow(ChatListViewFfi.CHATS, rows, avatarAssetForRow)
-    private val timelines =
-        ScriptedConversationLiveSubscriptions(
-            listOf(ScriptedConversationTimelineSubscription(emptyTimelinePage())),
-            conversationTimelineTestGroup(),
-        )
+    private val timelineOpens = AtomicInteger()
+    private val liveSubscriptions =
+        if (distinctGroupsPerRow) {
+            ConversationLiveSubscriptions(
+                openTimeline = { _, groupIdHex, _ ->
+                    val index = timelineOpens.getAndIncrement()
+                    holdOtherChat(otherChatTimelineGate, groupIdHex)
+                    beforeTimelineOpen(index)
+                    timelineScripts[index]
+                },
+                openGroupState = { _, groupIdHex ->
+                    ScriptedConversationGroupStateSubscription(
+                        conversationTimelineTestGroup().copy(groupIdHex = groupIdHex),
+                    )
+                },
+            )
+        } else {
+            // The shared-group fixture still passes every open through the hook, so a held open stays held.
+            val scripted =
+                ScriptedConversationLiveSubscriptions(timelineScripts, conversationTimelineTestGroup()).subscriptions
+            ConversationLiveSubscriptions(
+                // The nth open gets script n even when the hook holds an earlier open past a later one.
+                openTimeline = { _, groupIdHex, _ ->
+                    val index = timelineOpens.getAndIncrement()
+                    holdOtherChat(otherChatTimelineGate, groupIdHex)
+                    beforeTimelineOpen(index)
+                    timelineScripts[index]
+                },
+                openGroupState = scripted.openGroupState,
+            )
+        }
     val appState: WhiteNoiseAppState =
         conversationTimelineTestAppState(
-            timelines.subscriptions,
+            liveSubscriptions,
             additionalAccounts = additionalAccounts,
         ).also { state ->
             WhiteNoiseAppState::class.java.getDeclaredField("marmotRuntime").apply { isAccessible = true }.set(
@@ -412,7 +457,7 @@ internal class ReturnFixture(
                             true,
                         ),
                     )
-                "groupDetails" -> groupDetails()
+                "groupDetails" -> groupDetails(args?.getOrNull(1) as? String)
                 "chatListRow" -> rows.first { it.groupIdHex == args?.getOrNull(1) }
                 "readAvatarAssets" -> {
                     avatarReads.incrementAndGet()
@@ -441,14 +486,21 @@ internal class ReturnFixture(
             else -> error("Unexpected return-fixture call: $name")
         }
 
+    /** Answers the fixed test group unless rows were given their own groups. */
+    private fun groupDetails(requestedGroupIdHex: String?): GroupDetailsFfi {
+        val groupIdHex =
+            requestedGroupIdHex?.takeIf { distinctGroupsPerRow } ?: ConversationTimelineTestIds.GROUP_ID
+        return groupDetailsFor(groupIdHex)
+    }
+
     /** Keeps the mounted destination on its consented, authoritative empty timeline. */
-    private fun groupDetails() =
+    private fun groupDetailsFor(groupIdHex: String) =
         GroupDetailsFfi(
-            group = conversationTimelineTestGroup(),
+            group = conversationTimelineTestGroup().copy(groupIdHex = groupIdHex),
             members = emptyList(),
             mlsState =
                 AppGroupMlsStateFfi(
-                    groupIdHex = ConversationTimelineTestIds.GROUP_ID,
+                    groupIdHex = groupIdHex,
                     protocolProfile = AppProtocolProfileFfi.CURRENT,
                     lifecycleState = GroupLifecycleStateFfi.STABLE,
                     epoch = 0uL,
@@ -484,7 +536,13 @@ internal class ReturnWindow(
                 snapshot.rows.map { presented ->
                     val row = presented.row
                     val asset = avatarAssetForRow(row)
-                    val source = if (asset == null) PresentationSourceFfi.GROUP else presented.presentation.avatarSource
+                    val direct = row.conversationKind == ChatConversationKindFfi.DIRECT
+                    val source =
+                        when {
+                            direct -> PresentationSourceFfi.PEER_PROFILE
+                            asset == null -> PresentationSourceFfi.GROUP
+                            else -> presented.presentation.avatarSource
+                        }
                     val avatar =
                         when {
                             asset != null -> SelectedAvatarFfi.RemoteImage("https://example.invalid/avatar", row.title)
@@ -494,12 +552,14 @@ internal class ReturnWindow(
                                 SelectedAvatarFfi.EncryptedGroupImage(checkNotNull(row.avatar), row.title)
                             else -> return@map presented
                         }
+                    val peerId = if (direct) ConversationTimelineTestIds.SENDER_ID else presented.presentation.peerId
                     presented.copy(
                         avatarAsset = asset,
                         presentation =
                             presented.presentation.copy(
                                 avatar = avatar,
                                 avatarSource = source,
+                                peerId = peerId,
                             ),
                     )
                 },
@@ -518,7 +578,7 @@ internal class ReturnWindow(
     /** Holds the live stream until its owner cancels it. */
     override suspend fun next(): ChatListWindowSnapshotFfi? = updates.receiveCatching().getOrNull()
 
-    /** This six-row account has no next or previous page. */
+    /** This synthetic account has no next or previous page. */
     override suspend fun page(
         sequence: ULong,
         direction: ChatListPageDirectionFfi,
@@ -552,4 +612,12 @@ private class ReturnGroups(
 
     /** Receives are owned and cancelled by the production controller. */
     override fun close() = Unit
+}
+
+/** Holds a non-target chat's timeline open on [gate], after its open index is taken, so scripts keep their order. */
+private suspend fun holdOtherChat(
+    gate: CompletableDeferred<Unit>?,
+    groupIdHex: String,
+) {
+    if (gate != null && !groupIdHex.equals(ConversationTimelineTestIds.GROUP_ID, ignoreCase = true)) gate.await()
 }

@@ -1,12 +1,8 @@
 package dev.ipf.whitenoise.android.ui.chats
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
@@ -14,43 +10,36 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.SystemFolderKind
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseFilterChip
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
-import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
+import dev.ipf.whitenoise.android.ui.emojiPlainText
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 private const val FOLDER_HEADER_SCROLLED_THRESHOLD = 0.01f
-private val FOLDER_MANAGER_BUTTON_SIZE = 32.dp
 private val FOLDER_MANAGER_ICON_SIZE = 18.dp
 private const val FOLDER_PILL_MAX_VISIBLE_COUNT = 99
 
@@ -67,21 +56,14 @@ internal fun ChatFolderPills(
     modifier: Modifier = Modifier,
     chatsUnreadCount: ULong? = null,
 ) {
-    val scrolled =
-        (LocalWhiteNoiseHeaderScroll.current?.state?.overlappedFraction ?: 0f) > FOLDER_HEADER_SCROLLED_THRESHOLD
+    val headerScrollState = LocalWhiteNoiseHeaderScroll.current?.state
+    val scrolled by remember(headerScrollState) {
+        derivedStateOf { (headerScrollState?.overlappedFraction ?: 0f) > FOLDER_HEADER_SCROLLED_THRESHOLD }
+    }
     val containerColor =
         animateColorAsState(
             if (scrolled) MaterialTheme.colorScheme.surfaceContainer else MaterialTheme.colorScheme.surface,
             label = "Folder row background",
-        ).value
-    val selectedColor =
-        animateColorAsState(
-            if (scrolled) {
-                MaterialTheme.colorScheme.surfaceContainerLowest
-            } else {
-                MaterialTheme.colorScheme.surfaceContainerHigh
-            },
-            label = "Selected folder background",
         ).value
     val home = chips.firstOrNull { it.unfilteredHome }
     val showRoot = home == null
@@ -117,7 +99,6 @@ internal fun ChatFolderPills(
                     stringResource(R.string.folder_all_chats),
                     selectedFolderId == null,
                     CHAT_LIST_FILTER_CHIP_ALL_TAG,
-                    selectedColor,
                     { onSelect(null) },
                     unreadMessageCount = chatsUnreadCount,
                 )
@@ -137,7 +118,6 @@ internal fun ChatFolderPills(
                     },
                 selected = selectedFolderId == chip.folderId || (selectedFolderId == null && chip.unfilteredHome),
                 tag = if (chip.unfilteredHome) CHAT_LIST_FILTER_CHIP_ALL_TAG else chatListFilterChipTag(chip.folderId),
-                selectedColor = selectedColor,
                 onClick = { onSelect(chip.folderId) },
                 onLongClick = { onEditFolder(chip.folderId) },
                 trailingCount = chip.trailingCount,
@@ -146,12 +126,11 @@ internal fun ChatFolderPills(
         }
         if (onFolders != null) {
             item(key = "manage") {
+                // A full 48 dp IconButton: a size set outside it would shrink the touch target with the visual.
                 IconButton(
                     onClick = onFolders,
                     modifier =
                         Modifier
-                            .minimumInteractiveComponentSize()
-                            .size(FOLDER_MANAGER_BUTTON_SIZE)
                             .testTag("chats.manageFolders")
                             .explainOnLongPress(
                                 chatsExplanation(
@@ -172,8 +151,7 @@ internal fun ChatFolderPills(
 }
 
 /**
- * The selected fill settles with folder arrival while the existing gesture/semantics owner changes immediately.
- * Bulk-selection chips use a separate component and do not opt into this destination feedback.
+ * One folder destination filter. On AMOLED the active pill uses a gray outline as its selection cue.
  */
 @Suppress("LongParameterList", "FunctionNaming")
 @Composable
@@ -181,80 +159,46 @@ internal fun ChatFolderPill(
     label: String,
     selected: Boolean,
     tag: String,
-    selectedColor: Color,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
     trailingCount: Int = 0,
     unreadMessageCount: ULong? = null,
     labelMaxWidth: Dp? = null,
 ) {
-    val interactions = remember { MutableInteractionSource() }
-    val background = folderPillBackground(selected, selectedColor)
     val resources = LocalContext.current.resources
+    val spokenLabel = emojiPlainText(label)
     val description =
         if (unreadMessageCount != null) {
-            chatsPillAccessibleDescription(resources, label, unreadMessageCount)
+            chatsPillAccessibleDescription(resources, spokenLabel, unreadMessageCount)
         } else {
-            chatFolderChipAccessibleDescription(label, trailingCount)
+            chatFolderChipAccessibleDescription(spokenLabel, trailingCount)
         }
     val visibleCount =
         unreadMessageCount?.let(::chatsPillVisibleCount)
             ?: trailingCount.takeIf { it > 0 }?.let { if (it > FOLDER_PILL_MAX_VISIBLE_COUNT) "99+" else it.toString() }
-    val gesture =
-        interactions.chatFolderChipGestureModifier(
-            state = if (selected) ToggleableState.On else ToggleableState.Off,
-            showStateIndicator = false,
-            onClick = onClick,
-            onLongClick = onLongClick,
-            longClickLabel = if (onLongClick == null) null else stringResource(R.string.edit),
-        )
-    Box {
-        FilterChip(
-            selected = selected,
-            onClick = {},
-            label = { FolderPillLabel(label, labelMaxWidth) },
-            interactionSource = interactions,
-            shape = CircleShape,
-            border = null,
-            colors =
-                FilterChipDefaults.filterChipColors(
-                    containerColor = background,
-                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    selectedContainerColor = background,
-                    selectedLabelColor = MaterialTheme.colorScheme.onSurface,
-                ),
-            trailingIcon =
-                if (visibleCount != null) {
-                    (
-                        {
-                            Text(
-                                visibleCount,
-                                style = MaterialTheme.typography.labelSmall,
-                            )
-                        }
-                    )
-                } else {
-                    null
-                },
-            modifier = Modifier.clearAndSetSemantics {},
-        )
-        Box(
-            Modifier.matchParentSize().testTag(tag).then(gesture).semantics(mergeDescendants = true) {
-                contentDescription = description
-                this.selected = selected
-            },
-        )
-    }
+    WhiteNoiseFilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = { FolderPillLabel(label, labelMaxWidth) },
+        modifier = Modifier.testTag(tag),
+        trailingIcon = visibleCount?.let { count -> { Text(count, style = MaterialTheme.typography.labelSmall) } },
+        contentDescription = description,
+        onLongClick = onLongClick,
+        longClickLabel = if (onLongClick == null) null else stringResource(R.string.edit),
+    )
 }
 
-/** Keeps destination filter labels in one bounded line while semantics expose their complete name. */
+/**
+ * Keeps destination filter labels in one bounded line while semantics expose their complete name. Custom emoji in the
+ * name draw as artwork, like Unicode emoji do.
+ */
 @Composable
 @Suppress("FunctionNaming")
 private fun FolderPillLabel(
     label: String,
     maxWidth: Dp?,
 ) {
-    Text(
+    EmojiLabel(
         label,
         modifier = if (maxWidth == null) Modifier else Modifier.widthIn(max = maxWidth),
         maxLines = if (maxWidth == null) Int.MAX_VALUE else 1,
@@ -262,19 +206,15 @@ private fun FolderPillLabel(
     )
 }
 
-/** Retains selected fill through folder arrival while disabled motion uses the current target immediately. */
+/** Announces the complete folder label and eligible count even when the visible label is ellipsized. */
 @Composable
-private fun folderPillBackground(
-    selected: Boolean,
-    selectedColor: Color,
-): Color {
-    val motionEnabled = rememberSystemAnimationsEnabled()
-    val targetBackground = if (selected) selectedColor else selectedColor.copy(alpha = 0f)
-    val background by
-        animateColorAsState(
-            targetValue = targetBackground,
-            animationSpec = if (motionEnabled) tween(CHAT_FOLDER_TRANSITION_MILLIS) else snap(),
-            label = "Folder destination selection",
-        )
-    return if (motionEnabled) background else targetBackground
-}
+internal fun chatFolderChipAccessibleDescription(
+    label: String,
+    trailingCount: Int,
+): String =
+    if (trailingCount > 0) {
+        val countLabel = pluralStringResource(R.plurals.chat_folder_chat_count, trailingCount, trailingCount)
+        "$label, $countLabel"
+    } else {
+        label
+    }

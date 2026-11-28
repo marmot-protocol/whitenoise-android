@@ -14,7 +14,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.InputChip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -34,10 +33,13 @@ import dev.ipf.whitenoise.android.search.GlobalSearchContentKind
 import dev.ipf.whitenoise.android.search.labelRes
 import dev.ipf.whitenoise.android.state.ChatFolder
 import dev.ipf.whitenoise.android.state.SystemFolderKind
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseFilterChip
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
+import dev.ipf.whitenoise.android.ui.emojiPlainText
 import dev.ipf.whitenoise.android.ui.search.globalSearchDateFilterLabel
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
@@ -199,16 +201,16 @@ internal fun GlobalSearchFilterControlsRow(
             }
             items(chips.items.filterNot { it.chipId == conversationScope?.chipId }, key = { it.chipId }) { chip ->
                 val chipLabel = globalSearchActiveChipLabel(chip, state, folderNames)
-                val removeDescription = stringResource(R.string.chat_list_search_filter_remove, chipLabel)
-                InputChip(
+                val removeDescription =
+                    stringResource(R.string.chat_list_search_filter_remove, emojiPlainText(chipLabel))
+                WhiteNoiseFilterChip(
                     selected = true,
                     onClick = { onRemoveFilter(chip.chipId) },
-                    label = { Text(chipLabel) },
+                    label = { EmojiLabel(chipLabel) },
                     trailingIcon = { Icon(painterResource(R.drawable.ic_close), contentDescription = null) },
-                    modifier =
-                        Modifier
-                            .testTag(globalSearchFilterChipTag(chip.chipId))
-                            .semantics { contentDescription = removeDescription },
+                    modifier = Modifier.testTag(globalSearchFilterChipTag(chip.chipId)),
+                    showCheck = false,
+                    contentDescription = removeDescription,
                 )
             }
         }
@@ -237,7 +239,7 @@ private fun GlobalSearchScopeControlsHeader(
         val stacked = maxWidth < 360.dp && LocalDensity.current.fontScale >= 1.5f && onSearchOtherChats != null
         if (stacked) {
             Column(Modifier.fillMaxWidth()) {
-                Text(text = scopeLabel, modifier = Modifier.testTag("search-scope-label"))
+                EmojiLabel(text = scopeLabel, modifier = Modifier.testTag("search-scope-label"))
                 TextButton(
                     onClick = requireNotNull(onSearchOtherChats),
                     modifier = Modifier.fillMaxWidth().testTag("search-other-chats"),
@@ -247,7 +249,7 @@ private fun GlobalSearchScopeControlsHeader(
             }
         } else {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(text = scopeLabel, modifier = Modifier.weight(1f).testTag("search-scope-label"))
+                EmojiLabel(text = scopeLabel, modifier = Modifier.weight(1f).testTag("search-scope-label"))
                 if (onSearchOtherChats != null) {
                     TextButton(
                         onClick = onSearchOtherChats,

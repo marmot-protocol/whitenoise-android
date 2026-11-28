@@ -136,8 +136,8 @@ private fun TimelineMessage.projectedMessageIdHex(): String? = projected?.messag
 
 /**
  * Records of the rows the engine actually projected, in window order.
- * Optimistic sends and stream-debug rows carry synthetic ids that vanish on
- * reconciliation or cleanup, so anything tracking timeline identity across
+ * Optimistic sends carry synthetic ids that vanish on reconciliation or
+ * cleanup, so anything tracking timeline identity across
  * time — paging anchors, tail watermarks — must never see them.
  */
 internal fun canonicalTimelineRecords(items: List<TimelineMessage>): List<AppMessageRecordFfi> =

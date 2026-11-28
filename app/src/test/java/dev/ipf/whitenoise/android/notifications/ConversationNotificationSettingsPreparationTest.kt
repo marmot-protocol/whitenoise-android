@@ -52,7 +52,7 @@ class ConversationNotificationSettingsPreparationTest {
                         requestedParents =
                             listOf(
                                 NotificationChannelSpec.GROUP_MESSAGES,
-                                NotificationChannelSpec.AGENT_ACTIVITY,
+                                NotificationChannelSpec.INVITES,
                             ),
                         vibrationPattern = ConversationVibrationPattern.DOUBLE,
                     ),
@@ -67,8 +67,8 @@ class ConversationNotificationSettingsPreparationTest {
                 result.targetsByParentChannelId.getValue(NotificationChannelSpec.GROUP_MESSAGES.id).channelId,
             )
             assertEquals(
-                "${NotificationChannelSpec.AGENT_ACTIVITY.id}:SYSTEM_DEFAULT",
-                result.targetsByParentChannelId.getValue(NotificationChannelSpec.AGENT_ACTIVITY.id).channelId,
+                "${NotificationChannelSpec.INVITES.id}:SYSTEM_DEFAULT",
+                result.targetsByParentChannelId.getValue(NotificationChannelSpec.INVITES.id).channelId,
             )
         }
 
@@ -277,7 +277,9 @@ class ConversationNotificationSettingsPreparationTest {
             context: Context,
             shortcut: ShortcutInfoCompat,
             existing: Boolean,
+            isWriteAllowed: () -> Boolean,
         ) {
+            check(isWriteAllowed())
             pushes += 1
             if (existing) updates += 1
             lastPushed = shortcut
@@ -288,13 +290,17 @@ class ConversationNotificationSettingsPreparationTest {
         }
 
         /** Returns a deterministic active id encoding the requested vibration version. */
+        @Suppress("LongParameterList") // Matches the platform boundary under test.
         override suspend fun ensureChannel(
             context: Context,
             parent: NotificationChannelSpec,
             shortcutId: String,
             conversationTitle: String,
             vibrationPattern: ConversationVibrationPattern,
-        ): String {
+            accountRef: String?,
+            isWriteAllowed: () -> Boolean,
+        ): String? {
+            if (!isWriteAllowed()) return null
             channelEnsures += 1
             return "${parent.id}:${vibrationPattern.name}"
         }

@@ -13,9 +13,9 @@ name: signup-offline-retry
       visible: "Help Improve White Noise"
     commands:
       - back
-- assertVisible: "Sign Up"
-- assertVisible: "Sign In"
-- tapOn: "Sign Up"
+- assertVisible: "Sign up"
+- assertVisible: "Sign in"
+- tapOn: "Sign up"
 - scrollUntilVisible:
     element:
       id: "onboarding.sign_up.name"
@@ -51,8 +51,8 @@ name: signup-offline-retry
 - assertVisible: "Maestro Offline Draft"
 - assertVisible: "Synthetic offline test only"
 - tapOn: "Back"
-- assertVisible: "Sign In"
-- tapOn: "Sign Up"
+- assertVisible: "Sign in"
+- tapOn: "Sign up"
 - scrollUntilVisible:
     element:
       id: "onboarding.sign_up.name"

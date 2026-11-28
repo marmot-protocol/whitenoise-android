@@ -137,7 +137,7 @@ class PrivateContactDestinationAvatarTest {
                         ForwardTargetRow(appState, item, "Contact", "b", "self-b", false, {})
                     }
                     Box(Modifier.testTag("share-owner")) {
-                        ShareTargetRow(item, "Contact", false, "self-b", "b", appState, {})
+                        ShareTargetRow(0, 1, item, "Contact", false, "self-b", "b", appState, {})
                     }
                 }
             }

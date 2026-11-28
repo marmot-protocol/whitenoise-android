@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.rememberTextFieldState
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -21,6 +20,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.LinkedDeviceRow
 import dev.ipf.whitenoise.android.state.LinkedDeviceSettingsPatch
 import dev.ipf.whitenoise.android.state.deviceLabelFits
+import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
 import dev.ipf.whitenoise.android.ui.settings.SettingsAction
@@ -31,7 +31,6 @@ import dev.ipf.whitenoise.android.ui.settings.SettingsLink
 import dev.ipf.whitenoise.android.ui.settings.SettingsList
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
 import dev.ipf.whitenoise.android.ui.settings.SettingsSwitch
-import dev.ipf.whitenoise.android.ui.settings.SettingsValue
 
 internal const val DEVICE_DETAIL_LIST_TAG = "device_detail.list"
 internal const val DEVICE_DETAIL_RENAME_TAG = "device_detail.rename"
@@ -95,7 +94,7 @@ internal fun LinkedDeviceDetailContent(
 }
 
 /**
- * The rows of a device's page: the removal notice, its facts and Rename, its settings, and Remove device for a
+ * The rows of a device's page: the removal notice, its head, Rename, its settings, and Remove device for a
  * device other than this one whose removal is not already pending.
  */
 @Suppress("LongParameterList") // One flat set of values and the three things a row can ask for.
@@ -110,17 +109,9 @@ private fun LazyListScope.linkedDeviceDetailRows(
     if (device.removalPending) {
         item(key = "removing") { SettingsCallout(stringResource(R.string.linked_devices_removal_pending)) }
     }
-    item(key = "facts") {
+    item(key = "hero") { LinkedDeviceHero(device, name) }
+    item(key = "rename") {
         SettingsGroup {
-            row("facts") { context ->
-                SettingsValue(
-                    context = context,
-                    title = name,
-                    value = linkedDeviceSummary(device).joinToString("\n"),
-                    explanation = stringResource(R.string.explanation_linked_device_row),
-                    leading = { SettingsLeadingIcon(R.drawable.ic_device) },
-                )
-            }
             row("rename") { context ->
                 SettingsLink(
                     context = context,
@@ -129,7 +120,7 @@ private fun LazyListScope.linkedDeviceDetailRows(
                     modifier = Modifier.testTag(DEVICE_DETAIL_RENAME_TAG),
                     explanation = stringResource(R.string.device_detail_rename_detail),
                     enabled = editable,
-                    leading = { SettingsLeadingIcon(R.drawable.ic_person) },
+                    leading = { SettingsLeadingIcon(R.drawable.ic_edit) },
                 )
             }
         }
@@ -147,7 +138,7 @@ private fun LazyListScope.linkedDeviceDetailRows(
                         explanation = stringResource(R.string.device_detail_remove_detail),
                         enabled = editable,
                         destructive = true,
-                        leading = { SettingsLeadingIcon(R.drawable.ic_person_remove) },
+                        leading = { SettingsLeadingIcon(R.drawable.ic_delete) },
                     )
                 }
             }
@@ -242,22 +233,26 @@ private fun RenameDeviceDialog(
     )
 }
 
-/** Confirms removing a device, saying what removal does and that it is carried out as the devices are able to. */
+/**
+ * Confirms removing a device, saying what removal does, that it is carried out as the devices are able to, and that
+ * a lost or stolen device may still hold the key.
+ */
 @Composable
 private fun RemoveDeviceDialog(
     name: String,
     onRemove: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    WhiteNoiseAlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.device_detail_remove)) },
-        text = { Text(stringResource(R.string.device_detail_remove_confirm, name)) },
-        confirmButton = {
-            TextButton(onClick = onRemove, modifier = Modifier.testTag(DEVICE_DETAIL_REMOVE_CONFIRM_TAG)) {
-                Text(stringResource(R.string.device_detail_remove), color = MaterialTheme.colorScheme.error)
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+    ConfirmDialog(
+        title = stringResource(R.string.device_detail_remove),
+        message =
+            stringResource(R.string.device_detail_remove_confirm, name) + "\n\n" +
+                stringResource(R.string.device_detail_remove_stolen),
+        confirmLabel = stringResource(R.string.device_detail_remove),
+        onConfirm = onRemove,
+        onDismiss = onDismiss,
+        destructive = true,
+        confirmTag = DEVICE_DETAIL_REMOVE_CONFIRM_TAG,
+        protectInput = true,
     )
 }

@@ -18,8 +18,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -37,8 +35,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.ModalBottomSheetProperties
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SheetState
@@ -69,7 +65,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -84,10 +79,14 @@ import dev.ipf.whitenoise.android.media.sanitizeHttpsAvatarUrl
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.SheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyVerticalGrid
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetInset
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.settings.subtitleRes
-import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
+import dev.ipf.whitenoise.android.ui.theme.Radii
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -120,7 +119,7 @@ private fun ImageSourceButton(
             modifier
                 .height(52.dp)
                 .semantics { contentDescription = accessibilityLabel },
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(Radii.lg),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         contentColor = MaterialTheme.colorScheme.onSurface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
@@ -208,7 +207,7 @@ internal fun ImageSearchPreview(
                         Modifier
                             .fillMaxWidth()
                             .aspectRatio(IMAGE_SEARCH_BANNER_ASPECT_RATIO)
-                            .clip(RoundedCornerShape(12.dp))
+                            .clip(RoundedCornerShape(Radii.md))
                             .background(MaterialTheme.colorScheme.surfaceVariant)
                             .testTag(IMAGE_SEARCH_BANNER_PREVIEW_TAG),
                     contentAlignment = Alignment.Center,
@@ -382,37 +381,21 @@ internal fun ImageSearchSheet(
             }
     }
 
-    ModalBottomSheet(
-        containerColor = amoledSheetContainerColor(),
+    WhiteNoiseModalBottomSheet(
         onDismissRequest = { if (!inputBlocked) terminal.close(onDismiss) },
         sheetState = sheetState,
-        sheetGesturesEnabled = !inputBlocked,
-        properties =
-            ModalBottomSheetProperties(
-                shouldDismissOnBackPress = !inputBlocked,
-                shouldDismissOnClickOutside = !inputBlocked,
-            ),
+        interactionEnabled = !inputBlocked,
     ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .imePadding(),
-        ) {
+        Column(Modifier.fillMaxWidth()) {
+            WhiteNoiseSheetHeader(header)
             Column(
                 modifier =
                     Modifier
                         .weight(1f, fill = false)
                         .fadingVerticalScroll(rememberScrollState())
-                        .padding(horizontal = 20.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
+                        .padding(horizontal = WhiteNoiseSheetInset, vertical = WhiteNoiseSpacing.Related),
+                verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),
             ) {
-                Text(
-                    header,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
-                )
                 val subtitleRes =
                     when {
                         trimmedUrl.isEmpty() -> R.string.group_image_search_preview_subtitle_empty
@@ -596,7 +579,7 @@ internal fun ImageSearchSheet(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 8.dp)
+                        .padding(horizontal = WhiteNoiseSheetInset, vertical = WhiteNoiseSpacing.Related)
                         .testTag(IMAGE_SEARCH_ACTIONS_TAG),
             ) {
                 OutlinedButton(

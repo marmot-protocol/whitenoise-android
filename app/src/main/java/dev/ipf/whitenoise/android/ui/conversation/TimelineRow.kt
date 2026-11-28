@@ -2,12 +2,14 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.core.AgentOperationProjector
 import dev.ipf.whitenoise.android.core.DateTimeFormatState
@@ -20,6 +22,8 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationLoadFailureEdge
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.chatHistoryTransfer
+import dev.ipf.whitenoise.android.state.importedHistoryBoundary
 import dev.ipf.whitenoise.android.state.isLoadingOlder
 import dev.ipf.whitenoise.android.state.usesDirectTranscriptChrome
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
@@ -33,7 +37,7 @@ import dev.ipf.whitenoise.android.ui.conversation.reactions.rememberLocalReactio
 import dev.ipf.whitenoise.android.ui.group.isCurrentGroupMutationOwner
 import java.util.Locale
 
-/** Renders one projected timeline item and delegates bubble gestures to the conversation owner. */
+/** Renders one projected timeline item with its leading separators and delegates bubble gestures to the owner. */
 @Composable
 @Suppress("CyclomaticComplexMethod", "FunctionNaming", "LongMethod")
 internal fun TimelineRow(
@@ -81,6 +85,7 @@ internal fun TimelineRow(
     onBeforeBodyCollapse: () -> Unit = {},
     reactionViewport: () -> Rect? = { null },
     modifier: Modifier = Modifier,
+    senderGapMeasurements: ConversationSenderGapMeasurements? = null,
 ) = traceConversationUiSection(ConversationUiTrace.ROW) {
     val reactionMotion = rememberTimelineReactionMotion(item, controller, appState, composerGate, selectionMode)
     ReactionMotionRow(reactionMotion, modifier, reactionViewport) {
@@ -101,6 +106,13 @@ internal fun TimelineRow(
                 messageId = item.record.messageIdHex,
                 firstUnreadMessageId = entryFirstUnreadMessageId,
             )
+        val historyImport = LocalChatHistoryImport.current()
+        val historyBoundary = importedHistoryBoundary(older?.projected, item.projected, historyImport)
+        // Draw the import line ahead of the day separator to close the imported rows.
+        ImportedHistoryMarkers(
+            transfer = if (older == null && !controller.hasMoreBefore) chatHistoryTransfer(historyImport) else null,
+            boundary = historyBoundary,
+        )
         if (daySeparatorLabel != null) {
             val hasLeadingHeader =
                 controller.hasMoreBefore ||
@@ -113,7 +125,6 @@ internal fun TimelineRow(
                 followsGroupEvent = followsGroupEvent,
             )
         }
-        ImportedHistoryMarkers(older, item, atHistoryStart = older == null && !controller.hasMoreBefore)
         if (showUnreadDivider) {
             UnreadMessagesDivider(
                 count = entryUnreadCount,
@@ -121,19 +132,28 @@ internal fun TimelineRow(
                 followsGroupEvent = followsGroupEvent,
             )
         }
+        val hasLeadingSeparator = daySeparatorLabel != null || showUnreadDivider || historyBoundary != null
+        val senderGap =
+            if (!hasLeadingSeparator &&
+                conversationBubbleSenderChanges(
+                    older,
+                    item,
+                    appState.streamingDebugEnabled,
+                    controller.deletedMessageIds,
+                )
+            ) {
+                CONVERSATION_SENDER_CHANGE_EXTRA_SPACING
+            } else {
+                0.dp
+            }
         Column(
             Modifier
                 .fillMaxWidth()
                 .onSizeChanged { size ->
                     if (size.height > 0) onMeasured(item.record.messageIdHex, size.height)
-                },
+                }.measureConversationSenderGap(senderGapMeasurements, item.presentationId, senderGap)
+                .padding(top = senderGap),
         ) {
-            if (item.id.startsWith(ConversationController.STREAM_DEBUG_ID_PREFIX)) {
-                if (appState.streamingDebugEnabled) {
-                    StreamDebugEventRow(record = item.record)
-                }
-                return@Column
-            }
             when (timelineRowKind(item.record, appState.streamingDebugEnabled)) {
                 TimelineRowKind.GroupSystem -> {
                     GroupSystemTimelineRow(
@@ -218,7 +238,6 @@ internal fun TimelineRow(
             ) {
                 onActionMenuOpenChange(false)
             }
-            // Sender runs own attribution only; the timeline arrangement owns the outer interval.
             key(controller.boundAccountRef, controller.group.groupIdHex, item.presentationId) {
                 TimelineRowMessageBubble(
                     messageIdHex = item.record.messageIdHex,

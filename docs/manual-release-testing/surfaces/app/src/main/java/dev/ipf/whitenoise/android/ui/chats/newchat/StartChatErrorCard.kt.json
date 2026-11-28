@@ -1,0 +1,104 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/StartChatErrorCard.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "AppText.resolveForCompose",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/StartChatErrorCard.kt",
+        "anchor": "fun AppText.resolveForCompose(",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "ACC-003",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "StartChatErrorCard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/StartChatErrorCard.kt",
+        "anchor": "fun StartChatErrorCard(",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "ACC-003",
+          "ACC-017"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "setting:copy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/StartChatErrorCard.kt",
+        "anchor": "R.string.copy",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "ACC-003",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "setting:new_message_chat_created",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/StartChatErrorCard.kt",
+        "anchor": "R.string.new_message_chat_created",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "ACC-003",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "setting:new_message_open_chat",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/StartChatErrorCard.kt",
+        "anchor": "R.string.new_message_open_chat",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "ACC-003",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "setting:retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/StartChatErrorCard.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "ACC-003",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "setting:send_invite",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/StartChatErrorCard.kt",
+        "anchor": "R.string.send_invite",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "ACC-003",
+          "ACC-017",
+          "NCH-006"
+        ]
+      },
+      {
+        "surface": "Confirmed inbox failure copies recipient guidance",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/StartChatErrorCard.kt",
+        "anchor": "R.string.new_message_copy_inbox_instructions",
+        "test_ids": [
+          "NCH-001"
+        ]
+      },
+      {
+        "surface": "Clipboard guidance contains only a localized message for the recipient",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/StartChatErrorCard.kt",
+        "anchor": "R.string.new_message_inbox_instructions",
+        "test_ids": [
+          "NCH-001"
+        ]
+      }
+    ]
+  }
+}

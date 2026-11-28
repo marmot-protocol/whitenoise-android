@@ -154,6 +154,41 @@ class Nip30EmojiTest {
         assertEquals(emptyList<String>(), Nip30Emoji.shortcodesIn("~~~\n:tilde:\n~~~"))
     }
 
+    /** Code spans pair runs of equal length, fences close on a longer marker, and lone runs stay text. */
+    @Test
+    fun rawCodeRangesFollowCodeSpanAndFenceRules() {
+        assertEquals(listOf(0..9), rawCodeRanges("`:a:``:b:` :c:"))
+        assertEquals(listOf(":a:", ":c:"), Nip30Emoji.shortcodesIn("``:a: ```:b:``` :c:"))
+        assertEquals(listOf(":a:"), Nip30Emoji.shortcodesIn("   ````\n:x:\n```\n:y:\n`````  \r\n:a:"))
+        assertEquals(listOf(":b:"), Nip30Emoji.shortcodesIn("```lang `x`\n:b:"))
+        assertEquals(emptyList<String>(), Nip30Emoji.shortcodesIn("~~~ `info`\n:a:"))
+        assertEquals(listOf(":b:"), Nip30Emoji.shortcodesIn("    ```\n:b:"))
+        // A fence wins over an inline run that would pair across it, and CR alone ends a line.
+        assertEquals(listOf(":out:", ":after:"), Nip30Emoji.shortcodesIn("`:out:\n~~~\n`x\n:in:\n~~~\n:after:"))
+        assertEquals(listOf(":out:"), Nip30Emoji.shortcodesIn("~~~\r:in:\r~~~\r:out:"))
+        assertEquals(listOf(0..2), rawCodeRanges("~~~"))
+    }
+
+    /** Received text with long or many backtick runs is scanned in one pass, with or without a shortcode. */
+    @Test(timeout = 5_000)
+    fun backtickRunsDoNotBacktrack() {
+        val unmatched = "x" + "`".repeat(16_000) + "x".repeat(48_000)
+        val distinctLengths = (1..360).joinToString(" ") { "`".repeat(it) }
+        val fences = "```\n".repeat(16_000)
+        val emptyTildeFences = "~~~\n~~~\n".repeat(8_191)
+        val texts =
+            listOf(
+                unmatched,
+                "$unmatched :a:",
+                "$distinctLengths :a:",
+                "$fences:a:",
+                "$emptyTildeFences:a:",
+                ":a: `x` ".repeat(8_000),
+            )
+        texts.forEach(Nip30Emoji::shortcodesIn)
+        assertEquals(listOf(":a:"), Nip30Emoji.shortcodesIn("$emptyTildeFences:a:"))
+    }
+
     /** Only the NIP-30 alphabet MDK accepts for a sent tag, up to 62 characters, can be sent. */
     @Test
     fun sendableShortcodesUseTheStrictAlphabet() {

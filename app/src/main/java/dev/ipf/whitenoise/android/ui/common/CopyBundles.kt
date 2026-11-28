@@ -46,8 +46,6 @@ internal fun rememberMessageTextCopy(): MessageTextCopy =
         partialVisibility = stringResource(R.string.message_partial_visibility_warning),
         nonCanonicalHistory = stringResource(R.string.message_noncanonical_history_warning),
         deliveryNotConfirmed = stringResource(R.string.delivery_not_confirmed),
-        agentStreamStarted = stringResource(R.string.agent_stream_started),
-        streamFinished = stringResource(R.string.stream_finished),
         mediaAttachment = stringResource(R.string.media_attachment),
         mediaPhoto = stringResource(R.string.reply_media_photo),
         mediaVideo = stringResource(R.string.reply_media_video),
@@ -110,12 +108,10 @@ internal fun rememberGroupSystemCopy(): GroupSystemCopy =
         fallback = stringResource(R.string.group_system_fallback),
     )
 
+/** Resolves the localized copy the conversation controller formats into its own messages. */
 @Composable
 internal fun rememberConversationControllerCopy(): ConversationControllerCopy =
     ConversationControllerCopy(
-        waitingForStream = stringResource(R.string.waiting_for_stream),
-        streamFailedFormat = stringResource(R.string.stream_failed_format),
-        tryAgain = stringResource(R.string.error_try_again),
         couldntAddMemberDuplicateFormat = stringResource(R.string.toast_couldnt_add_member_duplicate_detail),
         groupRosterChanged = stringResource(R.string.toast_group_roster_changed),
     )

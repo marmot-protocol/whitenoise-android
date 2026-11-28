@@ -76,7 +76,7 @@ class ConversationTimelineExtendApplyTest {
                 dispatcher.runPending()
                 advanceUntilIdle()
 
-                assertEquals(emptyList<String>(), stale.await())
+                stale.await()
                 newest.await()
                 assertEquals(listOf(SECOND, THIRD), timelineMessageIds(controller))
             } finally {

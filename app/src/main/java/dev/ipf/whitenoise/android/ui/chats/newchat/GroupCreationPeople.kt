@@ -8,27 +8,19 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -44,11 +36,9 @@ import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
-import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
-import dev.ipf.whitenoise.android.ui.settings.rememberSettingsNativeSurface
-import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
-import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
+import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
+import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
+import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
 
 /** Current native person reference plus sanitized display data; this is not a discovery cache. */
 internal data class GroupCreationPerson(
@@ -71,69 +61,29 @@ internal fun GroupCreationPersonRow(
     onLongClick: ((Rect?) -> Unit)? = null,
 ) {
     val candidate = person.candidate
-    val shapes = WhiteNoiseListItemDefaults.segmentedShapes(index, count)
-    val followed = if (candidate.isFollowing) stringResource(R.string.user_search_you_follow) else null
+    val key = personKeyPlacement(candidate.displayName, person.subtitle, candidate.npub)
     val (profileModifier, profileClick) = rememberMeasuredControlClick { origin -> onLongClick?.invoke(origin) }
-    val native =
-        rememberSettingsNativeSurface(
-            destination = candidate.accountIdHex,
-            shape = shapes.shape,
-            strokeColor = if (isAmoledSurfaceTheme()) MaterialTheme.colorScheme.outlineVariant else Color.Unspecified,
-        ).first
-    val modifier =
-        Modifier
-            .fillMaxWidth()
-            .then(profileModifier)
-            .then(native)
-            .amoledSurfaceBorder(shapes.shape)
-            .testTag("new_group.person.${candidate.accountIdHex}")
-            .recipientRelationshipSemantics(followed, selected)
-    val leading: @Composable () -> Unit = {
-        Avatar(
-            candidate.displayName,
-            candidate.accountIdHex,
-            48.dp,
-            pictureUrl = person.avatarUrl,
-            pictureDomain = AvatarImageLoader.publicProfiles(),
-        )
-    }
-    val supporting: (@Composable () -> Unit)? =
-        person.subtitle?.let { subtitle ->
-            { Text(subtitle, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-        }
-    val headline: @Composable () -> Unit = {
-        EmojiLabel(candidate.displayName, maxLines = 1, overflow = TextOverflow.Ellipsis)
-    }
-    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-        if (onClick == null) {
-            Surface(shape = shapes.shape, color = MaterialTheme.colorScheme.surfaceContainerLowest) {
-                ListItem(
-                    headlineContent = headline,
-                    supportingContent = supporting,
-                    leadingContent = leading,
-                    colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-                    modifier = modifier,
-                )
-            }
-        } else {
-            ListItem(
-                onClick = onClick,
-                onLongClick = profileClick.takeIf { onLongClick != null },
-                enabled = enabled,
-                shapes = shapes,
-                colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-                modifier = modifier.semantics { role = Role.Checkbox },
-                leadingContent = leading,
-                supportingContent = supporting,
-                trailingContent = if (selected == true) ({ SelectedPersonCheck() }) else null,
-                content = headline,
-            )
-        }
-        // The prototype separates the segmented rows with the list gap, not a drawn line.
-        if (index < count - 1) {
-            Spacer(Modifier.height(WhiteNoiseListItemDefaults.segmentedGap))
-        }
-    }
+    PersonRow(
+        title = candidate.displayName,
+        subtitle = key.subtitle,
+        avatarSeed = candidate.accountIdHex,
+        avatarUrl = person.avatarUrl,
+        modifier = profileModifier.testTag("new_group.person.${candidate.accountIdHex}"),
+        index = index,
+        count = count,
+        isFollowed = candidate.isFollowing,
+        followedAccount = candidate.accountIdHex,
+        selectionState = selected,
+        enabled = enabled,
+        publicKeyCopyEnabled = true,
+        nativeDestination = candidate.accountIdHex,
+        onClick = onClick,
+        onLongClick = profileClick.takeIf { onLongClick != null },
+        publicKey = key.publicKey,
+        publicKeyInTitle = key.inTitle,
+        trailing = if (selected == true) ({ SelectedPersonCheck() }) else null,
+        avatarDomain = AvatarImageLoader.publicProfiles(),
+    )
 }
 
 /** The prototype marks a chosen person with the primary check glyph instead of a checkbox. */
@@ -157,9 +107,9 @@ internal fun GroupSelectedPerson(
     val candidate = person.candidate
     val interaction = remember(candidate.accountIdHex) { MutableInteractionSource() }
     val remove = stringResource(R.string.remove_member_named, candidate.displayName)
+    val titleIsKey = abbreviatesPublicKey(candidate.displayName, candidate.npub)
     Column(
-        Modifier
-            .width(80.dp)
+        (if (titleIsKey) Modifier.widthIn(min = 80.dp, max = 280.dp) else Modifier.width(80.dp))
             .clickable(interaction, null, role = Role.Button, onClick = onRemove)
             .semantics { contentDescription = remove }
             .testTag("new_group.selected.${candidate.accountIdHex}"),
@@ -174,6 +124,7 @@ internal fun GroupSelectedPerson(
                     64.dp,
                     pictureUrl = person.avatarUrl,
                     pictureDomain = AvatarImageLoader.publicProfiles(),
+                    followedAccount = candidate.accountIdHex,
                 )
             }
             Surface(
@@ -187,12 +138,16 @@ internal fun GroupSelectedPerson(
                 }
             }
         }
-        EmojiLabel(
-            candidate.displayName,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            style = MaterialTheme.typography.labelMedium,
-            textAlign = TextAlign.Center,
-        )
+        if (titleIsKey) {
+            PublicKeyCopyText(candidate.displayName, candidate.npub, style = MaterialTheme.typography.labelMedium)
+        } else {
+            EmojiLabel(
+                candidate.displayName,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.labelMedium,
+                textAlign = TextAlign.Center,
+            )
+        }
     }
 }

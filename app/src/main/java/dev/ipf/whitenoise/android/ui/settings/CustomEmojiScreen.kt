@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.input.InputTransformation
 import androidx.compose.foundation.text.input.rememberTextFieldState
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -34,7 +33,9 @@ import dev.ipf.whitenoise.android.ui.CustomEmojiSaveResult
 import dev.ipf.whitenoise.android.ui.CustomEmojiSet
 import dev.ipf.whitenoise.android.ui.CustomEmojiStore
 import dev.ipf.whitenoise.android.ui.EmojiArtImage
+import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
 import dev.ipf.whitenoise.android.ui.conversation.media.BoundedDocumentRead
 import dev.ipf.whitenoise.android.ui.conversation.media.queryDisplayName
@@ -144,10 +145,14 @@ internal fun CustomEmojiContent(
 ) {
     SettingsScaffold(title = stringResource(R.string.custom_emoji), onBack = onBack) {
         SettingsList(modifier = Modifier.testTag(CUSTOM_EMOJI_CONTENT_TAG)) {
-            item(key = "search.CustomEmoji.1") { SettingsExplainer(stringResource(R.string.custom_emoji_detail)) }
             item(key = "search.CustomEmoji.2") { CustomEmojiAddActions(onChoosePhoto, onChooseFile, onOpenSets) }
             if (emoji.entries.isEmpty()) {
-                item(key = "search.CustomEmoji.3") { SettingsExplainer(stringResource(R.string.custom_emoji_empty)) }
+                item(key = "search.CustomEmoji.3") {
+                    WhiteNoiseEmptyState(
+                        title = stringResource(R.string.custom_emoji_empty),
+                        detail = stringResource(R.string.custom_emoji_detail),
+                    )
+                }
             } else {
                 item(key = "search.CustomEmoji.4") {
                     SettingsGroup(modifier = Modifier.testTag("custom_emoji.list")) {
@@ -156,6 +161,7 @@ internal fun CustomEmojiContent(
                                 SettingsAction(
                                     context = context,
                                     title = entry.shortcode,
+                                    titleCanContainEmoji = false,
                                     subtitle =
                                         stringResource(
                                             if (entry.sendable) R.string.remove else R.string.custom_emoji_unsendable,
@@ -174,6 +180,7 @@ internal fun CustomEmojiContent(
                         }
                     }
                 }
+                item(key = "custom_emoji.detail") { SettingsExplainer(stringResource(R.string.custom_emoji_detail)) }
             }
         }
     }
@@ -361,18 +368,14 @@ internal fun ConfirmEmojiRemoval(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    WhiteNoiseAlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.custom_emoji_remove_title, emoji.shortcode)) },
-        text = { Text(stringResource(R.string.custom_emoji_remove_detail)) },
-        confirmButton = {
-            TextButton(onClick = { close(onConfirm) }) {
-                Text(stringResource(R.string.remove), color = MaterialTheme.colorScheme.error)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
-        },
+    ConfirmDialog(
+        title = stringResource(R.string.custom_emoji_remove_title, emoji.shortcode),
+        message = stringResource(R.string.custom_emoji_remove_detail),
+        confirmLabel = stringResource(R.string.remove),
+        onConfirm = onConfirm,
+        onDismiss = onDismiss,
+        destructive = true,
+        emojiLabels = false,
     )
 }
 

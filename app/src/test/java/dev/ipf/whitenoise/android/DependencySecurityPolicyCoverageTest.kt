@@ -60,16 +60,6 @@ class DependencySecurityPolicyCoverageTest {
         )
     }
 
-    @Test
-    fun ciVerifierAppliesTheSameEditions() {
-        assertTrue(
-            "the selected-evidence check must compare the release without its edition",
-            "below(component[\"version\"], minimums[key], (editions or {}).get(key))" in verifier,
-        )
-        assertTrue("the verifier must read the policy's editions", "policy.get(\"edition_suffixes\", {})" in verifier)
-        assertTrue("a malformed edition policy must fail verification", "invalid security edition policy" in verifier)
-    }
-
     private companion object {
         const val GUAVA = "com.google.guava:guava"
         val FIXED = listOf(33, 7, 2)

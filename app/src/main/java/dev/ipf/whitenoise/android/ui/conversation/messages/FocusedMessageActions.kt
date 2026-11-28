@@ -56,13 +56,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -84,31 +83,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.PopupPositionProvider
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiGlyph
 import dev.ipf.whitenoise.android.ui.conversation.reactions.reactionSourceBounds
 import dev.ipf.whitenoise.android.ui.design.KeyboardSafePopup
 import dev.ipf.whitenoise.android.ui.emojiPlainLabel
+import dev.ipf.whitenoise.android.ui.theme.InteractionStateOpacity
 import dev.ipf.whitenoise.android.ui.theme.Typography
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import dev.ipf.whitenoise.android.ui.theme.outlineSelectionColor
 import kotlinx.coroutines.launch
 import kotlin.math.ceil
 import kotlin.math.roundToInt
-
-/** One visible native capability; dispatch remains in the owning message. */
-internal data class FocusedMessageAction(
-    val label: String,
-    val supportingLabel: String?,
-    val enabled: Boolean,
-    val destructive: Boolean,
-    val icon: @Composable () -> Unit,
-    val onClick: () -> Unit,
-    val onClickAt: ((Rect?) -> Unit)? = null,
-    val explanation: Explanation? = null,
-    val dismissBeforeActivation: Boolean = true,
-)
 
 /**
  * Gives the overlay the whole popup window rather than a window cut to its own content.
@@ -206,12 +192,10 @@ private fun Modifier.focusedStackDrag(
 }
 
 private const val FOCUSED_BACKDROP_ALPHA = 0.88f
-private const val FOCUSED_PRESSED_STATE_ALPHA = 0.12f
 private const val FOCUSED_MORE_DISC_ALPHA = 0.08f
 private val FocusedStackMaximumWidth = 560.dp
 private val FocusedOverlayShadowSafeInset = 8.dp
 private val FocusedReactionRailInset = 4.dp
-private val FocusedStackHorizontalPadding = 16.dp
 
 // Two rows of 48dp targets: the rail height the overlay's 200dp preview budget was sized around.
 private val FocusedReactionRailBudget = 108.dp
@@ -238,6 +222,7 @@ internal fun FocusedMessageActions(
     initiatingHoldActive: Boolean = false,
     sourceBounds: IntRect?,
     touchY: Float?,
+    touchX: Float? = null,
     mine: Boolean,
     actions: List<FocusedMessageAction>,
     quickReactions: List<String>,
@@ -256,9 +241,12 @@ internal fun FocusedMessageActions(
     // Saveable so a popup window re-shown after an app switch does not hide content it already
     // revealed; the value lives in the host composition, not in the popup's own.
     var measured by rememberSaveable { mutableStateOf(false) }
+    // Back from the full action set returns to the first level instead of closing the menu (#4077).
+    val showingAllActions = rememberSaveable { mutableStateOf(false) }
     KeyboardSafePopup(
         expanded = true,
         onDismissRequest = onDismiss,
+        consumeBack = showingAllActions::collapseFullActionSet,
         popupPositionProvider = FocusedMessageOverlayFrameProvider,
         animateWindowContent = false,
         scrimModifier =
@@ -273,13 +261,14 @@ internal fun FocusedMessageActions(
             actions.map { action ->
                 action.withTerminalCallbacks(popupMotion::close)
             }
+        val frameInsets = WindowInsets.systemBars.union(WindowInsets.displayCutout)
         BoxWithConstraints(
             modifier =
                 Modifier
                     .fillMaxSize()
                     // The overlay owns the whole window now, so the travel range is the part of it
                     // the stack may actually occupy rather than the part the system bars cover.
-                    .windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout))
+                    .windowInsetsPadding(frameInsets)
                     // A tap reaching the frame landed beside the stack, on nothing, and dismisses
                     // exactly as the scrim underneath it would have before the frame covered it.
                     .focusedDismissOnTap(
@@ -289,7 +278,9 @@ internal fun FocusedMessageActions(
         ) {
             // The lifted bubble reports a window coordinate; the frame below starts under the top
             // inset. The stack would rest a status bar too low without converting between them.
-            val topInsetPx = WindowInsets.systemBars.union(WindowInsets.displayCutout).getTop(LocalDensity.current)
+            val density = LocalDensity.current
+            val topInsetPx = frameInsets.getTop(density)
+            val actionTouchX = frameInsets.actionTouchXInPaddedFrame(touchX, density, LocalLayoutDirection.current)
             // The theme scales its typography by the app's text-size setting; sp also carries the system scale.
             val textScale = MaterialTheme.typography.bodyLarge.fontSize.value / Typography.bodyLarge.fontSize.value
             val emojiSize = with(LocalDensity.current) { (FocusedReactionEmojiSize.value * textScale).sp.toDp() }
@@ -430,40 +421,16 @@ internal fun FocusedMessageActions(
                             .weight(1f, fill = false)
                             // Labels that need more than the column may use the whole padded window, so a
                             // wide window never wraps an action the 560dp column could not hold (#3587).
-                            .focusedColumnSlot(railWidth, actionPanelMaximumWidth, mine)
+                            .focusedColumnSlot(railWidth, actionPanelMaximumWidth, mine, actionTouchX)
                             .fadingVerticalScroll(rememberScrollState())
                             .testTag(FOCUSED_ACTION_MENU_SCROLL_TEST_TAG),
                 ) {
-                    FocusedActionMenu(terminalActions)
+                    FocusedActionMenu(terminalActions, showingAllActions.value) { showingAllActions.value = it }
                 }
             }
         }
     }
 }
-
-/**
- * Places a stack child as if the stack were still the centred column of [columnWidth], aligned to its end
- * edge for [mine] and its start edge otherwise, while letting it measure up to [maximumWidth].
- *
- * A child no wider than the column sits exactly where the capped stack put it. A wider one keeps that edge
- * until it would leave the window, then slides back inside it, so it grows across the window rather than
- * past either side. Offsets are start-relative, so RTL mirrors them like the column alignment did.
- */
-internal fun Modifier.focusedColumnSlot(
-    columnWidth: Dp,
-    maximumWidth: Dp,
-    mine: Boolean,
-): Modifier =
-    layout { measurable, constraints ->
-        val maxChild = maximumWidth.roundToPx().coerceIn(0, constraints.maxWidth)
-        val placeable = measurable.measure(constraints.copy(minWidth = 0, maxWidth = maxChild))
-        val width = constraints.maxWidth
-        val column = columnWidth.roundToPx().coerceIn(0, width)
-        val columnStart = (width - column) / 2
-        val preferred = if (mine) columnStart + column - placeable.width else columnStart
-        val start = preferred.coerceIn(0, (width - placeable.width).coerceAtLeast(0))
-        layout(width, placeable.height) { placeable.placeRelative(start, 0) }
-    }
 
 /**
  * Balances the reaction rail over as few rows as the width allows, so every configured choice keeps
@@ -662,7 +629,7 @@ private fun FocusedReactionTarget(
                     .clip(CircleShape)
                     .background(
                         if (pressed) {
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = FOCUSED_PRESSED_STATE_ALPHA)
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = InteractionStateOpacity.PRESSED_OR_FOCUSED)
                         } else {
                             Color.Transparent
                         },
@@ -746,7 +713,7 @@ private fun FocusedMoreReactionsTarget(
                     .background(MaterialTheme.colorScheme.onSurface.copy(alpha = FOCUSED_MORE_DISC_ALPHA))
                     .background(
                         if (pressed) {
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = FOCUSED_PRESSED_STATE_ALPHA)
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = InteractionStateOpacity.PRESSED_OR_FOCUSED)
                         } else {
                             Color.Transparent
                         },

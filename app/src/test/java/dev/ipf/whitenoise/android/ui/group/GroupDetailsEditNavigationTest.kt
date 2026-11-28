@@ -16,6 +16,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
@@ -51,6 +52,7 @@ import dev.ipf.whitenoise.android.audio.tts.EngineTrust
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineInfo
 import dev.ipf.whitenoise.android.audio.tts.TtsResolutionResult
 import dev.ipf.whitenoise.android.core.RecipientSearch
+import dev.ipf.whitenoise.android.state.AppReadAloud
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
@@ -102,7 +104,17 @@ class GroupDetailsEditNavigationTest {
         composeRule.onNode(hasText(GROUP_NAME) and hasClickAction()).assertIsDisplayed()
     }
 
-    /** Unavailable call actions do not occupy the primary action row. */
+    @Test
+    @Config(qualifiers = "en-w320dp-h600dp-mdpi")
+    fun editGroupSharedFieldsAmoledCompact() {
+        render(controller(group()), darkTheme = true, amoled = true)
+
+        composeRule.onNode(hasText(GROUP_NAME) and hasClickAction()).performClick()
+        assertEditorIsOpen()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/group_edit_shared_fields_amoled_compact.png")
+    }
+
+    /** At 360 dp, the four actions use two balanced rows to fit the longest caption. */
     @Test
     fun unavailableCallActionsDoNotOccupyThePrimaryActionRow() {
         render(controller(group()), onOpenSearch = {})
@@ -116,11 +128,37 @@ class GroupDetailsEditNavigationTest {
         val actions = listOf(addMembers, mute, timer, search)
         actions.forEach { it.assertIsDisplayed().assertHeightIsAtLeast(56.dp) }
         val bounds = actions.map { it.fetchSemanticsNode().boundsInRoot }
-        bounds.zipWithNext().forEach { (first, second) ->
-            assertEquals(first.width, second.width, 1f)
-            assertTrue(first.right <= second.left)
-        }
+        val (addBounds, muteBounds, timerBounds) = bounds
+        val searchBounds = bounds.last()
+        assertEquals(addBounds.top, muteBounds.top, 1f)
+        assertEquals(timerBounds.top, searchBounds.top, 1f)
+        assertTrue(addBounds.bottom < timerBounds.top)
+        assertTrue(addBounds.right <= muteBounds.left)
+        assertTrue(timerBounds.right <= searchBounds.left)
+        listOf(muteBounds, timerBounds, searchBounds).forEach { assertEquals(addBounds.width, it.width, 1f) }
         composeRule.onNodeWithTag("chat_info.add_people").performScrollTo().assertIsDisplayed()
+    }
+
+    /** Chat Info keeps the disappearing-messages editor enabled for admins and disabled for non-admins. */
+    @Test
+    fun chatInfoDisappearingActionOpensEditorOnlyForAuthorizedAdmin() {
+        val fixture = controller(group())
+        render(fixture)
+        val disappearing = composeRule.onNodeWithContentDescription(context.getString(R.string.disappearing))
+        disappearing.assertIsDisplayed().assertIsEnabled().performClick()
+        composeRule.onNodeWithTag(DISAPPEARING_PICKER_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(disappearingPresetTag(300L)).performClick()
+        composeRule.onNodeWithTag(DISAPPEARING_CONFIRM_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(DISAPPEARING_CONFIRM_ACTION_TAG).assertIsEnabled()
+
+        // Picking the current Off duration closes the sheet cleanly before switching to a non-admin role.
+        composeRule.onNodeWithTag(disappearingPresetTag(0L)).performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(DISAPPEARING_PICKER_TAG).assertDoesNotExist()
+
+        composeRule.runOnIdle { fixture.controller.applyGroupStateForTest(group(admin = false)) }
+        disappearing.assertIsDisplayed().assertIsNotEnabled().performClick()
+        composeRule.onNodeWithTag(DISAPPEARING_PICKER_TAG).assertDoesNotExist()
     }
 
     /** The real details and add-members destinations survive Activity saved-state restoration together. */
@@ -517,11 +555,11 @@ class GroupDetailsEditNavigationTest {
 
     /** Controlled source-render fixture copied from GroupAdvancedSettingsIconsTest; no engine handle. */
     private fun WhiteNoiseAppState.applyCaptureSpeechCatalog() {
-        val delegate = WhiteNoiseAppState::class.java.getDeclaredField("ttsResolution\$delegate")
+        val delegate = AppReadAloud::class.java.getDeclaredField("ttsResolution\$delegate")
         delegate.isAccessible = true
 
         @Suppress("UNCHECKED_CAST")
-        val state = delegate.get(this) as androidx.compose.runtime.MutableState<TtsResolutionResult?>
+        val state = delegate.get(readAloud) as androidx.compose.runtime.MutableState<TtsResolutionResult?>
         state.value =
             TtsResolutionResult(
                 status = TextToSpeech.SUCCESS,
@@ -916,7 +954,7 @@ class GroupDetailsEditNavigationTest {
     /** Asserts editor is open. */
     private fun assertEditorIsOpen() {
         composeRule.onNodeWithText(context.getString(R.string.group_name)).assertIsDisplayed()
-        composeRule.onNodeWithText(context.getString(R.string.group_description)).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.description)).assertIsDisplayed()
     }
 }
 
@@ -1105,7 +1143,7 @@ class GroupDetailsConfirmationNavigationTest {
     /** Asserts editor is open. */
     private fun assertEditorIsOpen() {
         composeRule.onNodeWithText(context.getString(R.string.group_name)).assertIsDisplayed()
-        composeRule.onNodeWithText(context.getString(R.string.group_description)).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.description)).assertIsDisplayed()
     }
 }
 

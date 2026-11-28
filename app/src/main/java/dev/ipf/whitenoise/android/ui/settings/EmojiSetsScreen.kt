@@ -2,14 +2,11 @@
 
 package dev.ipf.whitenoise.android.ui.settings
 
-import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.rememberTextFieldState
@@ -19,13 +16,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
@@ -39,29 +33,25 @@ import dev.ipf.marmotkit.EmojiSetFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.emojiSetAddress
 import dev.ipf.whitenoise.android.state.EmojiSetNotice
+import dev.ipf.whitenoise.android.state.EmojiSetsBackend
 import dev.ipf.whitenoise.android.state.EmojiSetsController
 import dev.ipf.whitenoise.android.state.EmojiSetsState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.emojiSetsBackend
 import dev.ipf.whitenoise.android.ui.BuiltinEmojiSetChoices
-import dev.ipf.whitenoise.android.ui.EmojiArt
-import dev.ipf.whitenoise.android.ui.EmojiArtImage
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Explanation
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
-import dev.ipf.whitenoise.android.ui.decodeEmojiImage
 import dev.ipf.whitenoise.android.ui.rememberBuiltinEmojiSetChoices
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /** The browser's Refresh action, which repeats discovery for the current query. */
 internal const val EMOJI_SETS_REFRESH_TEST_TAG = "emoji_sets.refresh"
 
 private val EmojiSetSpacing = 8.dp
-private val EmojiSetEntrySpacing = 4.dp
-private val EmojiSetImageSize = 96.dp
 
 /** The account's NIP-51 browser and preview. Its controller is discarded when the account changes. */
 @Composable
@@ -82,13 +72,9 @@ internal fun EmojiSetsScreen(
     }
     val generation = appState.runtimeGeneration
     key(appState, activeOwner, account, generation, initialAddress) {
-        val controller =
-            remember {
-                EmojiSetsController(
-                    appState.emojiSetsBackend(account, generation, activeOwner),
-                    appState.emojiSetLibrary::invalidate,
-                )
-            }
+        val backend = remember { appState.emojiSetsBackend(account, generation, activeOwner) }
+        val controller = remember { EmojiSetsController(backend, appState.emojiSetLibrary::invalidate) }
+        val images = rememberEmojiSetImages(controller.state.preview, backend)
         val scope = rememberCoroutineScope()
         val back = {
             when {
@@ -122,7 +108,7 @@ internal fun EmojiSetsScreen(
                 }
             },
             onShow = controller::show,
-            onLoadArtwork = { scope.launch { controller.loadArtwork() } },
+            images = images,
             onInstall = { appState.launchMutation { controller.install() } },
             onCancel = controller::cancelInstall,
             onRemove = { appState.launchMutation { controller.remove() } },
@@ -133,6 +119,18 @@ internal fun EmojiSetsScreen(
     }
 }
 
+/** A version, install or removal change starts with fresh image consent and tiles. */
+@Composable
+private fun rememberEmojiSetImages(
+    set: EmojiSetFfi?,
+    backend: EmojiSetsBackend,
+): EmojiSetImages? =
+    set?.let {
+        remember(backend, set.coordinate, set.eventIdHex, set.installed?.eventIdHex) {
+            EmojiSetImages(set, backend.imageSource())
+        }
+    }
+
 /** Pure presentation for the browser and preview, with only the editable query held in Compose. */
 @Suppress("LongParameterList")
 @Composable
@@ -141,7 +139,7 @@ internal fun EmojiSetsContent(
     onBack: () -> Unit,
     onSearch: (String) -> Unit,
     onShow: (EmojiSetFfi) -> Unit,
-    onLoadArtwork: () -> Unit,
+    images: EmojiSetImages?,
     onInstall: () -> Unit,
     onCancel: () -> Unit,
     onRemove: () -> Unit,
@@ -177,7 +175,14 @@ internal fun EmojiSetsContent(
         if (set == null) {
             EmojiSetBrowser(state, query, onSearch, onShow, builtinSets)
         } else {
-            EmojiSetPreview(state, set, onLoadArtwork, onInstall, onCancel, onRemove) { onSearch(set.coordinate) }
+            // Images belong to one exact version and install state; a mismatch shows the unloaded preview.
+            val setImages =
+                images?.takeIf {
+                    it.set.coordinate == set.coordinate &&
+                        it.set.eventIdHex == set.eventIdHex &&
+                        it.set.installed?.eventIdHex == set.installed?.eventIdHex
+                }
+            EmojiSetPreview(state, set, setImages, onInstall, onCancel, onRemove) { onSearch(set.coordinate) }
         }
     }
 }
@@ -189,8 +194,13 @@ private fun EmojiSetsAccountTitle(
     profileName: String,
 ) {
     Column {
-        Text(title, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(profileName, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        EmojiLabel(title, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        EmojiLabel(
+            profileName,
+            style = MaterialTheme.typography.labelMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -211,7 +221,12 @@ private fun EmojiSetBrowser(
         item { EmojiSetStatus(state, syncing = state.discovering) }
         // A failed or partial discovery shows only its notice, never the "no sets" message (#3882).
         if (!loading && state.showsNoSets(builtinsListed = listedBuiltins != null)) {
-            item { SettingsExplainer(stringResource(R.string.emoji_sets_empty)) }
+            item {
+                WhiteNoiseEmptyState(
+                    title = stringResource(R.string.emoji_sets_title),
+                    detail = stringResource(R.string.emoji_sets_empty),
+                )
+            }
         }
         // Installed sets, then relay results, under the sticker browser's headings (#3882).
         val (installed, discovered) = state.sets.partition { it.installed != null }
@@ -260,207 +275,24 @@ private fun EmojiSetQuery(
     }
 }
 
-/** Shows the exact version selected for install and discloses where its artwork is hosted. */
-@Suppress("LongParameterList")
-@Composable
-private fun EmojiSetPreview(
-    state: EmojiSetsState,
-    set: EmojiSetFfi,
-    onLoadArtwork: () -> Unit,
-    onInstall: () -> Unit,
-    onCancel: () -> Unit,
-    onRemove: () -> Unit,
-    onCheckUpdate: () -> Unit,
-) {
-    SettingsList {
-        item(key = "set.preview") {
-            EmojiSetPreviewHeader(state, set, onLoadArtwork)
-        }
-        item(key = "set.status") { EmojiSetStatus(state) }
-        item(key = "set.actions") {
-            EmojiSetActions(state, set, onInstall, onCancel, onRemove, onCheckUpdate)
-        }
-        items(set.emoji, key = { it.shortcode }) { emoji ->
-            Column(
-                modifier = Modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
-                verticalArrangement = Arrangement.spacedBy(EmojiSetEntrySpacing),
-            ) {
-                Text(":${emoji.shortcode}:", style = MaterialTheme.typography.bodyLarge)
-                Uri.parse(emoji.url).host?.let { host ->
-                    Text(host, style = MaterialTheme.typography.bodySmall)
-                }
-            }
-        }
-    }
-}
-
-/** The preview opens as text. Loading its image is a separate explicit action. */
-@Composable
-private fun EmojiSetPreviewHeader(
-    state: EmojiSetsState,
-    set: EmojiSetFfi,
-    onLoadArtwork: () -> Unit,
-) {
-    Column(
-        modifier = Modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
-        verticalArrangement = Arrangement.spacedBy(EmojiSetSpacing),
-    ) {
-        Text(set.displayTitle(), style = MaterialTheme.typography.headlineSmall)
-        set.description?.takeIf { it.isNotBlank() }?.let { Text(it) }
-        Text(pluralStringResource(R.plurals.emoji_sets_item_count, set.emoji.size, set.emoji.size))
-        Text(
-            stringResource(R.string.emoji_sets_image_privacy),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        val imageUrl = set.imageUrl ?: set.emoji.firstOrNull()?.url
-        Uri.parse(imageUrl.orEmpty()).host?.let { host ->
-            Text(stringResource(R.string.emoji_sets_preview_host, host))
-        }
-        if (state.artwork != null) {
-            key(state.artwork) {
-                val art by produceState<EmojiArt?>(null) {
-                    value = withContext(Dispatchers.IO) { decodeEmojiImage(state.artwork)?.let(EmojiArt::Decoded) }
-                }
-                art?.let {
-                    EmojiArtImage(it, set.displayTitle(), Modifier.size(EmojiSetImageSize))
-                }
-            }
-        } else if (imageUrl != null) {
-            val label = stringResource(R.string.emoji_sets_load_image)
-            TextButton(
-                onClick = onLoadArtwork,
-                modifier =
-                    Modifier.explainOnLongPress(
-                        Explanation(
-                            label,
-                            stringResource(R.string.explanation_organize_emoji_load_image),
-                        ),
-                    ),
-                enabled = !state.busy,
-            ) {
-                Text(label)
-            }
-        }
-    }
-}
-
-/** Displays only MDK's progress and keeps cancellation available until the install finishes. */
-@Suppress("LongMethod", "LongParameterList")
-@Composable
-private fun EmojiSetActions(
-    state: EmojiSetsState,
-    set: EmojiSetFfi,
-    onInstall: () -> Unit,
-    onCancel: () -> Unit,
-    onRemove: () -> Unit,
-    onCheckUpdate: () -> Unit,
-) {
-    Column(
-        modifier = Modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
-        verticalArrangement = Arrangement.spacedBy(EmojiSetSpacing),
-    ) {
-        val progress = state.progress
-        if (progress != null) {
-            if (progress.totalEmoji == 0u) {
-                Text(stringResource(R.string.emoji_sets_preparing_install))
-            } else {
-                Text(
-                    stringResource(
-                        R.string.emoji_sets_install_progress,
-                        progress.completedEmoji.toInt(),
-                        progress.totalEmoji.toInt(),
-                    ),
-                )
-            }
-            val cancelLabel = stringResource(R.string.cancel)
-            TextButton(
-                onClick = onCancel,
-                modifier =
-                    Modifier.explainOnLongPress(
-                        Explanation(
-                            cancelLabel,
-                            stringResource(R.string.explanation_organize_emoji_cancel),
-                        ),
-                    ),
-                enabled = !state.cancelling,
-            ) {
-                Text(cancelLabel)
-            }
-        } else {
-            val installed = set.installed
-            if (installed == null || installed.updateAvailable) {
-                val isInstall = installed == null
-                val label =
-                    stringResource(if (isInstall) R.string.emoji_sets_install else R.string.emoji_sets_update)
-                val body =
-                    stringResource(
-                        if (isInstall) {
-                            R.string.explanation_organize_emoji_install
-                        } else {
-                            R.string.explanation_organize_emoji_update
-                        },
-                    )
-                Button(
-                    onClick = onInstall,
-                    modifier = Modifier.explainOnLongPress(Explanation(label, body)),
-                    enabled = !state.busy,
-                ) {
-                    Text(label)
-                }
-            }
-            if (installed != null && !installed.updateAvailable) {
-                val checkLabel = stringResource(R.string.emoji_sets_check_update)
-                TextButton(
-                    onClick = onCheckUpdate,
-                    modifier =
-                        Modifier.explainOnLongPress(
-                            Explanation(
-                                checkLabel,
-                                stringResource(R.string.explanation_organize_emoji_check_update),
-                            ),
-                        ),
-                    enabled = !state.busy && !state.discovering,
-                ) {
-                    Text(checkLabel)
-                }
-            }
-            if (installed != null) {
-                val removeLabel = stringResource(R.string.remove)
-                TextButton(
-                    onClick = onRemove,
-                    modifier =
-                        Modifier.explainOnLongPress(
-                            Explanation(
-                                removeLabel,
-                                stringResource(R.string.explanation_organize_emoji_remove),
-                            ),
-                        ),
-                    enabled = !state.busy,
-                ) {
-                    Text(removeLabel)
-                }
-            }
-        }
-    }
-}
-
 /** Renders progress, including the browser's opening sync, and the typed result of the most recent operation. */
 @Composable
-private fun EmojiSetStatus(
+internal fun EmojiSetStatus(
     state: EmojiSetsState,
     syncing: Boolean = false,
+    showProgress: Boolean = true,
 ) {
-    val progress = state.progress
-    if (progress != null && progress.totalEmoji > 0u) {
-        LinearProgressIndicator(
-            progress = { progress.completedEmoji.toFloat() / progress.totalEmoji.toFloat() },
-            modifier = Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
-        )
-    } else if (state.busy || syncing) {
-        LinearProgressIndicator(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
-        )
+    if (showProgress) {
+        val progress = state.progress
+        val modifier = Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)
+        if (progress != null && progress.totalEmoji > 0u) {
+            LinearProgressIndicator(
+                progress = { progress.completedEmoji.toFloat() / progress.totalEmoji.toFloat() },
+                modifier = modifier,
+            )
+        } else if (state.busy || syncing) {
+            LinearProgressIndicator(modifier = modifier)
+        }
     }
     val notice =
         when (state.notice) {
@@ -475,5 +307,24 @@ private fun EmojiSetStatus(
     state.installedWithSkips?.let { SettingsExplainer(pluralStringResource(R.plurals.emoji_sets_skipped, it, it)) }
 }
 
-/** The set's title, falling back to its identifier and then its coordinate when unnamed. */
-internal fun EmojiSetFfi.displayTitle(): String = title?.takeIf { it.isNotBlank() } ?: identifier.ifBlank { coordinate }
+/** The set's title, else a readable identifier, else "Untitled set"; never a raw key or random identifier. */
+@Composable
+internal fun EmojiSetFfi.displayTitle(): String =
+    title?.takeIf { it.isNotBlank() }
+        ?: identifier.takeIf { it.isReadableIdentifier() }
+        ?: stringResource(R.string.emoji_sets_untitled)
+
+/** Hex digests, UUIDs, timestamps and random tokens read as noise, so they never stand in for a title. */
+internal fun String.isReadableIdentifier(): Boolean {
+    val id = trim()
+    if (id.isEmpty()) return false
+    val bare = id.removePrefix("0x")
+    val hasLettersAndDigits = id.any(Char::isDigit) && id.any(Char::isLetter)
+    val randomToken = id.length >= RANDOM_TOKEN_LENGTH && hasLettersAndDigits && id.none { it in WORD_SEPARATORS }
+    return !(bare.matches(HexLike) || id.matches(Timestamp) || randomToken)
+}
+
+private val HexLike = Regex("""[0-9a-fA-F-]{12,}""")
+private val Timestamp = Regex("""\d{8,}""")
+private const val WORD_SEPARATORS = " -_."
+private const val RANDOM_TOKEN_LENGTH = 16

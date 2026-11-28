@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.LocalSendAcceptanceFfi
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
+import dev.ipf.marmotkit.MessageDraftAttachmentInputFfi
 import dev.ipf.marmotkit.MessageDraftRevisionFfi
 import dev.ipf.marmotkit.SelectedMessageDraftAttachmentFfi
 import dev.ipf.marmotkit.SelectedMessageDraftContentFfi
@@ -16,6 +17,35 @@ import org.junit.Test
 
 /** Pins the production native seam without interpreting opaque revision internals in Android. */
 class MediaReplyDraftTest {
+    /** A refused voice queue restores the original composer using the exact inserted revision. */
+    @Test
+    fun rollbackRestoresThePreviousReplyOrClearsOnlyTheInsertedSlot() {
+        val previous = content(" caption ", "older-target", listOf(descriptor()))
+        for (original in listOf(null, previous)) {
+            val staged = revision()
+            var calls = 0
+            val engine =
+                nativeBoundary { method, args ->
+                    calls++
+                    assertEquals("account", args[0])
+                    assertSame(staged, args[1])
+                    if (original == null) {
+                        assertEquals("clearMessageDraftIfRevision", method)
+                    } else {
+                        assertEquals("saveMessageDraftInputsIfRevision", method)
+                        assertEquals(original.content, args[2])
+                        assertEquals(original.replyToMessageIdHex, args[3])
+                        assertEquals(listOf(MessageDraftAttachmentInputFfi.Retained("id")), args[4])
+                    }
+                    SelectedMessageDraftFfi(revision(), original)
+                }
+
+            engine.rollbackStagedMediaReply("account", MediaReplyDraft(staged, original))
+
+            assertEquals(1, calls)
+        }
+    }
+
     /** Voice, file, video and image replies use the typed draft target, including an initially empty slot. */
     @Test
     fun missingDraftStagesExactTargetAndBytes() {
@@ -38,8 +68,25 @@ class MediaReplyDraftTest {
                         else -> error(method)
                     }
                 }
-            assertSame(staged, engine.stageMediaReply("account", "group", "poll-original", null, listOf(attachment)))
+            val result = engine.stageMediaReply("account", "group", "poll-original", null, listOf(attachment))
+            assertSame(staged, result?.revision)
         }
+    }
+
+    /** A draft holding a stored file is never a reply's slot, and no attachment body is read to find out. */
+    @Test
+    fun draftWithStoredFileIsPreserved() {
+        val calls = mutableListOf<String>()
+        val stored = descriptor().copy(fileBacked = true)
+        val engine =
+            nativeBoundary { method, _ ->
+                calls += method
+                check(method == "selectedMessageDraft")
+                SelectedMessageDraftFfi(revision(), content("", attachments = listOf(stored)))
+            }
+
+        assertNull(engine.stageMediaReply("account", "group", "poll-original", null, listOf(attachment())))
+        assertEquals(listOf("selectedMessageDraft"), calls)
     }
 
     /** A newer text draft or a different reply is never overwritten to manufacture an outbound slot. */
@@ -100,7 +147,8 @@ class MediaReplyDraftTest {
                     else -> error(method)
                 }
             }
-        assertSame(saved, engine.stageMediaReply("account", "group", "poll-original", "caption", listOf(attachment())))
+        val result = engine.stageMediaReply("account", "group", "poll-original", "caption", listOf(attachment()))
+        assertSame(saved, result?.revision)
     }
 
     /** Composer whitespace follows outbound trimming without weakening the captured native revision. */
@@ -131,7 +179,7 @@ class MediaReplyDraftTest {
                 }
             assertSame(
                 saved,
-                engine.stageMediaReply("account", "group", "poll-original", caption, listOf(attachment())),
+                engine.stageMediaReply("account", "group", "poll-original", caption, listOf(attachment()))?.revision,
             )
         }
     }
@@ -280,7 +328,7 @@ class MediaReplyDraftTest {
                     else -> error(method)
                 }
             }
-        val actual = engine.stageMediaReply("account", "group", "poll-original", "caption", outgoing)
+        val actual = engine.stageMediaReply("account", "group", "poll-original", "caption", outgoing)?.revision
         assertSame(if (expectedIds == null) null else saved, actual)
         assertEquals(expectedIds, submitted?.map { it.id })
         submitted?.zip(outgoing)?.forEach { (native, pick) ->

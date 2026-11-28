@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -29,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ComposerShortcut
 import dev.ipf.whitenoise.android.state.composerDraftJumpShortcuts
+import dev.ipf.whitenoise.android.ui.common.SlotIconButton
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 
 internal const val COMPOSER_DRAFT_TOP_TAG = "composer-draft-top"
@@ -97,7 +97,7 @@ internal fun ComposerDraftEdgeAction(
             jumps.focusRequester(shortcut).requestFocus()
         }
     }
-    IconButton(
+    SlotIconButton(
         onClick = {
             if (focused) jumps.focusHandoff = if (toEnd) ComposerShortcut.JumpTop else ComposerShortcut.JumpBottom
             onJump(toEnd)
@@ -125,7 +125,7 @@ internal fun ComposerLegacyDraftTop(
     onClick: () -> Unit,
 ) {
     ComposerToolbarTargets {
-        IconButton(
+        SlotIconButton(
             onClick = onClick,
             modifier =
                 Modifier

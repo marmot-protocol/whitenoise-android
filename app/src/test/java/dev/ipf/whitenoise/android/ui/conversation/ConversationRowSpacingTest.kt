@@ -47,8 +47,8 @@ class ConversationRowSpacingTest : ConversationRowSpacingFixtures() {
         TimeZone.setDefault(originalTimeZone)
     }
 
-    /** Run boundaries alter attribution, never the empty host padding or list interval. */
-    @Test fun bubbleIntervalsStayCompactAcrossTimeSenderAndDirectChrome() {
+    /** Sender changes add space, independently of the time window used for attribution. */
+    @Test fun bubbleIntervalsFollowSenderChangesAcrossTimeAndDirectChrome() {
         var rows by mutableStateOf(listOf(message(1), message(2)))
         var controller by mutableStateOf(pollController)
         composeRule.setContent { Transcript(rows, controller = controller) }
@@ -74,11 +74,28 @@ class ConversationRowSpacingTest : ConversationRowSpacingFixtures() {
                             controller = chrome
                             rows = listOf(message(1, 1uL, firstMine), message(2, 1uL + delta, secondMine))
                         }
-                        assertBubbleBoundary(rows[0], rows[1])
+                        assertBubbleBoundary(rows[0], rows[1], if (firstMine == secondMine) 2f else 8f)
                     }
                 }
             }
         }
+    }
+
+    /** Different incoming authors get the same larger interval as an incoming-to-outgoing switch. */
+    @Test fun differentIncomingSendersGetTheirOwnInterval() {
+        val older = message(1)
+        val newer = message(2).let { it.copy(record = it.record.copy(sender = "ab".repeat(32))) }
+        composeRule.setContent { Transcript(listOf(older, newer)) }
+        assertBubbleBoundary(older, newer, 8f)
+    }
+
+    /** An unread separator already gives adjacent senders room. */
+    @Test fun unreadDividerOwnsTheIntervalBetweenDifferentSenders() {
+        val older = message(1)
+        val newer = message(2, mine = true)
+        composeRule.setContent { Transcript(listOf(older, newer), firstUnreadId = newer.record.messageIdHex) }
+        val divider = composeRule.onNodeWithTag(UNREAD_MESSAGES_DIVIDER_CONTENT_TAG).getUnclippedBoundsInRoot()
+        assertEquals(18f, bubbleBounds(newer).top.value - divider.bottom.value, 0.5f)
     }
 
     /** Rename/avatar/description/membership summaries keep equal compact intervals on both sides. */
@@ -201,21 +218,28 @@ class ConversationRowSpacingTest : ConversationRowSpacingFixtures() {
         assertActivityBottomInset(8f)
         val inserted = message(3, 90uL, mine = true)
         composeRule.runOnIdle { rows = listOf(activity, inserted, bubble) }
-        assertBubbleBoundary(inserted, bubble)
+        assertBubbleBoundary(inserted, bubble, 8f)
         composeRule.runOnIdle { rows = listOf(message(4, 0uL), activity, bubble) }
         assertActivityBottomInset(8f)
         composeRule.runOnIdle { rows = listOf(message(4, 0uL), bubble) }
-        assertBubbleBoundary(rows[0], bubble)
+        assertBubbleBoundary(rows[0], bubble, 2f)
     }
 
+    /** The extra space is part of the newer row's measured extent in the reversed list. */
     private fun assertBubbleBoundary(
         older: TimelineMessage,
         newer: TimelineMessage,
+        expectedGap: Float,
     ) {
         val first = hostBounds(older)
         val second = hostBounds(newer)
         assertEquals("timeline interval", 2f, second.top.value - first.bottom.value, 0.5f)
-        assertEquals("no extra bubble host top padding", second.top.value, bubbleBounds(newer).top.value, 0.5f)
+        assertEquals(
+            "sender-dependent bubble interval",
+            expectedGap,
+            bubbleBounds(newer).top.value - first.bottom.value,
+            0.5f,
+        )
         assertEquals(
             "complete chrome remains inside its host",
             first.bottom.value,

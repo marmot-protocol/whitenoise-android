@@ -7,6 +7,7 @@ import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -54,9 +55,11 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.decodeLocalPreviewAnimation
 import dev.ipf.whitenoise.android.media.editor.DraftPreparedPhoto
+import dev.ipf.whitenoise.android.media.pdf.PdfMetadataResult
 import dev.ipf.whitenoise.android.media.readLocalPreviewSource
 import dev.ipf.whitenoise.android.media.sandbox.MediaTrustScope
 import dev.ipf.whitenoise.android.ui.common.AppDivider
+import dev.ipf.whitenoise.android.ui.common.pressFeedbackInsideClip
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerAccessoryRemoveButton
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import kotlinx.coroutines.Dispatchers
@@ -138,10 +141,15 @@ internal fun ComposerAttachmentShelf(
     preparing: Boolean = false,
     preparedDocuments: Map<Uri, DraftPreparedPhoto> = emptyMap(),
     onOpenDocument: (Uri) -> Unit = {},
+    pdfChoices: ComposerPdfMetadataChoices? = null,
 ) {
     val items = remember(mediaSlots, documentUris) { stagedPreviewItems(mediaSlots, documentUris) }
     val metadata = rememberPreviewMetadata(items)
     val hasVisual = items.any { it is StagedPreviewItem.Media }
+    val context = LocalContext.current
+    val pdfRenderer = rememberComposerPdfPageRenderer()
+    val pdfs = remember(pdfChoices, pdfRenderer) { pdfChoices?.let { ComposerShelfPdfs(it, pdfRenderer) } }
+    if (pdfChoices != null) ComposerPdfShelfEffects(pdfChoices, documentUris, preparedDocuments, metadata, preparing)
     Column(Modifier.fillMaxWidth()) {
         LazyRow(
             modifier =
@@ -159,20 +167,20 @@ internal fun ComposerAttachmentShelf(
                     is StagedPreviewItem.Document -> "document:$index:${item.uri}"
                 }
             }) { index, item ->
+                val document = preparedDocuments[item.uri]
                 ComposerAttachmentShelfItem(
                     item = item,
                     index = index,
                     metadata = metadata[item.uri],
                     prepared = prepared,
                     enabled = enabled,
-                    document = preparedDocuments[item.uri],
+                    document = document,
+                    pdfs = pdfs,
                     onPreview =
                         when {
                             item is StagedPreviewItem.Media -> ({ onPreview(index) })
-                            !preparing &&
-                                preparedDocuments[item.uri]?.attachment?.let {
-                                    attachmentReaderTarget(it.mediaType, it.fileName)
-                                } != null -> ({ onOpenDocument(item.uri) })
+                            !preparing && composerDocumentReaderTarget(context, item.uri, document) != null ->
+                                ({ onOpenDocument(item.uri) })
                             else -> null
                         },
                     onRemove = {
@@ -188,6 +196,12 @@ internal fun ComposerAttachmentShelf(
     }
 }
 
+/** The shelf's PDF state and first-page renderer, present when the composer tracks PDF metadata choices. */
+internal class ComposerShelfPdfs(
+    val choices: ComposerPdfMetadataChoices,
+    val renderer: ComposerPdfPageRenderer,
+)
+
 /** One shelf entry: decodes its own thumbnail or animation, then hands the prototype card its geometry. */
 @Composable
 @Suppress("LongParameterList")
@@ -200,6 +214,7 @@ private fun ComposerAttachmentShelfItem(
     onPreview: (() -> Unit)?,
     onRemove: () -> Unit,
     document: DraftPreparedPhoto? = null,
+    pdfs: ComposerShelfPdfs? = null,
 ) {
     val media = item as? StagedPreviewItem.Media
     val bitmap =
@@ -212,6 +227,13 @@ private fun ComposerAttachmentShelfItem(
     val label =
         document?.attachment?.fileName ?: metadata?.displayName ?: item.uri.lastPathSegment
             ?: stringResource(R.string.reply_media_document)
+    val pdfMediaType = document?.attachment?.mediaType.orEmpty()
+    val inspected = pdfs?.choices?.state(item.uri)?.metadata
+    if (media == null && pdfs != null && isComposerPdf(pdfMediaType, label, inspected)) {
+        val tag = Modifier.testTag("conversation.composer.attachment.$index")
+        ComposerPdfShelfItem(item.uri, label, document, pdfs.choices, pdfs.renderer, onPreview, onRemove, tag, enabled)
+        return
+    }
     ComposerAttachmentShelfCard(
         label = label,
         enabled = enabled,
@@ -225,6 +247,14 @@ private fun ComposerAttachmentShelfItem(
         modifier = Modifier.testTag("conversation.composer.attachment.$index"),
     )
 }
+
+private fun isComposerPdf(
+    mediaType: String,
+    label: String,
+    inspected: PdfMetadataResult?,
+): Boolean =
+    documentAttachmentKind(mediaType, label) == DocumentAttachmentKind.Pdf ||
+        (inspected != null && inspected != PdfMetadataResult.NotPdf)
 
 /** Pure shelf presentation: optional preview actions are independent of styling and the 48dp removal target. */
 @Composable
@@ -247,6 +277,7 @@ internal fun ComposerAttachmentShelfCard(
         animation?.takeIf { it.intrinsicHeight > 0 }?.let { it.intrinsicWidth.toFloat() / it.intrinsicHeight }
             ?: bitmap?.let { it.width.toFloat() / it.height } ?: DEFAULT_ASPECT_RATIO
     val (cardWidth, cardHeight) = composerAttachmentCardSize(kind, ratio)
+    val press = remember { MutableInteractionSource() }
     Surface(
         modifier =
             modifier
@@ -254,7 +285,10 @@ internal fun ComposerAttachmentShelfCard(
                 .height(cardHeight.dp)
                 .then(
                     if (onPreview != null) {
+                        // The highlight is drawn inside the Surface's clip, so the outline is not clipped twice.
                         Modifier.clickable(
+                            interactionSource = press,
+                            indication = null,
                             enabled = enabled,
                             role = Role.Button,
                             onClickLabel = previewLabel,
@@ -268,7 +302,7 @@ internal fun ComposerAttachmentShelfCard(
         color = MaterialTheme.colorScheme.surfaceContainer,
         border = amoledOutlineBorder(),
     ) {
-        Box {
+        Box(Modifier.pressFeedbackInsideClip(press)) {
             if (visual) {
                 ComposerAttachmentVisual(label, bitmap, animation, video, gif)
             } else {

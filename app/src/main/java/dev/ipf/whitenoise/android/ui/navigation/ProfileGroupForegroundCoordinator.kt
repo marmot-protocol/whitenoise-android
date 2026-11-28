@@ -11,6 +11,9 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.NewGroupFlow
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
 import dev.ipf.whitenoise.android.ui.profile.ProfileSheet
 
+/**
+ * The profile sheet and the new-group flow it starts, drawn over [content] (the shell or a conversation).
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("FunctionNaming")
 @Composable

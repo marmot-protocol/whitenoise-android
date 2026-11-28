@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="linked_devices">Связанные устройства</string>
+    <string name="linked_devices">Устройства</string>
+    <string name="settings_search_alias_linked_devices">связанные устройства|привязанные устройства|привязать устройство|связать устройство</string>
+    <string name="group_account_devices_title">Связанные устройства</string>
     <string name="linked_devices_detail">Сообщения, отправленные с привязанного устройства, отображаются как ваши на всех ваших привязанных устройствах.</string>
     <string name="linked_devices_this_device">Это устройство</string>
     <string name="linked_devices_other_devices">Другие устройства</string>
@@ -36,9 +38,9 @@
     <string name="error_account_unlinked">Это устройство отвязано от этой учётной записи, поэтому войти здесь нельзя. Удалите учётную запись с этого устройства, затем войдите снова, чтобы заново связать его.</string>
     <string name="wipe_report_left_to_other_devices">Чатов, выход из которых завершат другие ваши устройства: %1$d</string>
     <string name="wipe_report_other_devices_not_reached">Не удалось попросить другие ваши устройства завершить выход этого устройства. Они могут продолжать показывать его, пока вы не удалите его с одного из них.</string>
-    <string name="history_imported_from_device">Импортировано с устройства %1$s</string>
-    <string name="history_imported_from_another_device">Импортировано с другого устройства</string>
-    <string name="history_restored_from_backup">Восстановлено из резервной копии</string>
+    <string name="history_imported_from_device">Сообщения выше получены с устройства %1$s</string>
+    <string name="history_imported_from_another_device">Сообщения выше получены с другого устройства</string>
+    <string name="history_restored_from_backup">Сообщения выше восстановлены из резервной копии</string>
     <string name="history_receiving">Получение прежних сообщений с другого вашего устройства…</string>
     <string name="history_retrying">Не удалось загрузить предыдущие сообщения. Мы автоматически попробуем ещё раз.</string>
     <string name="link_device_this_title">Связать это устройство</string>
@@ -75,7 +77,7 @@
     <string name="link_request_review">Рассмотреть</string>
     <string name="link_request_not_now">Не сейчас</string>
     <string name="link_request_preparing">Проверка нового устройства…</string>
-    <string name="link_request_compare_detail">Убедитесь, что на обоих устройствах показаны одинаковые эмодзи в одинаковом порядке. Если они различаются, нажмите «Не сейчас».</string>
+    <string name="link_request_compare_detail">Убедитесь, что устройство у вас в руках показывает те же эмодзи в том же порядке. Не зачитывайте их никому и не отправляйте снимок экрана.</string>
     <string name="link_request_label">Название устройства</string>
     <string name="link_request_label_too_long">Это название слишком длинное.</string>
     <string name="link_request_add_to_chats">Добавить во все мои чаты</string>
@@ -91,6 +93,14 @@
     <string name="link_request_linked">Новое устройство связано.</string>
     <string name="link_request_added_elsewhere">%1$s добавлено устройством %2$s.</string>
     <string name="link_request_added_elsewhere_unnamed">Устройство добавлено другим вашим устройством.</string>
+    <string name="link_request_notice">Новое устройство просит связать его с вашим аккаунтом.</string>
+    <string name="link_request_notice_other_profile">Новое устройство просит связать его с профилем %1$s.</string>
+    <string name="link_request_repeated_notice">Повторные запросы на связывание: возможно, у кого-то есть ваш ключ.</string>
+    <string name="link_request_repeated_notice_other_profile">Повторные запросы на связывание для %1$s: возможно, у кого-то есть ваш ключ.</string>
+    <string name="link_request_repeated_title">Повторные запросы на связывание</string>
+    <string name="link_request_repeated_detail">Устройства просили связать их с этим аккаунтом несколько раз за час. Возможно, у кого-то есть ваш закрытый ключ, поэтому связывание не предлагается. Если эти запросы отправили вы, повторите попытку позже с одного устройства.</string>
+    <string name="link_request_dont_link">Не связывать</string>
+    <string name="link_request_review_devices">Проверить устройства</string>
     <string name="device_detail_rename">Переименовать</string>
     <string name="device_detail_rename_detail">Название этого устройства, которое видно на всех ваших устройствах.</string>
     <string name="device_detail_keep">Сохранять при неактивности</string>
@@ -109,7 +119,7 @@
     <string name="devices_leftover_chats_detail">Эти чаты не могут принять удаление от ваших устройств. Администратор чата может удалить устройство там.</string>
     <string name="devices_key_refresh_overdue">Этому устройству не удалось обновить ключи приглашений. Через 30 дней его, возможно, нельзя будет добавлять в новые чаты. Держите приложение открытым на своих устройствах, чтобы они синхронизировались.</string>
     <string name="devices_stalled">Это устройство больше не успевает за другими вашими устройствами. Восстановите его связь, чтобы продолжить.</string>
-    <string name="device_repair_confirm_again">Откройте связанные устройства в настройках и повторно подтвердите восстановление перед привязкой.</string>
+    <string name="device_repair_confirm_again">Откройте «Устройства» в настройках и повторно подтвердите восстановление перед привязкой.</string>
     <string name="device_repair_try_link_again">Связь сброшена. Попробуйте привязать устройство ещё раз, чтобы завершить восстановление.</string>
     <string name="devices_repair">Восстановить связь этого устройства</string>
     <string name="devices_repair_confirm">Текущая привязка будет удалена, чтобы вы могли привязать устройство заново. Чаты, сообщения, черновики и настройки сохранятся. Восстановить старую привязку нельзя, даже если вы отмените новую.</string>
@@ -123,8 +133,8 @@
     <string name="sign_in_signed_out">Больше не выполнен вход</string>
     <string name="sign_in_question_new">Это были вы?</string>
     <string name="sign_in_question_before">Это устройство ещё у вас?</string>
-    <string name="sign_in_detail_new">Кто-то вошёл на другом устройстве. Если это были вы, можете привязать его. Если нет, нажмите «Это был не я».</string>
-    <string name="sign_in_detail_before">Это устройство вошло в учётную запись раньше текущего. Если оно ещё у вас, свяжите текущее устройство с него. Если нет, можно начать заново.</string>
+    <string name="sign_in_detail_new">Кто-то вошёл на другом устройстве. Если это были вы, можете привязать его. Если это ваше приложение, которое вы не хотите привязывать, нажмите «Моё, не привязывать». Если это были не вы, нажмите «Это был не я».</string>
+    <string name="sign_in_detail_before">Это устройство вошло в учётную запись раньше текущего. Если оно ещё у вас, привяжите текущее устройство с него или начните заново. Если вы его не узнаёте, нажмите «Не узнаю это устройство».</string>
     <string name="sign_in_previously_linked">Устройство, ранее связанное здесь, отсутствует в текущем списке этого устройства. Откройте оба устройства, чтобы проверить связь.</string>
     <string name="sign_in_reject">Это был не я</string>
     <string name="sign_in_reject_confirm">На всех ваших устройствах будет отмечено, что вход выполнили не вы, и появится предупреждение безопасности. Устройство останется в аккаунте, а ваш ключ не изменится.</string>
@@ -136,10 +146,10 @@
     <string name="start_fresh_title">Нет, начать заново</string>
     <string name="start_fresh_detail">Пока пользуйтесь этим устройством отдельно. Позже вы сможете привязать его с устройства, на котором уже входили в аккаунт.</string>
     <string name="started_fresh_note">Это устройство начало заново. Здесь появляются только чаты, в которые вас пригласят с этого момента.</string>
-    <string name="compromise_warning_title">Предупреждение о безопасности</string>
-    <string name="compromise_warning_rejected">Вход в эту учётную запись отмечен как не ваш. Возможно, у кого-то ещё есть ключ этой учётной записи или сеанс с её подписывающим приложением.</string>
-    <string name="compromise_warning_foreign_key">Это устройство нашло в своём слоте ключи приглашений, которые оно не создавало, и заменило их. Возможно, у кого-то ещё есть ключ этой учётной записи или сеанс с её подписывающим приложением.</string>
-    <string name="compromise_warning_dismiss">Отметить как просмотренное</string>
+    <string name="compromise_warning_title">Возможно, ваш секретный ключ есть у кого-то ещё</string>
+    <string name="compromise_warning_rejected">Вход в эту учётную запись отмечен как не ваш.</string>
+    <string name="compromise_warning_foreign_key">Это устройство нашло в своём слоте ключи приглашений, которые оно не создавало.</string>
+    <string name="compromise_warning_dismiss">Скрыть на этом устройстве</string>
     <string name="compromise_warning_dismiss_detail">Скрывает это предупреждение только на этом устройстве. Устройство не удаляется, вход не отклоняется, ключ не защищается.</string>
     <string name="device_move_section">Перемещение этого устройства</string>
     <string name="device_move_waiting">Ожидание добавления другими устройствами</string>
@@ -158,8 +168,8 @@
     <string name="link_offer_reminder">Свяжите это устройство, чтобы видеть чаты с других ваших устройств.</string>
     <string name="link_request_default_label">Новое устройство</string>
     <string name="link_request_options">Параметры</string>
-    <string name="link_request_options_detail">Выберите имя устройства и укажите, хотите ли вы поделиться чатами и их историей.</string>
-    <string name="explanation_link_request_options">Открывает название нового устройства и то, что оно получает.</string>
+    <string name="link_request_options_detail">Укажите, хотите ли вы поделиться чатами и их историей.</string>
+    <string name="explanation_link_request_options">Открывает то, что получает новое устройство.</string>
     <string name="device_move_advanced">Дополнительно</string>
     <string name="setup_device_link_next">После входа вы сможете привязать это устройство, чтобы получить чаты с других устройств.</string>
     <string name="unlinked_account_remove_for">Удалить %1$s с этого устройства</string>
@@ -177,4 +187,43 @@
     <string name="unlinked_remove_sign_in_detail">Это устройство было отвязано. Удалить чаты и данные этого профиля с устройства и войти с введённым ключом? На других ваших устройствах данные сохранятся.</string>
     <string name="invite_decline_wait_for_sync">Дождитесь синхронизации чата и снова нажмите «Отклонить».</string>
     <string name="invite_decline_check_delivery">Последнее изменение группы поступило не на все ретрансляторы. Перед новой попыткой проверьте, есть ли в чате предупреждение о доставке.</string>
+    <string name="sign_in_claim">Называет себя: %1$s</string>
+    <string name="sign_in_mine">Моё, не привязывать</string>
+    <string name="sign_in_mine_state">Ваше, не привязано</string>
+    <string name="sign_in_dont_recognize">Не узнаю это устройство</string>
+    <string name="compromise_warning_explainer">С вашим ключом можно войти где угодно, и его нельзя изменить или отозвать. White Noise не пускает неизвестные устройства в список привязанных, но не может закрыть им доступ.</string>
+    <string name="compromise_warning_steps_title">Что делать</string>
+    <string name="compromise_warning_step_remove">1. Удалите все устройства, которые вы не узнаёте.</string>
+    <string name="compromise_warning_step_signer">2. Если вы пользуетесь приложением для подписи, откройте в нём список подключённых приложений и удалите незнакомые.</string>
+    <string name="compromise_warning_step_move">3. Перейдите на новую учётную запись. Вашим контактам нужно будет добавить её.</string>
+    <string name="compromise_alert_review">Проверить устройства</string>
+    <string name="compromise_warning_hide_failed">Не удалось скрыть предупреждение. Попробуйте ещё раз.</string>
+    <string name="sign_in_alert_review_banner">В вашу учётную запись вошло устройство, которое вы не привязывали. Проверьте, ваше ли оно.</string>
+    <string name="sign_in_alert_review_action">Проверить</string>
+    <string name="sign_in_alert_badge_review">Вход нужно проверить</string>
+    <string name="sign_in_alert_badge_compromise">Предупреждение о безопасности</string>
+    <string name="sign_in_alert_review_body">В вашу учётную запись вошло устройство, которое вы не привязывали. Откройте White Noise, чтобы проверить, ваше ли оно.</string>
+    <string name="sign_in_alert_review_public">Вход нужно проверить</string>
+    <string name="sign_in_alert_compromise_body">Откройте White Noise, чтобы узнать, что произошло и что делать.</string>
+    <string name="sign_in_alert_compromise_public">Нужна проверка безопасности</string>
+    <string name="device_detail_remove_stolen">Если это устройство потеряно или украдено, у того, кто его держит, может всё ещё быть ваш ключ.</string>
+    <plurals name="sign_in_alert_review_title">
+        <item quantity="one">%d новый вход нужно проверить</item>
+        <item quantity="few">%d новых входа нужно проверить</item>
+        <item quantity="many">%d новых входов нужно проверить</item>
+        <item quantity="other">%d нового входа нужно проверить</item>
+    </plurals>
+    <string name="link_request_expired_attempt">Устройство пыталось привязаться: %1$s.</string>
+    <string name="link_consent_requested_at">Запрос в %1$s</string>
+    <string name="link_consent_access">Связанное устройство сможет читать ваши чаты, получать их историю и отправлять сообщения от вашего имени.</string>
+    <string name="link_consent_have_device">Продолжайте, только если вы сами начали настраивать White Noise на устройстве, которое сейчас перед вами.</string>
+    <string name="link_consent_scam">White Noise никогда не свяжется с вами с просьбой связать устройство или проверить эмодзи. Если кто-то попросил об этом, это мошенничество.</string>
+    <string name="link_consent_on_call">Вы разговариваете по телефону. Мошенники часто подсказывают жертвам по телефону, как связать устройство.</string>
+    <string name="link_consent_with_me">Новое устройство у меня</string>
+    <string name="link_consent_did_not_start">Я не отправлял этот запрос</string>
+    <string name="link_consent_someone_asked">Меня попросили это сделать</string>
+    <string name="link_consent_unlock">Разблокируйте этот телефон, чтобы сравнить эмодзи</string>
+    <string name="link_consent_lock_required">Чтобы связать устройство, настройте блокировку экрана на этом телефоне.</string>
+    <string name="link_consent_report_guidance">Привязка отклонена. Откройте этот вход в разделе «Устройства», чтобы сообщить о нём.</string>
+    <string name="link_touch_blocked">Другое приложение перекрывает White Noise. Закройте его окно и повторите попытку.</string>
 </resources>

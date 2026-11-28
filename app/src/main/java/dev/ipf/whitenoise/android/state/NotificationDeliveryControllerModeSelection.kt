@@ -19,7 +19,7 @@ internal suspend fun NotificationDeliveryController.applyMode(
     mode: NotificationDeliveryMode,
     enableRendering: Boolean,
 ): Boolean {
-    val intentGeneration = notificationDeliveryModeIntent.advance()
+    val intentGeneration = beginDeliveryModeTransaction()
     if (mode == NotificationDeliveryMode.Local) nativePushFallback.invalidateAll()
     notificationDeliveryModeBusy = true
     return try {
@@ -38,7 +38,11 @@ internal suspend fun NotificationDeliveryController.applyMode(
             }
         }
     } finally {
-        finishNotificationDeliveryModeTransaction(intentGeneration)
+        try {
+            finishNotificationDeliveryModeTransaction(intentGeneration)
+        } finally {
+            endDeliveryModeTransaction()
+        }
     }
 }
 
@@ -64,11 +68,41 @@ private suspend fun NotificationDeliveryController.ensureNotificationRenderingEn
     }
 }
 
-/** Registers every notification-enabled account before the device-wide persistent path is stopped. */
-@Suppress("ReturnCount", "TooGenericExceptionCaught")
+/**
+ * Selects native push for every notification-enabled account. Firebase auto-init is turned on only once the
+ * whole cutover has committed, since turning it on starts the SDK's background token sync, which no later off
+ * write can cancel. A selection that does not complete, including a cancelled one, settles auto-init instead.
+ */
 internal suspend fun NotificationDeliveryController.selectFcmDelivery(
     owner: NotificationDeliveryModeOwner,
     explicit: Boolean = false,
+): Boolean {
+    // runCatching also holds a cancellation, so auto-init is settled before getOrThrow rethrows it.
+    uncommittedNativePushEnables.incrementAndGet()
+    val selected =
+        try {
+            runCatching { selectFcmTransport(owner, explicit) }
+        } finally {
+            uncommittedNativePushEnables.decrementAndGet()
+        }
+    val settled =
+        withContext(NonCancellable) {
+            if (selected.getOrNull() == true) {
+                commitFcmAutoInitAfterEnable { ownsNotificationDeliveryMode(owner) }
+            } else {
+                settleFcmAutoInitAfterFailedSelection()
+                true
+            }
+        }
+    // A committed cutover that could neither settle auto-init nor store its retry does not report success.
+    return selected.getOrThrow() && settled
+}
+
+/** Registers every notification-enabled account before the device-wide persistent path is stopped. */
+@Suppress("ReturnCount", "TooGenericExceptionCaught")
+private suspend fun NotificationDeliveryController.selectFcmTransport(
+    owner: NotificationDeliveryModeOwner,
+    explicit: Boolean,
 ): Boolean {
     val config = pushServerConfigProvider() ?: return false
     if (!nativePushCapability(config).isAvailable) return false
@@ -78,7 +112,7 @@ internal suspend fun NotificationDeliveryController.selectFcmDelivery(
     val persistentStopAttempted = AtomicBoolean(false)
     return try {
         if (!withContext(pushWakeStorageDispatcher) { pushTokenStore.registrationAllowed() }) return false
-        val token = fetchFcmTokenOrNull() ?: return false
+        val token = fetchFcmTokenForOwner(owner) ?: return false
         val registered = enableNativeDeliveryForAccounts(owner, config, token, previous)
         if (!registered) {
             rollbackNativePushMode(owner, previous)
@@ -131,7 +165,11 @@ private suspend fun NotificationDeliveryController.clearExplicitPendingDisable(o
     return cleared && ownsNotificationDeliveryMode(owner)
 }
 
-/** Registers at most three accounts together while the native sync lock fences other mutations. */
+/**
+ * Registers at most three accounts together while the native sync lock fences other mutations. It leaves
+ * Firebase auto-init alone: the selection can still roll back after this, so only the committed cutover
+ * turns it on.
+ */
 private suspend fun NotificationDeliveryController.enableNativeDeliveryForAccounts(
     owner: NotificationDeliveryModeOwner,
     config: PushServerConfig,
@@ -141,11 +179,14 @@ private suspend fun NotificationDeliveryController.enableNativeDeliveryForAccoun
     nativePushSyncMutex.withLock {
         val orderedAccounts =
             listOf(owner.activeAccountRef) + owner.accountRefs.filterNot { it == owner.activeAccountRef }
+        val configure: suspend (String) -> Boolean = { account ->
+            configureNativeDeliveryForAccount(owner, account, config, token, previous)
+        }
         orderedAccounts.chunked(FCM_REGISTRATION_BATCH_SIZE).all { batch ->
             val ready =
                 coroutineScope {
                     batch
-                        .map { async { configureNativeDeliveryForAccount(owner, it, config, token, previous) } }
+                        .map { async { configure(it) } }
                         .awaitAll()
                         .all { it }
                 }
@@ -178,14 +219,33 @@ private suspend fun NotificationDeliveryController.configureNativeDeliveryForAcc
         }
     if (!ownsNotificationDeliveryMode(owner) || updated.nativePushEnabled != desiredNative) return false
     if (account == owner.activeAccountRef) localNotificationSettings = updated
-    return !desiredNative || syncPushForNotificationDeliveryOwner(owner, account, config, token)
+    if (!desiredNative) return true
+    return syncPushForNotificationDeliveryOwner(owner, account, config, token)
+}
+
+/**
+ * Selects persistent delivery for every signed-in account. If it does not complete after a native-push
+ * disable committed, including on cancellation, Firebase auto-init is settled from the accounts' live
+ * demand, since the off write at the end of the cutover may never run.
+ */
+@Suppress("MaxLineLength")
+internal suspend fun NotificationDeliveryController.selectPersistentDelivery(owner: NotificationDeliveryModeOwner): Boolean {
+    val nativeDisableCommitted = AtomicBoolean(false)
+    // runCatching also holds a cancellation, so the settle runs before getOrThrow rethrows it.
+    val selected = runCatching { selectPersistentTransport(owner, nativeDisableCommitted) }
+    if (selected.getOrNull() != true && nativeDisableCommitted.get()) {
+        withContext(NonCancellable) { settleFcmAutoInitAfterFailedSelection() }
+    }
+    return selected.getOrThrow()
 }
 
 /** Waits for the exact foreground-service acknowledgement before disabling native delivery. */
-@Suppress("MaxLineLength", "ReturnCount", "TooGenericExceptionCaught")
-internal suspend fun NotificationDeliveryController.selectPersistentDelivery(owner: NotificationDeliveryModeOwner): Boolean {
+@Suppress("ReturnCount", "TooGenericExceptionCaught")
+private suspend fun NotificationDeliveryController.selectPersistentTransport(
+    owner: NotificationDeliveryModeOwner,
+    nativeDisableCommitted: AtomicBoolean,
+): Boolean {
     val previousPersistent = backgroundConnectionEnabled
-    val nativeDisableCommitted = AtomicBoolean(false)
     return try {
         val fallbackOwner =
             establishPersistentMode(owner) ?: run {
@@ -237,7 +297,10 @@ internal suspend fun NotificationDeliveryController.establishPersistentMode(mode
     }
 }
 
-/** Disables native delivery for every captured signed-in account behind the acknowledged service. */
+/**
+ * Disables native delivery for every captured signed-in account, then Firebase auto-init, behind the service.
+ * Returns false when an account change fails or auto-init could neither be turned off nor have its retry stored.
+ */
 @Suppress("ReturnCount")
 private suspend fun NotificationDeliveryController.disableNativePushForPersistentDelivery(
     modeOwner: NotificationDeliveryModeOwner,
@@ -266,6 +329,8 @@ private suspend fun NotificationDeliveryController.disableNativePushForPersisten
             clearPushRegistrationForNotificationDeliveryOwnerLocked(modeOwner, account)
             if (!ownsNotificationDeliveryMode(modeOwner)) return@withLock false
         }
-        true
+        // Every signed-in account left native push, so Firebase must stop refreshing its token. A write that
+        // neither lands nor stores its retry fails the cutover, which keeps Local delivery established.
+        applyFcmAutoInit(enabled = false)
     }
 }

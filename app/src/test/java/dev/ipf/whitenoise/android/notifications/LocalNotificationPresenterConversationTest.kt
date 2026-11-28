@@ -1047,28 +1047,6 @@ class LocalNotificationPresenterConversationTest {
     }
 
     @Test
-    fun inheritedAgentActivityPostsOnTheGlobalSilentAgentChannel() {
-        presenter.ensureChannels()
-
-        runBlocking {
-            presenter.show(
-                update(
-                    isMention = false,
-                    trafficClass = NotificationTrafficClassFfi.AGENT_ACTIVITY,
-                ),
-                shortNpub = { "npub1test" },
-            )
-        }
-
-        assertEquals(
-            NotificationChannelSpec.AGENT_ACTIVITY.id,
-            manager.activeNotifications
-                .single()
-                .notification.channelId,
-        )
-    }
-
-    @Test
     fun deletedConversationChannelIsRecreatedWithoutAProcessRestart() {
         presenter.ensureChannels()
         runBlocking {

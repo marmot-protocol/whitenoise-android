@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="linked_devices">Verknüpfte Geräte</string>
+    <string name="linked_devices">Geräte</string>
+    <string name="settings_search_alias_linked_devices">verknüpfte Geräte|Gerät verknüpfen</string>
+    <string name="group_account_devices_title">Verknüpfte Geräte</string>
     <string name="linked_devices_detail">Nachrichten, die du von einem verknüpften Gerät sendest, erscheinen auf allen deinen verknüpften Geräten als deine Nachrichten.</string>
     <string name="linked_devices_this_device">Dieses Gerät</string>
     <string name="linked_devices_other_devices">Andere Geräte</string>
@@ -36,9 +38,9 @@
     <string name="error_account_unlinked">Dieses Gerät wurde von diesem Konto getrennt und kann sich hier nicht anmelden. Entferne das Konto von diesem Gerät und melde dich dann erneut an, um dieses Gerät neu zu verknüpfen.</string>
     <string name="wipe_report_left_to_other_devices">Chats, die deine anderen Geräte abschließen: %1$d</string>
     <string name="wipe_report_other_devices_not_reached">Deine anderen Geräte konnten nicht gebeten werden, die Abmeldung dieses Geräts abzuschließen. Sie führen dieses Gerät möglicherweise weiter auf, bis du es von einem von ihnen entfernst.</string>
-    <string name="history_imported_from_device">Importiert von %1$s</string>
-    <string name="history_imported_from_another_device">Von einem anderen Gerät importiert</string>
-    <string name="history_restored_from_backup">Aus Backup wiederhergestellt</string>
+    <string name="history_imported_from_device">Die Nachrichten darüber stammen von %1$s</string>
+    <string name="history_imported_from_another_device">Die Nachrichten darüber stammen von einem anderen Gerät</string>
+    <string name="history_restored_from_backup">Die Nachrichten darüber wurden aus einem Backup wiederhergestellt</string>
     <string name="history_receiving">Frühere Nachrichten werden von einem anderen deiner Geräte empfangen…</string>
     <string name="history_retrying">Frühere Nachrichten konnten nicht geladen werden. Wir versuchen es automatisch erneut.</string>
     <string name="link_device_this_title">Dieses Gerät verknüpfen</string>
@@ -75,7 +77,7 @@
     <string name="link_request_review">Prüfen</string>
     <string name="link_request_not_now">Nicht jetzt</string>
     <string name="link_request_preparing">Neues Gerät wird geprüft…</string>
-    <string name="link_request_compare_detail">Prüfe, ob beide Geräte dieselben Emojis in derselben Reihenfolge zeigen. Falls sie sich unterscheiden, tippe auf „Nicht jetzt“.</string>
+    <string name="link_request_compare_detail">Prüfe, ob das Gerät in deiner Hand dieselben Emojis in derselben Reihenfolge anzeigt. Lies sie niemandem vor und sende keinen Screenshot.</string>
     <string name="link_request_label">Gerätename</string>
     <string name="link_request_label_too_long">Dieser Name ist zu lang.</string>
     <string name="link_request_add_to_chats">Zu allen meinen Chats hinzufügen</string>
@@ -91,6 +93,14 @@
     <string name="link_request_linked">Das neue Gerät ist verknüpft.</string>
     <string name="link_request_added_elsewhere">%1$s wurde von %2$s hinzugefügt.</string>
     <string name="link_request_added_elsewhere_unnamed">Das Gerät wurde von einem anderen deiner Geräte hinzugefügt.</string>
+    <string name="link_request_notice">Ein neues Gerät möchte mit deinem Konto verknüpft werden.</string>
+    <string name="link_request_notice_other_profile">Ein neues Gerät möchte mit %1$s verknüpft werden.</string>
+    <string name="link_request_repeated_notice">Wiederholte Verknüpfungsanfragen: Jemand hat möglicherweise deinen Schlüssel.</string>
+    <string name="link_request_repeated_notice_other_profile">Wiederholte Verknüpfungsanfragen für %1$s: Jemand hat möglicherweise deinen Schlüssel.</string>
+    <string name="link_request_repeated_title">Wiederholte Verknüpfungsanfragen</string>
+    <string name="link_request_repeated_detail">Innerhalb einer Stunde wollten mehrmals Geräte mit diesem Konto verknüpft werden. Jemand hat möglicherweise deinen privaten Schlüssel, daher wird Verknüpfen nicht angeboten. Wenn du diese Anfragen selbst gestellt hast, versuche es später von einem Gerät aus erneut.</string>
+    <string name="link_request_dont_link">Nicht verknüpfen</string>
+    <string name="link_request_review_devices">Geräte prüfen</string>
     <string name="device_detail_rename">Umbenennen</string>
     <string name="device_detail_rename_detail">Der Name, der für dieses Gerät auf all deinen Geräten angezeigt wird.</string>
     <string name="device_detail_keep">Bei Inaktivität behalten</string>
@@ -109,7 +119,7 @@
     <string name="devices_leftover_chats_detail">Diese Chats können die Entfernung nicht von deinen Geräten übernehmen. Ein Chat-Admin kann das Gerät dort entfernen.</string>
     <string name="devices_key_refresh_overdue">Dieses Gerät konnte seine Einladungsschlüssel nicht erneuern. Nach 30 Tagen kann es möglicherweise nicht mehr zu neuen Chats hinzugefügt werden. Lass die App auf deinen Geräten geöffnet, damit sie aufholen können.</string>
     <string name="devices_stalled">Dieses Gerät kann mit deinen anderen Geräten nicht mehr Schritt halten. Repariere seine Verknüpfung, um fortzufahren.</string>
-    <string name="device_repair_confirm_again">Öffne in den Einstellungen die verknüpften Geräte und bestätige die Reparatur erneut, bevor du das Gerät verknüpfst.</string>
+    <string name="device_repair_confirm_again">Öffne in den Einstellungen „Geräte“ und bestätige die Reparatur erneut, bevor du das Gerät verknüpfst.</string>
     <string name="device_repair_try_link_again">Verknüpfung zurückgesetzt. Verknüpfe das Gerät erneut, um die Reparatur abzuschließen.</string>
     <string name="devices_repair">Verknüpfung dieses Geräts reparieren</string>
     <string name="devices_repair_confirm">Die aktuelle Verknüpfung wird entfernt, damit du dieses Gerät erneut verknüpfen kannst. Deine Chats, Nachrichten, Entwürfe und Einstellungen bleiben erhalten. Die alte Verknüpfung lässt sich auch dann nicht wiederherstellen, wenn du den Vorgang abbrichst.</string>
@@ -123,8 +133,8 @@
     <string name="sign_in_signed_out">Nicht mehr angemeldet</string>
     <string name="sign_in_question_new">Warst du das?</string>
     <string name="sign_in_question_before">Hast du dieses Gerät noch?</string>
-    <string name="sign_in_detail_new">Jemand hat sich auf einem anderen Gerät angemeldet. Wenn du es warst, kannst du das Gerät verknüpfen. Andernfalls tippe auf „Das war ich nicht“.</string>
-    <string name="sign_in_detail_before">Dieses Gerät war vor diesem hier beim Konto angemeldet. Wenn du es noch hast, verknüpfe dieses Gerät von dort aus. Wenn nicht, kannst du neu beginnen.</string>
+    <string name="sign_in_detail_new">Jemand hat sich auf einem anderen Gerät angemeldet. Wenn du es warst, kannst du das Gerät verknüpfen. Wenn es eine deiner Apps ist, die du nicht verknüpfen willst, tippe auf „Meins, nicht verknüpfen“. Wenn du es nicht warst, tippe auf „Das war ich nicht“.</string>
+    <string name="sign_in_detail_before">Dieses Gerät war vor diesem hier beim Konto angemeldet. Wenn du es noch hast, verknüpfe dieses Gerät von dort aus oder beginne neu. Wenn du es nicht erkennst, tippe auf „Erkenne ich nicht“.</string>
     <string name="sign_in_previously_linked">Ein zuvor hier verknüpftes Gerät fehlt in der aktuellen Liste dieses Geräts. Öffne beide Geräte, um die Verknüpfung zu prüfen.</string>
     <string name="sign_in_reject">Das war ich nicht</string>
     <string name="sign_in_reject_confirm">Auf allen deinen Geräten wird vermerkt, dass diese Anmeldung nicht von dir stammt, und eine Sicherheitswarnung wird angezeigt. Das Gerät bleibt angemeldet und dein Schlüssel bleibt gleich.</string>
@@ -136,10 +146,10 @@
     <string name="start_fresh_title">Nein, neu beginnen</string>
     <string name="start_fresh_detail">Nutze dieses Gerät vorerst allein. Du kannst es später von einem Gerät aus verknüpfen, auf dem du dich zuvor angemeldet hast.</string>
     <string name="started_fresh_note">Dieses Gerät hat neu begonnen. Hier erscheinen nur Chats, zu denen du ab jetzt eingeladen wirst.</string>
-    <string name="compromise_warning_title">Sicherheitswarnung</string>
-    <string name="compromise_warning_rejected">Eine Anmeldung bei diesem Konto wurde als nicht von dir stammend markiert. Jemand anderes könnte den Schlüssel dieses Kontos oder eine Sitzung mit dessen Signierer besitzen.</string>
-    <string name="compromise_warning_foreign_key">Dieses Gerät hat in seinem eigenen Slot Einladungsschlüssel gefunden, die es nicht erstellt hat, und sie ersetzt. Jemand anderes könnte den Schlüssel dieses Kontos oder eine Sitzung mit dessen Signierer besitzen.</string>
-    <string name="compromise_warning_dismiss">Als gesehen markieren</string>
+    <string name="compromise_warning_title">Jemand anderes hat vielleicht deinen geheimen Schlüssel</string>
+    <string name="compromise_warning_rejected">Eine Anmeldung bei diesem Konto wurde als nicht deine markiert.</string>
+    <string name="compromise_warning_foreign_key">Dieses Gerät hat in seinem eigenen Slot Einladungsschlüssel gefunden, die es nicht erstellt hat.</string>
+    <string name="compromise_warning_dismiss">Auf diesem Gerät ausblenden</string>
     <string name="compromise_warning_dismiss_detail">Blendet diese Warnung nur auf diesem Gerät aus. Dadurch wird weder ein Gerät entfernt noch eine Anmeldung abgelehnt oder dein Schlüssel geschützt.</string>
     <string name="device_move_section">Dieses Gerät wird verschoben</string>
     <string name="device_move_waiting">Warten, bis die anderen Geräte es hinzufügen</string>
@@ -158,8 +168,8 @@
     <string name="link_offer_reminder">Verknüpfe dieses Gerät, um die Chats deiner anderen Geräte zu sehen.</string>
     <string name="link_request_default_label">Neues Gerät</string>
     <string name="link_request_options">Optionen</string>
-    <string name="link_request_options_detail">Wähle einen Gerätenamen und entscheide, ob Chats und ihr Verlauf geteilt werden sollen.</string>
-    <string name="explanation_link_request_options">Öffnet den Namen des neuen Geräts und was es erhält.</string>
+    <string name="link_request_options_detail">Entscheide, ob Chats und ihr Verlauf geteilt werden sollen.</string>
+    <string name="explanation_link_request_options">Öffnet, was das neue Gerät erhält.</string>
     <string name="device_move_advanced">Erweitert</string>
     <string name="setup_device_link_next">Nach der Anmeldung kannst du dieses Gerät verknüpfen, um Chats von deinen anderen Geräten zu erhalten.</string>
     <string name="unlinked_account_remove_for">%1$s von diesem Gerät entfernen</string>
@@ -177,4 +187,41 @@
     <string name="unlinked_remove_sign_in_detail">Die Verknüpfung dieses Geräts wurde aufgehoben. Möchtest du die Chats und Daten dieses Profils von diesem Gerät löschen und dich mit dem eingegebenen Schlüssel anmelden? Deine anderen Geräte behalten ihre Daten.</string>
     <string name="invite_decline_wait_for_sync">Warte, bis dieser Chat synchronisiert ist, und tippe erneut auf „Ablehnen“.</string>
     <string name="invite_decline_check_delivery">Deine letzte Gruppenänderung hat noch nicht alle Relays erreicht. Prüfe vor dem nächsten Versuch, ob dieser Chat eine Zustellwarnung anzeigt.</string>
+    <string name="sign_in_claim">Gibt an: %1$s</string>
+    <string name="sign_in_mine">Meins, nicht verknüpfen</string>
+    <string name="sign_in_mine_state">Deins, nicht verknüpft</string>
+    <string name="sign_in_dont_recognize">Erkenne ich nicht</string>
+    <string name="compromise_warning_explainer">Mit deinem Schlüssel kann man sich überall anmelden, und er lässt sich weder ändern noch widerrufen. White Noise hält unbekannte Geräte aus deinen verknüpften Geräten heraus, kann sie aber nicht aussperren.</string>
+    <string name="compromise_warning_steps_title">Was du tun kannst</string>
+    <string name="compromise_warning_step_remove">1. Entferne jedes Gerät, das du nicht erkennst.</string>
+    <string name="compromise_warning_step_signer">2. Wenn du eine Signer-App nutzt, öffne dort die verbundenen Apps und entferne unbekannte Apps.</string>
+    <string name="compromise_warning_step_move">3. Zieh auf ein neues Konto um. Deine Kontakte müssen es neu hinzufügen.</string>
+    <string name="compromise_alert_review">Geräte prüfen</string>
+    <string name="compromise_warning_hide_failed">Die Warnung konnte nicht ausgeblendet werden. Versuche es noch einmal.</string>
+    <string name="sign_in_alert_review_banner">Ein Gerät, das du nicht verknüpft hast, hat sich bei deinem Konto angemeldet. Prüfe, ob es deins ist.</string>
+    <string name="sign_in_alert_review_action">Prüfen</string>
+    <string name="sign_in_alert_badge_review">Anmeldung zu prüfen</string>
+    <string name="sign_in_alert_badge_compromise">Sicherheitswarnung</string>
+    <string name="sign_in_alert_review_body">Ein Gerät, das du nicht verknüpft hast, hat sich bei deinem Konto angemeldet. Öffne White Noise, um zu prüfen, ob es deins ist.</string>
+    <string name="sign_in_alert_review_public">Anmeldung zu prüfen</string>
+    <string name="sign_in_alert_compromise_body">Öffne White Noise, um zu sehen, was passiert ist und was du tun kannst.</string>
+    <string name="sign_in_alert_compromise_public">Sicherheitsprüfung nötig</string>
+    <string name="device_detail_remove_stolen">Wenn dieses Gerät verloren oder gestohlen wurde, hat die Person, die es hat, vielleicht noch deinen Schlüssel.</string>
+    <plurals name="sign_in_alert_review_title">
+        <item quantity="one">Neue Anmeldung zu prüfen</item>
+        <item quantity="other">%d neue Anmeldungen zu prüfen</item>
+    </plurals>
+    <string name="link_request_expired_attempt">Ein Gerät hat um %1$s versucht, sich zu verknüpfen.</string>
+    <string name="link_consent_requested_at">Angefragt um %1$s</string>
+    <string name="link_consent_access">Ein verknüpftes Gerät kann deine Chats lesen, den Chatverlauf abrufen und in deinem Namen Nachrichten senden.</string>
+    <string name="link_consent_have_device">Fahre nur fort, wenn du White Noise selbst auf einem Gerät vor dir einrichtest.</string>
+    <string name="link_consent_scam">White Noise wird dich nie kontaktieren und dich bitten, ein Gerät zu verknüpfen oder Emojis zu prüfen. Wenn dich jemand darum gebeten hat, ist es ein Betrugsversuch.</string>
+    <string name="link_consent_on_call">Du telefonierst gerade. Betrüger leiten Menschen oft am Telefon durch die Geräteverknüpfung.</string>
+    <string name="link_consent_with_me">Ich habe das neue Gerät vor mir</string>
+    <string name="link_consent_did_not_start">Ich habe das nicht gestartet</string>
+    <string name="link_consent_someone_asked">Jemand hat mich darum gebeten</string>
+    <string name="link_consent_unlock">Entsperre dieses Telefon, um Emojis zu vergleichen</string>
+    <string name="link_consent_lock_required">Richte auf diesem Telefon eine Displaysperre ein, um ein Gerät zu verknüpfen.</string>
+    <string name="link_consent_report_guidance">Kopplung abgelehnt. Öffne die Anmeldung unter „Geräte“, um sie zu melden.</string>
+    <string name="link_touch_blocked">Eine andere App verdeckt White Noise. Schließe ihr Fenster und versuche es erneut.</string>
 </resources>

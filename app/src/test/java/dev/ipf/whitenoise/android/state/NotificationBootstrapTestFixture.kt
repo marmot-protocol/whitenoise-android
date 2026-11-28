@@ -39,6 +39,11 @@ import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.MarmotEventFfi
 import dev.ipf.marmotkit.MarmotInterface
+import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.marmotkit.Nip46ErrorFfi
+import dev.ipf.marmotkit.Nip46SessionFfi
+import dev.ipf.marmotkit.Nip46StateFfi
+import dev.ipf.marmotkit.Nip46StatusFfi
 import dev.ipf.marmotkit.NoPointer
 import dev.ipf.marmotkit.NotificationSettingsFfi
 import dev.ipf.marmotkit.NotificationTrafficClassFfi
@@ -130,6 +135,7 @@ internal class NotificationBootstrapTestFixture(
     private val signInFailure: Throwable? = null,
     private val onSignInAccount: ((String) -> Unit)? = null,
     initialNotificationSettings: NotificationSettingsFfi? = null,
+    private val onNip46Resume: ((String) -> Boolean)? = null,
     // Optional behavior hooks so worker/reconciliation tests can steer the FFI
     // boundary per call; every default preserves the fixture's original shape.
     private val onOnboardingSnapshot: (() -> OnboardingSnapshotFfi?)? = null,
@@ -137,6 +143,8 @@ internal class NotificationBootstrapTestFixture(
     private val onPrivacyRuntimeConfig: (() -> Unit)? = null,
     private val onUsageDiagnosticsRead: (() -> Unit)? = null,
     private val onCreateIdentity: (() -> AccountSummaryFfi)? = null,
+    private val onRuntimeStart: (() -> Unit)? = null,
+    private val onListAccountsAfterStart: (() -> Unit)? = null,
     private val onUserProfile: ((accountIdHex: String) -> UserProfileMetadataFfi?)? = null,
     private val onChatList: ((accountRef: String) -> List<ChatListRowFfi>)? = null,
     // Separate activation's presented-row boundary from concurrent raw unread folds.
@@ -156,6 +164,7 @@ internal class NotificationBootstrapTestFixture(
     private val onUpsertPushRegistration: ((accountRef: String) -> Unit)? = null,
     private val onNotificationSettings: ((accountRef: String) -> NotificationSettingsFfi?)? = null,
     private val onChatNotificationSettings: ((String, String) -> ChatNotificationSettingsFfi)? = null,
+    private val onSetChatMuted: ((String, String, Long?) -> ChatNotificationSettingsFfi)? = null,
     nativePushFallbackPlatform: NativePushFallbackPlatform = AndroidNativePushFallbackPlatform(context),
     pushServerConfigProvider: () -> PushServerConfig? = PushServerConfig::current,
     fcmTokenReader: suspend () -> String? = { null },
@@ -333,6 +342,7 @@ internal class NotificationBootstrapTestFixture(
                 "start" -> {
                     runtimeStartCalls.incrementAndGet()
                     runtimeStartGate.await()
+                    onRuntimeStart?.invoke()
                     runtimeStarted.set(true)
                     Unit
                 }
@@ -405,6 +415,12 @@ internal class NotificationBootstrapTestFixture(
                             updatedAtMs = 0L,
                         )
                 }
+                "setChatMuted" ->
+                    onSetChatMuted?.invoke(
+                        arguments?.get(0) as String,
+                        arguments[1] as String,
+                        arguments[2] as Long?,
+                    ) ?: throw UnsupportedOperationException("Unexpected Marmot call: ${method.name}")
                 "groupRecoveryStatus" ->
                     GroupRecoveryStatusFfi(
                         groupIdHex = arguments?.get(1) as String,
@@ -518,7 +534,10 @@ internal class NotificationBootstrapTestFixture(
                     "npub1coldidentityfallback"
                 }
                 "createIdentity" -> checkNotNull(onCreateIdentity) { "Unexpected identity creation" }.invoke()
-                "listAccounts" -> accounts.toList()
+                "listAccounts" -> {
+                    if (runtimeStarted.get()) onListAccountsAfterStart?.invoke()
+                    accounts.toList()
+                }
                 "attachmentDownloadPolicy" -> AttachmentDownloadPolicyFfi(false, 2_000uL, 300uL, 40uL)
                 "setAttachmentDownloadPolicy" -> Unit
                 "beginAttachmentPermissionUpdate" -> "fixture-permission-generation"
@@ -643,6 +662,18 @@ internal class NotificationBootstrapTestFixture(
                         }
                     onDisplayName?.invoke(call, accountIdHex) ?: localDisplayName
                 }
+                "nip46Resume" -> {
+                    val accountRef = arguments?.first() as String
+                    try {
+                        if (onNip46Resume?.invoke(accountRef) == true) {
+                            allocateWithoutConstructor(FixtureRemoteSignerSession::class.java)
+                        } else {
+                            failSuspendedNativeCall(arguments, MarmotKitException.Nip46(Nip46ErrorFfi.Unavailable()))
+                        }
+                    } catch (error: MarmotKitException.Nip46) {
+                        failSuspendedNativeCall(arguments, error)
+                    }
+                }
                 "registerExternalSigner" -> {
                     signerRegistrationCalls.incrementAndGet()
                     Unit
@@ -750,6 +781,12 @@ internal class NotificationBootstrapTestFixture(
         val field = unsafeClass.getDeclaredField("theUnsafe").apply { isAccessible = true }
         val unsafe = field.get(null)
         return unsafeClass.getMethod("allocateInstance", Class::class.java).invoke(unsafe, type) as T
+    }
+
+    private class FixtureRemoteSignerSession : Nip46SessionFfi(NoPointer) {
+        override fun status() = Nip46StatusFfi(Nip46StateFfi.UNAVAILABLE, null, null, null, 0u)
+
+        override fun close() = Unit
     }
 
     /** One immutable attachment history generation that owns no native handle. */

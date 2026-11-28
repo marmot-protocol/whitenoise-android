@@ -9,7 +9,8 @@
         "anchor": "fun FocusedActionMenu(",
         "test_ids": [
           "MSG-004",
-          "MSG-005"
+          "MSG-005",
+          "MSG-050"
         ]
       },
       {
@@ -36,6 +37,14 @@
         "anchor": "fun FocusedActionMenu(",
         "test_ids": [
           "MSG-004"
+        ]
+      },
+      {
+        "surface": "Common long-press actions lead; More actions is the last cell, and Back returns to the first level",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActionGrid.kt",
+        "anchor": "if (disclosure != null && disclosureWidth != null) {",
+        "test_ids": [
+          "MSG-050"
         ]
       }
     ]

@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -25,7 +24,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.GroupRecoveryStatusFfi
 import dev.ipf.marmotkit.GroupRejoinInvitationFfi
@@ -34,10 +32,26 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.dismissGroupCommitRefusal
 import dev.ipf.whitenoise.android.ui.EmojiLabel
-import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
-import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
+
+/** Lets a tall recovery card scroll inside the space left by the composer. */
+@Composable
+@Suppress("FunctionNaming")
+internal fun EmptyConversationRecoveryContent(
+    state: ConversationEmptyState,
+    modifier: Modifier = Modifier,
+    recovery: @Composable () -> Unit,
+) {
+    Column(modifier) {
+        Column(Modifier.fadingVerticalScroll()) { recovery() }
+        ConversationEmptyMessage(state, verticalPadding = 0.dp)
+    }
+}
 
 /** Wires the conversation-owned recovery actions consistently in empty and populated timelines. */
 @Composable
@@ -154,7 +168,7 @@ internal fun GroupRecoveryCard(
         if (readFailed) {
             Text(
                 stringResource(R.string.group_recovery_check_failed),
-                style = MaterialTheme.typography.bodyMedium.copy(textAlign = TextAlign.Center),
+                style = MaterialTheme.typography.bodyMedium,
             )
             WhiteNoiseButton(onClick = onRetry, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.retry))
@@ -175,7 +189,7 @@ internal fun GroupRecoveryCard(
     }
 }
 
-/** One centered line of the engine's recovery status, shown only while [visible]. */
+/** One line of the engine's recovery status, shown only while [visible]. */
 @Composable
 @Suppress("FunctionNaming")
 private fun RecoveryStatusLine(
@@ -183,7 +197,7 @@ private fun RecoveryStatusLine(
     visible: Boolean,
 ) {
     if (!visible) return
-    Text(stringResource(text), style = MaterialTheme.typography.bodyMedium.copy(textAlign = TextAlign.Center))
+    Text(stringResource(text), style = MaterialTheme.typography.bodyMedium)
 }
 
 /**
@@ -200,14 +214,14 @@ private fun GroupConvergenceParkedNotice(
     if (!convergence.parked) return
     Text(
         stringResource(R.string.group_convergence_parked),
-        style = MaterialTheme.typography.bodyMedium.copy(textAlign = TextAlign.Center),
+        style = MaterialTheme.typography.bodyMedium,
     )
     convergence.retryFailure?.takeUnless { convergence.retrying }?.let { failure ->
         Text(
             stringResource(failure),
             // The retry's outcome appears without focus moving, so TalkBack announces it politely.
             modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-            style = MaterialTheme.typography.bodyMedium.copy(textAlign = TextAlign.Center),
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.error,
         )
     }
@@ -238,7 +252,7 @@ private fun GroupHistoryNotice(
     val wording = if (rejoined) R.string.group_history_before_rejoin else R.string.group_history_may_be_incomplete
     Text(
         stringResource(wording),
-        style = MaterialTheme.typography.bodyMedium.copy(textAlign = TextAlign.Center),
+        style = MaterialTheme.typography.bodyMedium,
     )
     // Only the user may accept that this history may stay incomplete.
     if (status.historyNoticeIds.isNotEmpty()) {
@@ -248,7 +262,7 @@ private fun GroupHistoryNotice(
     }
 }
 
-/** Applies prototype timeline-notice chrome to the retained native recovery controls. */
+/** Gives the callout the timeline's section spacing above and below adjacent rows. */
 @Composable
 @Suppress("FunctionNaming")
 private fun RecoveryNoticeSurface(
@@ -256,24 +270,13 @@ private fun RecoveryNoticeSurface(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Box(
-        modifier = modifier.fillMaxWidth().padding(vertical = 24.dp),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(horizontal = WhiteNoiseSpacing.NoticeHorizontalInset, vertical = WhiteNoiseSpacing.Section),
         contentAlignment = Alignment.Center,
     ) {
-        Surface(
-            // The prototype's notice hugs its text up to 440 dp rather than filling the row.
-            modifier = Modifier.widthIn(max = 440.dp),
-            shape = MaterialTheme.shapes.large,
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
-            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            border = amoledOutlineBorder(),
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                content = content,
-            )
-        }
+        WhiteNoiseCallout(modifier = Modifier.widthIn(max = 440.dp), content = content)
     }
 }
 
@@ -295,7 +298,7 @@ private fun GroupRejoinInvitationDialog(
     val currentOnConfirm = rememberUpdatedState(onConfirm)
     val currentOnDecline = rememberUpdatedState(onDecline)
     key(invitation, busy) {
-        AnimatedAlertDialog(
+        WhiteNoiseAlertDialog(
             onDismissRequest = { if (!busy) onDismiss() },
             dismissEnabled = { !busy },
             title = { Text(stringResource(R.string.group_rejoin_title)) },

@@ -1,0 +1,63 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StatePage.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "StatePage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StatePage.kt",
+        "anchor": "fun StatePage(",
+        "test_ids": [
+          "CHL-001",
+          "INT-003",
+          "INT-004",
+          "INT-012"
+        ]
+      },
+      {
+        "surface": "StateProgressPage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StatePage.kt",
+        "anchor": "fun StateProgressPage(",
+        "test_ids": [
+          "INT-003",
+          "INT-004",
+          "INT-012"
+        ]
+      },
+      {
+        "surface": "StateContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StatePage.kt",
+        "anchor": "fun StateContent(",
+        "test_ids": [
+          "INT-003",
+          "INT-004",
+          "INT-012"
+        ]
+      },
+      {
+        "surface": "ActionLabel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StatePage.kt",
+        "anchor": "fun ActionLabel(",
+        "test_ids": [
+          "INT-003",
+          "INT-004",
+          "INT-012"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Scroll boundaries: StatePage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StatePage.kt",
+        "anchor": ".whiteNoiseVerticalScroll(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

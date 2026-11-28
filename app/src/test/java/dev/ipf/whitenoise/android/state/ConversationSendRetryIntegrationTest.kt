@@ -250,7 +250,7 @@ class ConversationSendRetryIntegrationTest {
                         revisions += Triple(original, text, token)
                         pendingLocalSend()
                     },
-                    statusReader = { _, _, _ -> LocalSendStatusFfi.Queued },
+                    statusReader = { _, _, _ -> LocalSendStatusFfi.Queued("11".repeat(32)) },
                     originalSummary = successfulSendSummary(),
                 )
             try {
@@ -377,7 +377,7 @@ class ConversationSendRetryIntegrationTest {
                     },
                     { _, _, _ ->
                         reads += 1
-                        if (reads == 1) LocalSendStatusFfi.Rejected else LocalSendStatusFfi.Queued
+                        if (reads == 1) LocalSendStatusFfi.Rejected else LocalSendStatusFfi.Queued("11".repeat(32))
                     },
                 )
             try {
@@ -459,7 +459,7 @@ class ConversationSendRetryIntegrationTest {
                         editCalls += 1
                         pendingLocalSend()
                     },
-                    { _, _, _ -> LocalSendStatusFfi.Queued },
+                    { _, _, _ -> LocalSendStatusFfi.Queued("11".repeat(32)) },
                     state,
                 )
             try {
@@ -604,7 +604,7 @@ class ConversationSendRetryIntegrationTest {
                     if (editPublished) {
                         publishedNativeEditStatus("edit-id")
                     } else {
-                        LocalSendStatusFfi.Queued
+                        LocalSendStatusFfi.Queued("11".repeat(32))
                     }
                 })
             try {
@@ -655,7 +655,7 @@ class ConversationSendRetryIntegrationTest {
                         editToken = token
                         pendingLocalSend(listOf("edit-id"))
                     },
-                    { _, _, _ -> LocalSendStatusFfi.EngineOwned },
+                    { _, _, _ -> LocalSendStatusFfi.EngineOwned("11".repeat(32)) },
                 )
             try {
                 controller.retryMembers()
@@ -858,7 +858,7 @@ class ConversationSendRetryIntegrationTest {
                         if (reads == 1) {
                             firstRead.complete(Unit)
                             releaseRead.await()
-                            LocalSendStatusFfi.Queued
+                            LocalSendStatusFfi.Queued("11".repeat(32))
                         } else {
                             publishedNativeEditStatus("edit-id")
                         }
@@ -937,7 +937,11 @@ class ConversationSendRetryIntegrationTest {
                     },
                     { _, _, _ ->
                         statusReads += 1
-                        if (statusReads == 1) LocalSendStatusFfi.Rejected else LocalSendStatusFfi.Queued
+                        if (statusReads == 1) {
+                            LocalSendStatusFfi.Rejected
+                        } else {
+                            LocalSendStatusFfi.Queued("11".repeat(32))
+                        }
                     },
                 )
             try {
@@ -1108,7 +1112,7 @@ class ConversationSendRetryIntegrationTest {
                         editReturn.await()
                         throw MarmotKitException.Runtime("old account admission failed")
                     },
-                    statusReader = { _, _, _ -> LocalSendStatusFfi.Queued },
+                    statusReader = { _, _, _ -> LocalSendStatusFfi.Queued("11".repeat(32)) },
                     state = state,
                 )
             try {
@@ -1448,6 +1452,7 @@ class ConversationSendRetryIntegrationTest {
             val appState = appState()
             appState.setDraft(GROUP_ID, TextFieldValue("typed"))
             val releasePublish = CompletableDeferred<Unit>()
+            val settlements = mutableListOf<Boolean>()
             var pendingShown = 0
             val controller =
                 ConversationController(
@@ -1468,6 +1473,7 @@ class ConversationSendRetryIntegrationTest {
                     expectedDraftText = "typed",
                     payload = "typed spoken",
                     onPendingShown = { pendingShown += 1 },
+                    onTextSendSettled = { settlements.add(it) },
                 )
 
             try {
@@ -1478,10 +1484,12 @@ class ConversationSendRetryIntegrationTest {
 
                 assertEquals(1, pendingShown)
                 assertEquals(MessageStatus.Pending, controller.timeline.single().status)
+                assertTrue(settlements.isEmpty())
                 assertFalse(send.isCompleted)
 
                 releasePublish.complete(Unit)
                 assertTrue(send.await())
+                assertEquals(listOf(true), settlements)
             } finally {
                 releasePublish.complete(Unit)
                 appState.detachConversationController(controller)
@@ -1497,9 +1505,10 @@ class ConversationSendRetryIntegrationTest {
                     MarmotKitException.Publish("send event timed out"),
                 )
 
-            failures.forEach { failure ->
+            failures.forEachIndexed { index, failure ->
                 val appState = appState()
                 appState.setDraft(GROUP_ID, TextFieldValue("typed"))
+                val settlements = mutableListOf<Boolean>()
                 val reply = timelineAppMessage(REPLY_MESSAGE_ID)
                 val controller =
                     ConversationController(
@@ -1521,11 +1530,13 @@ class ConversationSendRetryIntegrationTest {
                         expectedDraftText = "typed",
                         payload = "spoken reply",
                         replyToMessageIdHex = REPLY_MESSAGE_ID,
+                        onTextSendSettled = { settlements.add(it) },
                     )
 
                 try {
                     assertFalse(appState.sendDictationTranscriptIfOriginUnchanged(request))
                     assertEquals(reply, controller.replyingTo)
+                    assertEquals(if (index == 0) listOf(false) else emptyList(), settlements)
                 } finally {
                     appState.detachConversationController(controller)
                 }
@@ -3164,6 +3175,7 @@ class ConversationSendRetryIntegrationTest {
             )
         }
 
+    /** An accepted-pending send settles the projection that arrived before the send returned. */
     @Test
     fun acceptedPendingSendReturnSettlesAProjectionThatArrivedFirst() =
         runTest {
@@ -3184,7 +3196,7 @@ class ConversationSendRetryIntegrationTest {
                     initialGroup = group(),
                     initialMemberSnapshot = memberSnapshot(),
                     textPublisher = { _, _, _, _ ->
-                        controller.testApplyLiveTimelineChangesAndRegisterStreams(
+                        controller.testApplyLiveTimelineChanges(
                             listOf(
                                 TimelineMessageChangeFfi.Upsert(
                                     trigger = TimelineUpdateTriggerFfi.NEW_MESSAGE,
@@ -3325,6 +3337,7 @@ class ConversationSendRetryIntegrationTest {
             assertEquals(null, sent.record.retentionExpiresAt)
         }
 
+    /** The send-time retention hint survives its projection and a page refresh while MDK's expiry is pending. */
     @Test
     fun retentionHintSurvivesProjectionAndPageRefreshWhileExpiryIsPending() =
         runTest {
@@ -3342,7 +3355,7 @@ class ConversationSendRetryIntegrationTest {
                     initialGroup = group(disappearingMessageSecs = 30uL),
                     initialMemberSnapshot = memberSnapshot(),
                     textPublisher = { _, _, _, _ ->
-                        controller.testApplyLiveTimelineChangesAndRegisterStreams(
+                        controller.testApplyLiveTimelineChanges(
                             listOf(
                                 TimelineMessageChangeFfi.Upsert(
                                     trigger = TimelineUpdateTriggerFfi.NEW_MESSAGE,
@@ -3439,9 +3452,10 @@ class ConversationSendRetryIntegrationTest {
         }
 
     @Test
-    fun sendKeepsRetryingPastTheShortConnectWindowAndStaysPendingUntilAccepted() =
+    fun sendStaysPendingAcrossRepeatedConnectFailuresUntilAccepted() =
         runTest {
             val appState = appState()
+            val acceptingAttempt = 4
             var attempts = 0
             lateinit var controller: ConversationController
             controller =
@@ -3452,7 +3466,7 @@ class ConversationSendRetryIntegrationTest {
                     textPublisher = { _, _, _, _ ->
                         attempts += 1
                         assertEquals(MessageStatus.Pending, controller.timeline.single().status)
-                        if (attempts <= SEND_RETRY_ATTEMPTS) {
+                        if (attempts < acceptingAttempt) {
                             throw MarmotKitException.Publish("connect relay failed")
                         }
                         SendSummaryFfi(
@@ -3466,7 +3480,7 @@ class ConversationSendRetryIntegrationTest {
 
             controller.send("hello")
 
-            assertEquals(SEND_RETRY_ATTEMPTS + 1, attempts)
+            assertEquals(acceptingAttempt, attempts)
             assertEquals(MessageStatus.Sent, controller.timeline.single().status)
             assertEquals(null, appState.toast)
         }
@@ -3823,6 +3837,238 @@ class ConversationSendRetryIntegrationTest {
             assertEquals("another chat's failure is still true", failureNotice, appState.toast)
         }
 
+    /** The bubble and reply consumption precede the caller callbacks, which precede admission and acceptance. */
+    @Test
+    fun firstSendRunsPresentationCallbacksBeforeAdmissionAndDurableAcceptance() =
+        runTest {
+            val appState = appState()
+            val events = mutableListOf<String>()
+            lateinit var controller: ConversationController
+            controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { replyTarget, _, _, text ->
+                        events += "publish:$replyTarget:$text"
+                        successfulSendSummary()
+                    },
+                )
+            controller.replyingTo = timelineAppMessage(REPLY_MESSAGE_ID)
+
+            controller.send(
+                text = "  ordered  ",
+                onAccepted = { events += "accepted" },
+                onTerminalFailure = { events += "terminal" },
+                onPresentationAccepted = { key ->
+                    val row = controller.timeline.single()
+                    assertEquals(key, row.id)
+                    assertEquals("ordered", row.record.plaintext)
+                    assertEquals(MessageStatus.Pending, row.status)
+                    assertNull("the reply is consumed before the caller hears of the bubble", controller.replyingTo)
+                    events += "presented"
+                },
+                onDurablyAccepted = { events += "durable" },
+            )
+
+            assertEquals(listOf("presented", "accepted", "publish:$REPLY_MESSAGE_ID:ordered", "durable"), events)
+            assertEquals(MessageStatus.Sent, controller.timeline.single().status)
+            assertTrue(controller.optimisticSendPhases.isEmpty())
+        }
+
+    /** A definite first-send failure keeps a Failed row and reports it before the terminal callback runs. */
+    @Test
+    fun definiteFirstSendFailureReportsBeforeTheTerminalCallback() =
+        runTest {
+            val appState = appState()
+            val events = mutableListOf<String>()
+            lateinit var controller: ConversationController
+            var presentedKey: String? = null
+            controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ ->
+                        events += "publish"
+                        throw MarmotKitException.Publish("relay rejected event")
+                    },
+                )
+
+            controller.send(
+                text = "fails",
+                onAccepted = { events += "accepted" },
+                onTerminalFailure = {
+                    assertNotNull("the failure notice precedes the terminal callback", appState.toast)
+                    assertEquals(MessageStatus.Failed, controller.timeline.single().status)
+                    events += "terminal"
+                },
+                onPresentationAccepted = { presentedKey = it },
+                onDurablyAccepted = { events += "durable" },
+            )
+
+            assertEquals(listOf("accepted", "publish", "terminal"), events)
+            val failed = controller.timeline.single()
+            assertEquals("the failed row keeps the optimistic key", presentedKey, failed.id)
+            assertEquals(OptimisticSendPhase.FAILED, controller.optimisticSendPhases[failed.id])
+        }
+
+    /** Eviction during the first send drops the row and membership without a failure notice. */
+    @Test
+    fun evictionDuringFirstSendRemovesTheBubbleAndEndsWithTheTerminalCallback() =
+        runTest {
+            val appState = appState()
+            val events = mutableListOf<String>()
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ -> throw IllegalStateException("GroupStateError::UseAfterEviction") },
+                )
+
+            controller.send(
+                text = "evicted",
+                onAccepted = { events += "accepted" },
+                onTerminalFailure = { events += "terminal" },
+                onDurablyAccepted = { events += "durable" },
+            )
+
+            assertEquals(listOf("accepted", "terminal"), events)
+            assertTrue(controller.timeline.isEmpty())
+            assertFalse(controller.isSelfMember)
+            assertNull(appState.toast)
+        }
+
+    /** An ambiguous first send stays Pending and runs neither the terminal nor the durable callback. */
+    @Test
+    fun ambiguousFirstSendRunsNoTerminalOrDurableCallback() =
+        runTest {
+            val appState = appState()
+            val events = mutableListOf<String>()
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ -> throw MarmotKitException.Publish("send event timed out") },
+                )
+
+            controller.send(
+                text = "uncertain",
+                onAccepted = { events += "accepted" },
+                onTerminalFailure = { events += "terminal" },
+                onDurablyAccepted = { events += "durable" },
+            )
+
+            assertEquals(listOf("accepted"), events)
+            val pending = controller.timeline.single()
+            assertEquals(MessageStatus.Pending, pending.status)
+            assertEquals(OptimisticSendPhase.ACCEPTANCE_UNKNOWN, controller.optimisticSendPhases[pending.id])
+        }
+
+    /** A manual retry keeps the row's key and republishes the text and reply target its first send resolved. */
+    @Test
+    fun manualRetryKeepsTheRowIdentityAndRepublishesTheCapturedReply() =
+        runTest {
+            val appState = appState()
+            val published = mutableListOf<Pair<String?, String>>()
+            lateinit var controller: ConversationController
+            var retryRow: TimelineMessage? = null
+            controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { replyTarget, _, _, text ->
+                        published += replyTarget to text
+                        if (published.size == 1) throw MarmotKitException.Publish("relay rejected event")
+                        retryRow = controller.timeline.single()
+                        successfulSendSummary()
+                    },
+                )
+            controller.replyingTo = timelineAppMessage(REPLY_MESSAGE_ID)
+            controller.send("reply once")
+            val failed = controller.timeline.single()
+            controller.replyingTo = timelineAppMessage("e5".repeat(32))
+
+            controller.retryFailedSend(failed)
+
+            assertEquals(listOf(REPLY_MESSAGE_ID to "reply once", REPLY_MESSAGE_ID to "reply once"), published)
+            assertEquals(failed.id, retryRow?.id)
+            assertEquals(failed.record.messageIdHex, retryRow?.record?.messageIdHex)
+            assertEquals(MessageStatus.Pending, retryRow?.status)
+            assertEquals(MessageStatus.Sent, controller.timeline.single().status)
+            assertTrue(controller.optimisticSendPhases.isEmpty())
+        }
+
+    /** A retry whose send MDK already committed settles on that row without publishing again. */
+    @Test
+    fun retryOfACommittedProjectionCompletesDurableAcceptanceWithoutPublishing() =
+        runTest {
+            val appState = appState()
+            var attempts = 0
+            var durable = 0
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ ->
+                        attempts += 1
+                        throw MarmotKitException.Publish("relay rejected event")
+                    },
+                )
+            controller.send("hello", onDurablyAccepted = { durable += 1 })
+            val failed = controller.timeline.single()
+            assertNotNull(appState.toast)
+            val committed = projectedMessage(failed.record.recordedAt, null, null, sourceMessageIdHex = null)
+            applyProjection(controller, committed)
+
+            controller.retryFailedSend(failed)
+
+            assertEquals("a committed send is never published again", 1, attempts)
+            assertEquals(1, durable)
+            assertNull("durable acceptance retires the first attempt's notice", appState.toast)
+            assertFalse(failed.id in controller.optimisticMessages)
+            assertFalse(failed.id in controller.optimisticSendPhases)
+        }
+
+    /** Cancelling a retry while it waits to reconnect removes the row and publishes nothing more. */
+    @Test
+    fun cancellingARetryDuringBackoffRemovesTheRowWithoutPublishing() =
+        runTest {
+            val appState = appState()
+            val retryAttemptFailed = CompletableDeferred<Unit>()
+            var attempts = 0
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ ->
+                        attempts += 1
+                        if (attempts == 1) throw MarmotKitException.Publish("relay rejected event")
+                        retryAttemptFailed.complete(Unit)
+                        throw MarmotKitException.Publish("connect relay failed")
+                    },
+                )
+            controller.send("cancel my retry")
+            val failed = controller.timeline.single()
+
+            val retry = async { controller.retryFailedSend(failed) }
+            retryAttemptFailed.await()
+            yield()
+            assertEquals(MessageStatus.Pending, controller.timeline.single().status)
+            assertTrue(controller.deleteMessage(controller.timeline.single().record, presentFailure = false))
+            retry.await()
+
+            assertEquals(2, attempts)
+            assertTrue(controller.timeline.isEmpty())
+            assertEquals(OptimisticSendPhase.CANCELLED, controller.optimisticSendPhases[failed.id])
+            assertFalse(failed.id in controller.discardedDuringRetry)
+        }
+
     private fun successfulSendSummary() =
         SendSummaryFfi(
             published = 1u,
@@ -3831,6 +4077,7 @@ class ConversationSendRetryIntegrationTest {
             maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
         )
 
+    /** A controller whose publisher projects the send before returning an accepted-pending summary. */
     private fun acceptedPendingConversationController(appState: WhiteNoiseAppState): ConversationController {
         lateinit var controller: ConversationController
         controller =
@@ -3839,7 +4086,7 @@ class ConversationSendRetryIntegrationTest {
                 initialGroup = group(),
                 initialMemberSnapshot = memberSnapshot(),
                 textPublisher = { _, _, _, _ ->
-                    controller.testApplyLiveTimelineChangesAndRegisterStreams(
+                    controller.testApplyLiveTimelineChanges(
                         listOf(
                             TimelineMessageChangeFfi.Upsert(
                                 trigger = TimelineUpdateTriggerFfi.NEW_MESSAGE,
@@ -3953,7 +4200,7 @@ class ConversationSendRetryIntegrationTest {
     ) = nativeEditControllerWithStatus(
         originalReturn = originalReturn,
         publisher = publisher,
-        statusReader = { _, _, _ -> LocalSendStatusFfi.Queued },
+        statusReader = { _, _, _ -> LocalSendStatusFfi.Queued("11".repeat(32)) },
     )
 
     private fun nativeEditControllerWithStatus(
@@ -4156,6 +4403,8 @@ class ConversationSendRetryIntegrationTest {
         retentionExpiresAt: ULong?,
         sourceMessageIdHex: String? = "d4".repeat(32),
     ) = TimelineMessageRecordFfi(
+        agentItem = null,
+        agentItemFirstEventMissing = false,
         clientToken = null,
         messageIdHex = CONFIRMED_MESSAGE_ID,
         sourceMessageIdHex = sourceMessageIdHex,
@@ -4177,7 +4426,7 @@ class ConversationSendRetryIntegrationTest {
         replyPreview = null,
         mediaJson = null,
         media = emptyList(),
-        agentTextStreamJson = null,
+        thread = null,
         poll = null,
         groupSystem = null,
         hasReports = false,
@@ -4244,11 +4493,12 @@ private fun attachedChatsController(
         chatsController.applyChatListRow(row)
     }
 
+/** Delivers [message] to [controller] as a new live message. */
 private fun applyProjection(
     controller: ConversationController,
     message: TimelineMessageRecordFfi,
 ) {
-    controller.testApplyLiveTimelineChangesAndRegisterStreams(
+    controller.testApplyLiveTimelineChanges(
         listOf(
             TimelineMessageChangeFfi.Upsert(
                 trigger = TimelineUpdateTriggerFfi.NEW_MESSAGE,

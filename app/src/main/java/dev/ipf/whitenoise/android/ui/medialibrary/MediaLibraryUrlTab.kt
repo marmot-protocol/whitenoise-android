@@ -24,11 +24,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -37,9 +35,11 @@ import dev.ipf.whitenoise.android.media.MediaInventory
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
 import dev.ipf.whitenoise.android.ui.conversation.media.presentMediaLaunchFailure
 import dev.ipf.whitenoise.android.ui.settings.rememberSettingsNativeSurface
 import dev.ipf.whitenoise.android.ui.settings.settingsCardMorph
+import dev.ipf.whitenoise.android.ui.theme.Radii
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import java.net.URI
@@ -54,7 +54,7 @@ internal fun UrlLibraryTab(
     onJumpToMessage: (String) -> Unit,
 ) {
     val context = LocalContext.current
-    val clipboard = LocalClipboardManager.current
+    val clipboard = rememberClipboardCopier()
     MonthSectionedColumn(
         sections = tiles.urlSections,
         listState = listState,
@@ -83,7 +83,7 @@ internal fun UrlLibraryTab(
                 }
             },
             onCopy = {
-                clipboard.setText(AnnotatedString(entry.url))
+                clipboard.copy(entry.url)
             },
         )
     }
@@ -123,9 +123,9 @@ private fun UrlLibraryRow(
             modifier =
                 Modifier
                     .size(40.dp)
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(RoundedCornerShape(Radii.sm))
                     .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .amoledSurfaceBorder(RoundedCornerShape(8.dp)),
+                    .amoledSurfaceBorder(RoundedCornerShape(Radii.sm)),
             contentAlignment = Alignment.Center,
         ) {
             Icon(

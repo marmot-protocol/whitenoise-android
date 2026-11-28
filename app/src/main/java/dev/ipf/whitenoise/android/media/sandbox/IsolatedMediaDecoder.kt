@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Looper
 import android.os.Process
 import dev.ipf.whitenoise.android.media.MediaTrustDomain
+import java.io.FileNotFoundException
 
 /** All production still-image codec calls enter the permissionless service, never a local fallback. */
 @Suppress("TooManyFunctions") // One process-owned facade for the complete platform codec boundary.
@@ -195,7 +196,8 @@ internal object IsolatedMediaDecoder {
         resolver: ContentResolver,
         uri: Uri,
         edge: Int,
-    ): MediaProbe? = safely { mediaTransport?.probeUri(resolver, uri, edge) }
+        playbackColors: Boolean = false,
+    ): MediaProbe? = safely { mediaTransport?.probeUri(resolver, uri, edge, playbackColors) }
 
     /** Blocking compressed-audio work has a separate bounded analysis lane. */
     internal fun openAudioStream(file: java.io.File): IsolatedAvStream {
@@ -216,11 +218,11 @@ internal object IsolatedMediaDecoder {
         positionMs: Long,
         edge: Int = 1280,
     ): MediaProbe? =
-        safely {
+        safely(preserveMissingFile = true) {
             if (positionMs !in 0..MAX_MEDIA_DURATION_MS) {
                 null
             } else {
-                mediaTransport?.probeUriAt(resolver, uri, positionMs, edge)
+                mediaTransport?.probeUriAt(resolver, uri, positionMs, edge, playbackColors = true)
             }
         }
 
@@ -321,10 +323,12 @@ internal object IsolatedMediaDecoder {
     /**
      * Runs [block] against the installed transport, refusing isolated ones on the main thread and mapping ordinary
      * failures to null. Admission-busy faults always escape so owners can park on availability, startup faults only
-     * when [preserveStartupFaults] is set, and an interrupt is restored before returning null.
+     * when [preserveStartupFaults] is set. Paused seeks can opt into an attributable missing-file error.
+     * Restore interrupt status before returning null.
      */
     private fun <T> safely(
         preserveStartupFaults: Boolean = false,
+        preserveMissingFile: Boolean = false,
         block: (MediaDecodeTransport) -> T?,
     ): T? =
         try {
@@ -342,6 +346,8 @@ internal object IsolatedMediaDecoder {
         } catch (interrupted: InterruptedException) {
             Thread.currentThread().interrupt()
             null
+        } catch (missing: FileNotFoundException) {
+            if (preserveMissingFile) throw missing else null
         } catch (_: Exception) {
             null
         } catch (_: OutOfMemoryError) {

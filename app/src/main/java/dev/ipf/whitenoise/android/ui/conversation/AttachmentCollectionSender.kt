@@ -16,7 +16,9 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftSendClearToken
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.PendingAttachment
+import dev.ipf.whitenoise.android.state.RetainedDraftHandling
 import dev.ipf.whitenoise.android.state.attachmentCollections
+import dev.ipf.whitenoise.android.state.clearDraftAfterSuccessfulSend
 import dev.ipf.whitenoise.android.state.shouldAcceptMediaUploadForAccount
 import dev.ipf.whitenoise.android.state.skipItems
 import dev.ipf.whitenoise.android.state.withChunkState
@@ -49,6 +51,8 @@ internal class CollectionRun(
     val draftClear: DraftSendClearToken? = null,
     val onFirstSeeded: () -> Unit = {},
     private val pickScope: String? = null,
+    /** PDFs the person chose to send with their metadata, for this run only; a resumed run asks again. */
+    val keepPdfMetadata: Set<Uri> = emptySet(),
 ) {
     /**
      * The pick an item's slot id or document URI is drafted under: unchanged for a send from the composer, scoped to
@@ -79,6 +83,20 @@ internal class CollectionRun(
         itemIds.forEach(images::remove)
         uris.forEach(documents::remove)
     }
+}
+
+/**
+ * Marks a queued send as a collection chunk. The caption chunk also carries [captionOwner], the composer text
+ * captured at Send, so its admission can record which draft save a restart may clear the caption from.
+ */
+private fun markCollectionChunk(
+    controller: ConversationController,
+    queued: ConversationController.QueuedAttachmentSend,
+    captionOwner: DraftSendClearToken?,
+) {
+    val retained = controller.retainedMediaUploads.get(queued.key) ?: return
+    retained.draftHandling = RetainedDraftHandling.COLLECTION_CHUNK
+    if (captionOwner != null) retained.draftSendClearToken = captionOwner
 }
 
 /** One chunk's attachments in send order, and the items that could not be prepared. */
@@ -175,6 +193,7 @@ internal class AttachmentCollectionSender(
         if (prepared.skipped.isNotEmpty()) {
             persist(run) { op, now -> op.skipItems(prepared.skipped, now) }
             appState.presentSkippedAttachments(prepared.skipped.size, prepared.reason)
+            appState.retainedConversationStates.recordNativeComposerCleanup(run.accountRef, run.groupIdHex)
         }
         val current = sender
         var seeded: ConversationController.QueuedAttachmentSend? = null
@@ -206,6 +225,7 @@ internal class AttachmentCollectionSender(
             }
             return
         }
+        markCollectionChunk(current.controller, queued, run.draftClear.takeIf { chunk.carriesCaption })
         val recorded = registry.recordChunkToken(run.operationId, chunk.id, queued.tempId)
         // A cancel, pause or discard that landed while the send was being seeded leaves the chunk without this
         // token, so the send is withdrawn before any upload, as is one whose token the journal could not hold.
@@ -225,15 +245,26 @@ internal class AttachmentCollectionSender(
         current.controller.uploadQueued(queued) { onChunkAccepted(run, chunk) }
     }
 
-    /** Records a durable acceptance, and clears the composer draft once the caption-bearing chunk is MDK's. */
+    /** Records native ownership and arranges consumption of the original stored files after the journal write. */
     private fun onChunkAccepted(
         run: CollectionRun,
         chunk: CollectionChunk,
     ) {
-        registry.update(run.operationId) {
-            it.withChunkState(chunk.id, CollectionChunkState.ACCEPTED, CollectionItemState.PUBLISHED, registry.now())
+        val accepted =
+            registry.update(run.operationId) {
+                it.withChunkState(
+                    chunk.id,
+                    CollectionChunkState.ACCEPTED,
+                    CollectionItemState.PUBLISHED,
+                    registry.now(),
+                )
+            }
+        if (chunk.carriesCaption && accepted != null) {
+            run.draftClear?.let { appState.clearDraftAfterSuccessfulSend(it, textOnly = true) }
         }
-        if (chunk.carriesCaption) run.draftClear?.let(appState::clearDraftAfterSuccessfulSend)
+        if (accepted?.needsStoredDraftCleanup == true) {
+            appState.launchMutation { appState.finishCollectionDraftCleanup(run.operationId) }
+        }
     }
 
     /**
@@ -271,7 +302,13 @@ internal class AttachmentCollectionSender(
                             listOfNotNull(run.preparedDocument(uri)?.let { uri to it }).toMap(),
                         allowFileBacked = true,
                         staging = FileBackedSendStaging { staged += it },
+                        keepPdfMetadata = run.keepPdfMetadata,
                         pickKey = run::pickKey,
+                        ownedMime =
+                            item.storedDraft
+                                ?.takeIf { it.fileBacked }
+                                ?.let { mapOf(uri to it.mediaType) }
+                                .orEmpty(),
                     )
                 val attachment = (prepared.images + prepared.documents.attachments).singleOrNull()
                 val bytes = attachment?.inMemoryBytes?.size?.toLong() ?: 0L
@@ -463,6 +500,7 @@ internal suspend fun ConversationMediaSender.driveResumedCollection(
     sessionEpoch: Long,
     lease: PrivateShareSendLease?,
     original: ConversationMediaSender,
+    keepPdfMetadata: Set<Uri>,
 ) {
     val run =
         CollectionRun(
@@ -472,6 +510,7 @@ internal suspend fun ConversationMediaSender.driveResumedCollection(
             sessionEpoch,
             caption = null,
             pickScope = operation.id,
+            keepPdfMetadata = keepPdfMetadata,
         )
     val picks = operation.items.map { run.pickKey(if (it.kind == CollectionItemKind.MEDIA) it.id else it.uri) }
     val send = controller.beginOutgoingSend(picks, ownDraft = true)

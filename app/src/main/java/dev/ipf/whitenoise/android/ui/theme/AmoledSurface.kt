@@ -38,6 +38,15 @@ internal fun amoledSurfaceBorderStroke(width: Dp = 1.dp): BorderStroke? =
         null
     }
 
+/** The gray selection outline used by compact options on pure black surfaces. */
+@Composable
+internal fun amoledSelectedChipBorder(selected: Boolean): BorderStroke? =
+    if (selected && isAmoledSurfaceTheme()) {
+        BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+    } else {
+        null
+    }
+
 @Composable
 internal fun Modifier.amoledSurfaceBorder(
     shape: Shape,

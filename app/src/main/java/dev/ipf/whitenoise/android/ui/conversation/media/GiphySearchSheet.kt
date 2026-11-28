@@ -69,7 +69,6 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
-import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -113,7 +112,7 @@ internal fun GiphySearchSheet(
         remember(client, language) { { text -> client.search(text, language) } }
     val state = rememberGiphySearchState(query, retryAttempt, search)
 
-    WhiteNoiseModalBottomSheet(onDismissRequest = onDismiss, containerColor = amoledSheetContainerColor()) {
+    WhiteNoiseModalBottomSheet(onDismissRequest = onDismiss) {
         WhiteNoiseSheetHeader(stringResource(R.string.giphy_search_title), onClose = onDismiss)
         GiphySearchContent(
             searchField = searchField,

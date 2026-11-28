@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.common
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.ImageBitmap
 import dev.ipf.marmotkit.AppGroupRecordFfi
@@ -12,8 +13,11 @@ import dev.ipf.whitenoise.android.state.ChatListAvatarSeed
 import dev.ipf.whitenoise.android.state.ChatListAvatarSource
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.cacheKey
+import dev.ipf.whitenoise.android.state.durableDisplayAvatarKey
 import dev.ipf.whitenoise.android.state.isRenderable
+import dev.ipf.whitenoise.android.state.persistDisplayAvatar
 import dev.ipf.whitenoise.android.state.retainedAvatarBytesReader
+import dev.ipf.whitenoise.android.state.storedKey
 
 /**
  * Pixels and a legacy URL belong to the same current, explicitly owned presentation. [animationKey] is
@@ -176,7 +180,7 @@ internal fun rememberGroupAvatarClassification(
     val key = accountRef?.let { asset.takeIf { it.isRenderable() }?.cacheKey(it) }
     val pins =
         LocalPreparedGroupAvatarPixels.current?.takeIf {
-            it.accountRef == accountRef && it.runtimeGeneration == appState.runtimeGeneration && it.lifetime == lifetime
+            it.matchesOwner(accountRef, appState.runtimeGeneration, lifetime)
         }
     return remember(appState, appState.runtimeGeneration, accountRef, lifetime, key, image) {
         key?.let(AvatarImageLoader::cachedAnimationClassification)
@@ -202,7 +206,24 @@ internal fun rememberSelectedDurableGroupAvatar(
 ): GroupAvatarPresentation {
     val key = accountRef?.let { asset.takeIf { it.isRenderable() }?.cacheKey(it) }
     val ownedSeed = seed?.takeIf { it.source == ChatListAvatarSource.DURABLE && it.key == key }
-    val image = rememberDurableAvatar(appState, asset, accountRef, domain) ?: ownedSeed?.image
+    val displayKey = if (personPicture) null else durableDisplayAvatarKey(accountRef, group.groupIdHex, asset)
+    val diskGeneration = displayKey?.let { appState.displayAvatars.generation(it.accountRef) }
+    val image =
+        rememberDurableAvatar(
+            appState,
+            asset,
+            accountRef,
+            domain,
+            seededImage = ownedSeed?.image,
+            displayKey = displayKey,
+        )
+    // Live replacements and prepared rows can adopt exact pixels without starting their own load.
+    LaunchedEffect(displayKey, image) {
+        if (displayKey == null || diskGeneration == null || image == null) return@LaunchedEffect
+        if (AvatarImageLoader.cachedImage(displayKey.storedKey()) === image) {
+            appState.persistDisplayAvatar(displayKey, diskGeneration, keepExisting = true)
+        }
+    }
     val classification = rememberGroupAvatarClassification(appState, asset, accountRef, image, ownedSeed)
     return appState.durableGroupAvatarPresentation(group, asset, accountRef, image, personPicture, classification)
 }

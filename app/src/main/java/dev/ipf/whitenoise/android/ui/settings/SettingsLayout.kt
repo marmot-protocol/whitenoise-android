@@ -1,7 +1,5 @@
 package dev.ipf.whitenoise.android.ui.settings
 
-import android.os.Build
-import android.widget.Toast
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -39,18 +37,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.AppRevision
 import dev.ipf.whitenoise.android.BuildConfig
@@ -58,12 +51,16 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.AdaptiveContent
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseTextFieldContainerColor
+import dev.ipf.whitenoise.android.ui.common.SectionHeader
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
+import dev.ipf.whitenoise.android.ui.common.motionBoundsOnScreen
+import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationFooter
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseElevation
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -155,7 +152,7 @@ internal fun SettingsList(
         WhiteNoiseLazyColumn(
             modifier =
                 modifier.fillMaxSize().testTag(listTag).onGloballyPositioned {
-                    page?.reportViewport(viewport, it.settingsMorphBounds(view))
+                    page?.reportViewport(viewport, it.motionBoundsOnScreen(view))
                 },
             state = state,
             contentPadding = contentPadding,
@@ -201,31 +198,36 @@ internal fun SettingsList(
 /** Section label above a settings group at the 32 dp heading line, announced as a heading. */
 @Suppress("FunctionNaming")
 @Composable
-internal fun SettingsSection(title: String) {
-    Text(
+internal fun SettingsSection(
+    title: String,
+    explanation: String? = null,
+) {
+    SectionHeader(
         text = title,
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .semantics { heading() }
-                .padding(
-                    start = WhiteNoiseSpacing.SettingsSectionInset,
-                    end = WhiteNoiseSpacing.SettingsSectionInset,
-                    top = if (LocalSettingsList.current) WhiteNoiseSpacing.FormField else WhiteNoiseSpacing.Section,
-                    bottom = if (LocalSettingsList.current) 0.dp else WhiteNoiseSpacing.Related,
-                ),
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        style = MaterialTheme.typography.labelLarge,
+        modifier = Modifier.explainOnLongPress(explanation?.let { Explanation(title, it) }),
+        contentPadding =
+            PaddingValues(
+                start = WhiteNoiseSpacing.SettingsSectionInset,
+                top = if (LocalSettingsList.current) WhiteNoiseSpacing.FormField else WhiteNoiseSpacing.Section,
+                end = WhiteNoiseSpacing.SettingsSectionInset,
+                bottom = if (LocalSettingsList.current) 0.dp else WhiteNoiseSpacing.Related,
+            ),
     )
 }
 
-/** Helper copy beneath a group at the same 32 dp content line, in the quiet supporting style. */
+/**
+ * Helper copy beneath a group at the same 32 dp content line, in the quiet supporting style. [modifier] wraps the
+ * text, so semantics meant for the copy itself must merge descendants to reach it.
+ */
 @Suppress("FunctionNaming")
 @Composable
-internal fun SettingsExplainer(text: String) {
+internal fun SettingsExplainer(
+    text: String,
+    modifier: Modifier = Modifier,
+) {
     Column(
         modifier =
-            Modifier
+            modifier
                 .fillMaxWidth()
                 .padding(
                     start = WhiteNoiseSpacing.SettingsSectionInset,
@@ -241,8 +243,7 @@ internal fun SettingsExplainer(text: String) {
 @Suppress("FunctionNaming")
 @Composable
 internal fun SettingsVersionFooter(versionName: String) {
-    val clipboard = LocalClipboardManager.current
-    val context = LocalContext.current
+    val clipboard = rememberClipboardCopier()
     val copyLabel = stringResource(R.string.copy)
     Box(
         modifier =
@@ -250,19 +251,14 @@ internal fun SettingsVersionFooter(versionName: String) {
                 .fillMaxWidth()
                 .heightIn(min = 48.dp)
                 .clickable(role = Role.Button, onClickLabel = copyLabel) {
-                    clipboard.setText(
-                        AnnotatedString(
-                            buildIdentity(
-                                versionName,
-                                BuildConfig.VERSION_CODE,
-                                AppRevision.FULL_SHA,
-                                AppRevision.SOURCE_PR,
-                            ),
+                    clipboard.copy(
+                        buildIdentity(
+                            versionName,
+                            BuildConfig.VERSION_CODE,
+                            AppRevision.FULL_SHA,
+                            AppRevision.SOURCE_PR,
                         ),
                     )
-                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-                        Toast.makeText(context, R.string.copied, Toast.LENGTH_SHORT).show()
-                    }
                 }.padding(WhiteNoiseSpacing.CompactScreenMargin)
                 .testTag("settings.version_footer"),
         contentAlignment = Alignment.Center,
@@ -308,15 +304,19 @@ internal fun SettingsCallout(
     )
 }
 
-/** Pinned action area above the navigation bar and keyboard; a Save button lives here. */
+/**
+ * Pinned action area above the navigation bar and keyboard, where a Save button lives. It takes the docked
+ * tint unless [elevated] is false, for a page whose own colour already sets the area apart.
+ */
 @Suppress("FunctionNaming")
 @Composable
 internal fun SettingsBottomAction(
     modifier: Modifier = Modifier,
     color: Color = MaterialTheme.colorScheme.surface,
-    tonalElevation: Dp = SettingsBottomActionElevation,
+    elevated: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val tonalElevation = if (elevated) WhiteNoiseElevation.Docked else WhiteNoiseElevation.None
     Surface(modifier = modifier, color = color, tonalElevation = tonalElevation) {
         Box(Modifier.fillMaxWidth().floatingDictationFooter()) {
             AdaptiveContent {
@@ -351,8 +351,6 @@ internal fun SettingsGroupPanel(
         Column(Modifier.fillMaxWidth(), content = content)
     }
 }
-
-private val SettingsBottomActionElevation = 2.dp
 
 /** Free-form content on the group surface at the screen margin, for panels that are not a row list. */
 @Suppress("FunctionNaming")

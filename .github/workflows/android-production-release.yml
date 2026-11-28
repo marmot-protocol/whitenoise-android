@@ -33,7 +33,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up JDK 17
-        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: '17'
@@ -41,7 +41,7 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
         with:
-          cache-read-only: true
+          cache-disabled: true
 
       - name: Read and validate version
         id: version
@@ -57,6 +57,9 @@ jobs:
             exit 1
           fi
           printf 'name=%s\n' "$version_name" >> "$GITHUB_OUTPUT"
+
+      - name: Require Stable MarmotKit
+        run: python3 -B scripts/check_marmotkit_release_channel.py
 
       - name: Require production release secrets
         shell: bash

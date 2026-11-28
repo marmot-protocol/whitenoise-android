@@ -3,15 +3,16 @@ package dev.ipf.whitenoise.android.ui.group
 import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasClickAction
-import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -45,10 +46,14 @@ class GroupMemberKeyCopyTest {
     fun transferAdminKeyCopiesWithoutPickingTheMember() {
         val picked = showTransferAdminSheet(peerName = PEER_NAME)
 
-        composeRule.onNodeWithTag("transfer_admin.key.$PEER", useUnmergedTree = true).performClick()
+        val key = composeRule.onNode(peerKey(), useUnmergedTree = true)
+        val shortKey = key.fetchSemanticsNode().config[SemanticsProperties.Text].joinToString("")
+        key.performTouchInput { click() }
         assertEquals(PEER_NPUB, clipText())
+        // A sheet row has no room for the grouped key, so copying leaves the short form in place.
+        key.assertTextEquals(shortKey)
         assertEquals(emptyList<String>(), picked)
-        composeRule.onNode(hasText(PEER_NAME), useUnmergedTree = true).performClick()
+        composeRule.onNode(hasText(PEER_NAME), useUnmergedTree = true).performTouchInput { click() }
         composeRule.waitForIdle()
         assertEquals(listOf(PEER), picked)
     }
@@ -64,17 +69,21 @@ class GroupMemberKeyCopyTest {
         composeRule
             .onAllNodes(hasText(PEER_NPUB.take(10), substring = true), useUnmergedTree = true)
             .assertCountEquals(1)
-        composeRule.onNodeWithTag("transfer_admin.key.$PEER", useUnmergedTree = true).performClick()
+        composeRule.onNode(peerKey(), useUnmergedTree = true).performTouchInput { click() }
         assertEquals(PEER_NPUB, clipText())
         assertEquals(emptyList<String>(), picked)
         composeRule
             .onNode(
-                hasClickAction() and hasAnyDescendant(hasTestTag("transfer_admin.key.$PEER")),
+                hasClickAction() and hasAnyDescendant(peerKey()),
                 useUnmergedTree = true,
             ).performTouchInput { click(centerLeft + Offset(1f, 0f)) }
         composeRule.waitForIdle()
         assertEquals(listOf(PEER), picked)
     }
+
+    private fun peerKey() =
+        hasText(PEER_NPUB.take(10), substring = true) and
+            SemanticsMatcher.keyIsDefined(SemanticsActions.CustomActions)
 
     /** Shows the transfer-admin sheet with one peer candidate named [peerName], returning the picks it records. */
     private fun showTransferAdminSheet(peerName: String?): List<String> {

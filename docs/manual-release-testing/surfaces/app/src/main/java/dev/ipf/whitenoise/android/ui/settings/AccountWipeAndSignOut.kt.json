@@ -27,7 +27,8 @@
         "anchor": "fun SignOutProgressDialog(",
         "test_ids": [
           "ACC-013",
-          "ACC-014"
+          "ACC-014",
+          "SET-072"
         ]
       },
       {
@@ -36,7 +37,8 @@
         "anchor": "fun SignOutSheet(",
         "test_ids": [
           "SET-001",
-          "ACC-009"
+          "ACC-009",
+          "SET-072"
         ]
       },
       {
@@ -68,7 +70,16 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountWipeAndSignOut.kt",
         "anchor": "fun ProfileKeyWipeConfirmationDialog(",
         "test_ids": [
-          "ACC-009"
+          "ACC-009",
+          "ACC-014"
+        ]
+      },
+      {
+        "surface": "ProfileKeyWipeConfirmationBody",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountWipeAndSignOut.kt",
+        "anchor": "fun ProfileKeyWipeConfirmationBody(",
+        "test_ids": [
+          "ACC-014"
         ]
       }
     ],

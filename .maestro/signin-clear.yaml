@@ -14,9 +14,9 @@ name: signin-clear
       visible: "Help Improve White Noise"
     commands:
       - back
-- assertVisible: "Sign Up"
-- assertVisible: "Sign In"
-- tapOn: "Sign In"
+- assertVisible: "Sign up"
+- assertVisible: "Sign in"
+- tapOn: "Sign in"
 - tapOn: "Private key"
 - inputText: "not-a-key"
 - hideKeyboard
@@ -30,6 +30,6 @@ name: signin-clear
 - assertNotVisible: "That doesn't look like a valid nsec or npub key."
 - assertVisible: "Enter your Nostr secret key to use an existing identity on this device."
 - tapOn: "Back"
-- assertVisible: "Sign Up"
-- assertVisible: "Sign In"
+- assertVisible: "Sign up"
+- assertVisible: "Sign in"
 - takeScreenshot: signin-clear

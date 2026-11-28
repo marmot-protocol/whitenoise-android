@@ -104,6 +104,7 @@ class ComposerToolbarHoldTest {
                 assertEquals(before.left, held.left, 1f)
                 assertEquals(before.top, held.top, 1f)
                 voice.performTouchInput {
+                    advanceEventTime(600)
                     moveBy(Offset(-12f, 0f))
                     up()
                 }
@@ -112,7 +113,33 @@ class ComposerToolbarHoldTest {
                 assertFalse(fixture.controller.isRecording)
                 assertEquals(1, fixture.stops)
                 assertEquals(1, fixture.cancels) // Successful finalization also disposes the recorder session.
+                assertEquals(1, fixture.immediateSends)
+            } finally {
+                fixture.controller.release()
+                fixture.dictation.cancel()
+                runCurrent()
+            }
+        }
+
+    @Test
+    fun systemCancellationDuringHoldKeepsTheTakeForReview() =
+        runTest {
+            val fixture = render(this)
+            try {
+                voice.performTouchInput { down(center) }
+                runCurrent()
+                composeRule.waitForIdle()
+                voice.performTouchInput {
+                    advanceEventTime(600)
+                    moveBy(Offset(-1f, 0f))
+                    cancel()
+                }
+                composeRule.waitForIdle()
+                advanceTimeBy(VoiceRecordingController.RECORDING_TAIL_MS)
+                runCurrent()
+                assertFalse(fixture.controller.isRecording)
                 assertEquals(1, fixture.completes)
+                assertEquals(0, fixture.immediateSends)
             } finally {
                 fixture.controller.release()
                 fixture.dictation.cancel()
@@ -236,6 +263,7 @@ class ComposerToolbarHoldTest {
                 },
                 mainDispatcher = dispatcher,
                 recorderDispatcher = dispatcher,
+                afterHeldRelease = { { _, _ -> fixture.immediateSends++ } },
             )
         val textState = ComposerTextState(TextFieldValue())
         composeRule.setContent {
@@ -281,5 +309,6 @@ class ComposerToolbarHoldTest {
         var stops = 0
         var cancels = 0
         var completes = 0
+        var immediateSends = 0
     }
 }

@@ -992,7 +992,7 @@ private fun applyProjection(
     controller: ConversationController,
     message: TimelineMessageRecordFfi,
 ) {
-    controller.testApplyLiveTimelineChangesAndRegisterStreams(
+    controller.testApplyLiveTimelineChanges(
         listOf(
             TimelineMessageChangeFfi.Upsert(
                 trigger = TimelineUpdateTriggerFfi.NEW_MESSAGE,
@@ -1059,6 +1059,8 @@ private fun projectedMediaMessage(
     recordedAt: ULong,
     reference: MediaAttachmentReferenceFfi,
 ) = TimelineMessageRecordFfi(
+    agentItem = null,
+    agentItemFirstEventMissing = false,
     clientToken = null,
     messageIdHex = CONFIRMED_MESSAGE_ID,
     sourceMessageIdHex = "d4".repeat(32),
@@ -1075,7 +1077,7 @@ private fun projectedMediaMessage(
     replyPreview = null,
     mediaJson = null,
     media = MessageAttachments.acceptedOutcomes(listOf(reference)),
-    agentTextStreamJson = null,
+    thread = null,
     poll = null,
     groupSystem = null,
     hasReports = false,
@@ -1437,14 +1439,17 @@ private fun mediaAdmissionBoundary(
     } as MarmotInterface
 }
 
-/** Exercises retry settlement through the shipping media sender and reviewed recording owner together. */
+/** Exercises the voice reply hand-off through the shipping media sender and reviewed recording owner together. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 class ConversationVoiceReplyRetryTest {
-    /** A failed upload releases preparation, and bubble Retry consumes only the original reviewed take. */
+    /**
+     * A voice reply leaves the review the moment its row is seeded. After a failed upload the failed bubble is the
+     * only owner of the take, so the user cannot send it twice, and Retry uploads again and publishes once.
+     */
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun failedVoiceReplySettlesReviewAfterBubbleRetry() =
+    fun voiceReplyHandsOffAtSeedAndTheFailedBubbleOwnsRetry() =
         runTest {
             Dispatchers.setMain(StandardTestDispatcher(testScheduler))
             val state = mediaSendReconciliationAppState()
@@ -1463,8 +1468,8 @@ class ConversationVoiceReplyRetryTest {
                 .set(state, AppMarmotRuntime("test", engine))
             val controller = voiceRetryController(state)
             val sender = ConversationMediaSender(state, controller, ApplicationProvider.getApplicationContext()) {}
-            val rejected = CompletableDeferred<Unit>()
-            val review = voiceRetryReview(this, sender, rejected)
+            val handedOff = CompletableDeferred<Boolean>()
+            val review = voiceRetryReview(this, sender, handedOff)
             val recording =
                 java.io.File
                     .createTempFile("voice-reply", ".m4a")
@@ -1479,20 +1484,22 @@ class ConversationVoiceReplyRetryTest {
                 review.offer(recording, 1_000L)
                 val clip = checkNotNull(review.clip)
                 assertTrue(review.send(clip))
-                rejected.await()
-                assertEquals("Expected rejection at upload, native calls: $calls", 1, uploads)
+                assertTrue("The seeded row must take the reply over", handedOff.await())
+                assertNull(review.clip)
+                assertFalse(recording.exists())
+                assertFalse(review.send(clip))
+
+                state.mutationsScope.coroutineContext.job.children
+                    .toList()
+                    .forEach { it.join() }
+                assertEquals("Expected one failed upload, native calls: $calls", 1, uploads)
                 assertTrue(
                     "The reply must be staged before upload failure",
                     calls.contains("saveMessageDraftIfRevision"),
                 )
-                assertTrue(review.clip === clip)
-                assertTrue(recording.exists())
                 val failed = controller.timeline.single()
                 assertEquals(MessageStatus.Failed, failed.status)
                 controller.retryFailedSend(failed)
-                assertNull(review.clip)
-                assertFalse(recording.exists())
-                assertFalse(review.send(clip))
                 assertEquals(2, uploads)
                 assertEquals(1, calls.count { it == "sendMessageDraftWithClientToken" })
             } finally {
@@ -1514,18 +1521,18 @@ private fun voiceRetryController(state: WhiteNoiseAppState) =
         markdownParser = { emptyMarkdownDocument() },
     )
 
-/** Signals the failed attempt only after the real review owner has retained its original recording. */
+/** Reports the sender's hand-off only after the real review owner has settled it. */
 private fun voiceRetryReview(
     scope: CoroutineScope,
     sender: ConversationMediaSender,
-    rejected: CompletableDeferred<Unit>,
+    handedOff: CompletableDeferred<Boolean>,
 ) = VoiceRecordingReview(
     scope = scope,
     ownerIsCurrent = { true },
     send = { file, duration, guard, complete ->
         sender.sendVoiceAttachment(file, duration, guard) { accepted ->
             complete(accepted)
-            if (!accepted) rejected.complete(Unit)
+            handedOff.complete(accepted)
         }
     },
 )

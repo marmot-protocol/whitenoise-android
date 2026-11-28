@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="composer_pdf_pages">
+        <item quantity="other">PDF · %d 頁</item>
+    </plurals>
+    <string name="composer_pdf_metadata_options">PDF 中繼資料選項</string>
+    <string name="composer_pdf_keep_metadata">保留中繼資料</string>
+    <string name="composer_pdf_remove_metadata">移除中繼資料</string>
+    <string name="composer_pdf_metadata_options_body">收件者可以查看 %1$s 原始檔案中的作者、日期和其他屬性。</string>
+    <string name="composer_pdf_metadata_removed">已移除中繼資料</string>
+    <string name="composer_pdf_metadata_removed_on_send">傳送時移除中繼資料</string>
+    <string name="composer_pdf_metadata_signed">已簽署：保留中繼資料</string>
+    <string name="composer_pdf_metadata_encrypted">受保護：保留中繼資料</string>
+    <string name="composer_pdf_metadata_unsupported">無法移除中繼資料</string>
+    <string name="composer_pdf_metadata_sending_as_is">將連同中繼資料傳送</string>
+    <string name="composer_pdf_metadata_dialog_title">連同中繼資料傳送？</string>
+    <string name="composer_pdf_metadata_dialog_signed">%1$s 已簽署。移除其中繼資料會破壞簽章，因此只能按原樣傳送。</string>
+    <string name="composer_pdf_metadata_dialog_encrypted">%1$s 受密碼保護，因此無法移除其中繼資料。</string>
+    <string name="composer_pdf_metadata_dialog_unsupported">White Noise 無法安全地移除 %1$s 的中繼資料。</string>
+    <plurals name="composer_pdf_metadata_dialog_several">
+        <item quantity="other">無法移除 %1$d 個 PDF 的中繼資料：%2$s。</item>
+    </plurals>
+    <string name="composer_pdf_metadata_dialog_consequence">此聊天中的所有人都能看到作者、建立它的應用程式以及建立或修改時間等資訊。</string>
+    <string name="composer_pdf_metadata_send_as_is">按原樣傳送</string>
+    <string name="media_file_pdf_metadata_kept">此 PDF 未傳送，因為無法移除其中繼資料。請從訊息框傳送，以選擇是否按原樣傳送。</string>
+</resources>

@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="linked_devices">Dispositivi collegati</string>
+    <string name="linked_devices">Dispositivi</string>
+    <string name="settings_search_alias_linked_devices">dispositivi collegati|collegare un dispositivo</string>
+    <string name="group_account_devices_title">Dispositivi collegati</string>
     <string name="linked_devices_detail">I messaggi che invii da un dispositivo collegato appaiono come tuoi su tutti i tuoi dispositivi collegati.</string>
     <string name="linked_devices_this_device">Questo dispositivo</string>
     <string name="linked_devices_other_devices">Altri dispositivi</string>
@@ -36,9 +38,9 @@
     <string name="error_account_unlinked">Questo dispositivo è stato scollegato da questo account, quindi non può accedere qui. Rimuovi l’account da questo dispositivo, poi accedi di nuovo per collegarlo nuovamente.</string>
     <string name="wipe_report_left_to_other_devices">Chat che completeranno gli altri tuoi dispositivi: %1$d</string>
     <string name="wipe_report_other_devices_not_reached">Non è stato possibile chiedere agli altri tuoi dispositivi di completare la disconnessione di questo. Potrebbero continuare a elencarlo finché non lo rimuovi da uno di essi.</string>
-    <string name="history_imported_from_device">Importato da %1$s</string>
-    <string name="history_imported_from_another_device">Importato da un altro dispositivo</string>
-    <string name="history_restored_from_backup">Ripristinato da un backup</string>
+    <string name="history_imported_from_device">I messaggi qui sopra provengono da %1$s</string>
+    <string name="history_imported_from_another_device">I messaggi qui sopra provengono da un altro dispositivo</string>
+    <string name="history_restored_from_backup">I messaggi qui sopra sono stati ripristinati da un backup</string>
     <string name="history_receiving">Ricezione dei messaggi precedenti da un altro dei tuoi dispositivi…</string>
     <string name="history_retrying">Impossibile caricare i messaggi precedenti. Riproveremo automaticamente.</string>
     <string name="link_device_this_title">Collega questo dispositivo</string>
@@ -75,7 +77,7 @@
     <string name="link_request_review">Esamina</string>
     <string name="link_request_not_now">Non ora</string>
     <string name="link_request_preparing">Verifica del nuovo dispositivo…</string>
-    <string name="link_request_compare_detail">Controlla che entrambi i dispositivi mostrino le stesse emoji nello stesso ordine. Se sono diverse, tocca «Non ora».</string>
+    <string name="link_request_compare_detail">Controlla che il dispositivo che hai in mano mostri le stesse emoji nello stesso ordine. Non leggerle a nessuno e non inviare screenshot.</string>
     <string name="link_request_label">Nome del dispositivo</string>
     <string name="link_request_label_too_long">Questo nome è troppo lungo.</string>
     <string name="link_request_add_to_chats">Aggiungi a tutte le mie chat</string>
@@ -91,6 +93,14 @@
     <string name="link_request_linked">Il nuovo dispositivo è collegato.</string>
     <string name="link_request_added_elsewhere">%1$s è stato aggiunto da %2$s.</string>
     <string name="link_request_added_elsewhere_unnamed">Il dispositivo è stato aggiunto da un altro dei tuoi dispositivi.</string>
+    <string name="link_request_notice">Un nuovo dispositivo chiede di essere collegato al tuo account.</string>
+    <string name="link_request_notice_other_profile">Un nuovo dispositivo chiede di essere collegato a %1$s.</string>
+    <string name="link_request_repeated_notice">Richieste di collegamento ripetute: qualcuno potrebbe avere la tua chiave.</string>
+    <string name="link_request_repeated_notice_other_profile">Richieste di collegamento ripetute per %1$s: qualcuno potrebbe avere la tua chiave.</string>
+    <string name="link_request_repeated_title">Richieste di collegamento ripetute</string>
+    <string name="link_request_repeated_detail">Alcuni dispositivi hanno chiesto di collegarsi a questo account più di una volta in un\'ora. Qualcuno potrebbe avere la tua chiave privata, quindi il collegamento non è disponibile. Se hai fatto tu queste richieste, riprova più tardi da un solo dispositivo.</string>
+    <string name="link_request_dont_link">Non collegare</string>
+    <string name="link_request_review_devices">Controlla i dispositivi</string>
     <string name="device_detail_rename">Rinomina</string>
     <string name="device_detail_rename_detail">Il nome mostrato per questo dispositivo su tutti i tuoi dispositivi.</string>
     <string name="device_detail_keep">Mantieni anche se inattivo</string>
@@ -109,7 +119,7 @@
     <string name="devices_leftover_chats_detail">Queste chat non possono applicare la rimozione dai tuoi dispositivi. Un amministratore può rimuovere il dispositivo lì.</string>
     <string name="devices_key_refresh_overdue">Questo dispositivo non è riuscito a rinnovare le chiavi di invito. Dopo 30 giorni potrebbe non essere più possibile aggiungerlo a nuove chat. Tieni l’app aperta sui tuoi dispositivi perché possano aggiornarsi.</string>
     <string name="devices_stalled">Questo dispositivo non riesce più a tenere il passo con gli altri. Ripara il collegamento per continuare.</string>
-    <string name="device_repair_confirm_again">Apri i dispositivi collegati nelle impostazioni e conferma di nuovo la riparazione prima di collegare questo dispositivo.</string>
+    <string name="device_repair_confirm_again">Apri «Dispositivi» nelle impostazioni e conferma di nuovo la riparazione prima di collegare questo dispositivo.</string>
     <string name="device_repair_try_link_again">Collegamento reimpostato. Prova a collegare di nuovo il dispositivo per completare la riparazione.</string>
     <string name="devices_repair">Ripara il collegamento di questo dispositivo</string>
     <string name="devices_repair_confirm">Il collegamento attuale verrà rimosso per permetterti di collegare di nuovo il dispositivo. Conserverai chat, messaggi, bozze e impostazioni. Il vecchio collegamento non si può ripristinare, anche se annulli la procedura.</string>
@@ -123,8 +133,8 @@
     <string name="sign_in_signed_out">Non ha più effettuato l’accesso</string>
     <string name="sign_in_question_new">Eri tu?</string>
     <string name="sign_in_question_before">Hai ancora questo dispositivo?</string>
-    <string name="sign_in_detail_new">Qualcuno ha effettuato l’accesso su un altro dispositivo. Se eri tu, puoi collegarlo. Altrimenti tocca «Non ero io».</string>
-    <string name="sign_in_detail_before">Questo dispositivo aveva effettuato l’accesso all’account prima di questo. Se lo hai ancora, collega questo dispositivo da lì. Altrimenti puoi ricominciare da zero.</string>
+    <string name="sign_in_detail_new">Qualcuno ha effettuato l’accesso su un altro dispositivo. Se eri tu, puoi collegarlo. Se è una tua app che non vuoi collegare, tocca «È mio, non collegare». Se non eri tu, tocca «Non ero io».</string>
+    <string name="sign_in_detail_before">Questo dispositivo aveva effettuato l’accesso all’account prima di questo. Se lo hai ancora, collega questo dispositivo da lì oppure ricomincia da zero. Se non lo riconosci, tocca «Non lo riconosco».</string>
     <string name="sign_in_previously_linked">Un dispositivo collegato qui in precedenza manca dall’elenco attuale di questo dispositivo. Apri entrambi i dispositivi per verificare il collegamento.</string>
     <string name="sign_in_reject">Non ero io</string>
     <string name="sign_in_reject_confirm">Su tutti i tuoi dispositivi verrà indicato che questo accesso non era tuo e apparirà un avviso di sicurezza. Il dispositivo resterà connesso e la tua chiave non cambierà.</string>
@@ -136,10 +146,10 @@
     <string name="start_fresh_title">No, ricomincia da zero</string>
     <string name="start_fresh_detail">Per ora usa questo dispositivo da solo. Potrai ancora collegarlo da un dispositivo su cui hai già effettuato l’accesso.</string>
     <string name="started_fresh_note">Questo dispositivo è ripartito da zero. Qui compaiono solo le chat a cui vieni invitato d’ora in poi.</string>
-    <string name="compromise_warning_title">Avviso di sicurezza</string>
-    <string name="compromise_warning_rejected">Un accesso a questo account è stato segnalato come non tuo. Qualcun altro potrebbe avere la chiave dell’account o una sessione con il suo firmatario.</string>
-    <string name="compromise_warning_foreign_key">Questo dispositivo ha trovato nel proprio slot chiavi di invito che non ha creato e le ha sostituite. Qualcun altro potrebbe avere la chiave dell’account o una sessione con il suo firmatario.</string>
-    <string name="compromise_warning_dismiss">Segna come visto</string>
+    <string name="compromise_warning_title">Qualcun altro potrebbe avere la tua chiave segreta</string>
+    <string name="compromise_warning_rejected">Un accesso a questo account è stato segnato come non tuo.</string>
+    <string name="compromise_warning_foreign_key">Questo dispositivo ha trovato nel proprio slot chiavi di invito che non ha creato.</string>
+    <string name="compromise_warning_dismiss">Nascondi su questo dispositivo</string>
     <string name="compromise_warning_dismiss_detail">Nasconde questo avviso solo su questo dispositivo. Non rimuove un dispositivo, non rifiuta un accesso e non protegge la tua chiave.</string>
     <string name="device_move_section">Spostamento di questo dispositivo</string>
     <string name="device_move_waiting">In attesa di essere aggiunto dagli altri dispositivi</string>
@@ -158,8 +168,8 @@
     <string name="link_offer_reminder">Collega questo dispositivo per vedere le chat degli altri tuoi dispositivi.</string>
     <string name="link_request_default_label">Nuovo dispositivo</string>
     <string name="link_request_options">Opzioni</string>
-    <string name="link_request_options_detail">Scegli il nome del dispositivo e se condividere le chat e la loro cronologia.</string>
-    <string name="explanation_link_request_options">Apre il nome del nuovo dispositivo e ciò che riceve.</string>
+    <string name="link_request_options_detail">Scegli se condividere le chat e la loro cronologia.</string>
+    <string name="explanation_link_request_options">Apre ciò che riceve il nuovo dispositivo.</string>
     <string name="device_move_advanced">Avanzate</string>
     <string name="setup_device_link_next">Dopo l’accesso puoi collegare questo dispositivo per ricevere le chat dagli altri dispositivi.</string>
     <string name="unlinked_account_remove_for">Rimuovi %1$s da questo dispositivo</string>
@@ -177,4 +187,42 @@
     <string name="unlinked_remove_sign_in_detail">Questo dispositivo è stato scollegato. Vuoi eliminare da questo dispositivo le chat e i dati di questo profilo e accedere con la chiave che hai inserito? Gli altri dispositivi conserveranno i loro dati.</string>
     <string name="invite_decline_wait_for_sync">Attendi che la chat si sincronizzi e tocca di nuovo «Rifiuta».</string>
     <string name="invite_decline_check_delivery">L’ultima modifica al gruppo non ha raggiunto tutti i relay. Prima di riprovare, verifica se la chat mostra un avviso di consegna.</string>
+    <string name="sign_in_claim">Dice di essere: %1$s</string>
+    <string name="sign_in_mine">È mio, non collegare</string>
+    <string name="sign_in_mine_state">Tuo, non collegato</string>
+    <string name="sign_in_dont_recognize">Non lo riconosco</string>
+    <string name="compromise_warning_explainer">La tua chiave può accedere ovunque e non può essere cambiata né annullata. White Noise tiene i dispositivi sconosciuti fuori dai tuoi dispositivi collegati, ma non può chiudere loro l’accesso.</string>
+    <string name="compromise_warning_steps_title">Cosa fare</string>
+    <string name="compromise_warning_step_remove">1. Rimuovi ogni dispositivo che non riconosci.</string>
+    <string name="compromise_warning_step_signer">2. Se usi un’app di firma, apri le app connesse e rimuovi quelle che non riconosci.</string>
+    <string name="compromise_warning_step_move">3. Passa a un nuovo account. I tuoi contatti dovranno aggiungerlo.</string>
+    <string name="compromise_alert_review">Controlla i dispositivi</string>
+    <string name="compromise_warning_hide_failed">Impossibile nascondere l’avviso. Riprova.</string>
+    <string name="sign_in_alert_review_banner">Un dispositivo che non hai collegato ha effettuato l’accesso al tuo account. Controlla se è tuo.</string>
+    <string name="sign_in_alert_review_action">Controlla</string>
+    <string name="sign_in_alert_badge_review">Accesso da controllare</string>
+    <string name="sign_in_alert_badge_compromise">Avviso di sicurezza</string>
+    <string name="sign_in_alert_review_body">Un dispositivo che non hai collegato ha effettuato l’accesso al tuo account. Apri White Noise per controllare se è tuo.</string>
+    <string name="sign_in_alert_review_public">Accesso da controllare</string>
+    <string name="sign_in_alert_compromise_body">Apri White Noise per vedere cosa è successo e cosa fare.</string>
+    <string name="sign_in_alert_compromise_public">Serve un controllo di sicurezza</string>
+    <string name="device_detail_remove_stolen">Se questo dispositivo è stato perso o rubato, chi lo ha potrebbe avere ancora la tua chiave.</string>
+    <plurals name="sign_in_alert_review_title">
+        <item quantity="one">Nuovo accesso da controllare</item>
+        <item quantity="many">%d nuovi accessi da controllare</item>
+        <item quantity="other">%d nuovi accessi da controllare</item>
+    </plurals>
+    <string name="link_request_expired_attempt">Un dispositivo ha tentato di collegarsi il %1$s.</string>
+    <string name="link_consent_requested_at">Richiesta alle %1$s</string>
+    <string name="link_consent_access">Un dispositivo collegato può leggere le tue chat, riceverne la cronologia e inviare messaggi a tuo nome.</string>
+    <string name="link_consent_have_device">Continua solo se hai iniziato a configurare White Noise su un dispositivo che hai davanti.</string>
+    <string name="link_consent_scam">White Noise non ti contatterà mai per chiederti di collegare un dispositivo o controllare le emoji. Se qualcuno te lo ha chiesto, è una truffa.</string>
+    <string name="link_consent_on_call">Sei in chiamata. I truffatori spesso guidano le vittime al telefono per far collegare un dispositivo.</string>
+    <string name="link_consent_with_me">Ho il nuovo dispositivo con me</string>
+    <string name="link_consent_did_not_start">Non ho avviato io la richiesta</string>
+    <string name="link_consent_someone_asked">Qualcuno mi ha chiesto di farlo</string>
+    <string name="link_consent_unlock">Sblocca questo telefono per confrontare le emoji</string>
+    <string name="link_consent_lock_required">Imposta un blocco schermo su questo telefono per collegare un dispositivo.</string>
+    <string name="link_consent_report_guidance">Collegamento rifiutato. Apri l’accesso in Dispositivi per segnalarlo.</string>
+    <string name="link_touch_blocked">Un’altra app copre White Noise. Chiudi la sua finestra e riprova.</string>
 </resources>

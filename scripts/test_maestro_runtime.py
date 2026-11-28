@@ -876,7 +876,7 @@ class RuntimeEvidenceTest(unittest.TestCase):
             for command in list(yaml.safe_load_all(text))[1]:
                 selector = command.get('assertVisible') if isinstance(command, dict) else None
                 if isinstance(selector, dict) and selector.get('containsChild') == {
-                    'text': '^(Allow Camera|Open settings)$'
+                    'text': '^(Allow camera|Open settings)$'
                 }:
                     self.assertEqual(selector.get('id'), 'qr_scanner.recovery', path.name)
                     self.assertIs(selector['enabled'], True)
@@ -891,8 +891,8 @@ class RuntimeEvidenceTest(unittest.TestCase):
                     self.assertIn('NAV-009', runtime.CASES[path.stem]['manual_ids'])
         initial = list(yaml.safe_load_all(paths[0].read_text()))[1]
         self.assertIn({'assertVisible': {'id': 'qr_scanner.recovery', 'enabled': True,
-                                        'containsChild': {'text': '^(Allow Camera|Open settings)$'}}}, initial)
-        self.assertIn({'assertVisible': {'text': '^Allow Camera$'}}, initial)
+                                        'containsChild': {'text': '^(Allow camera|Open settings)$'}}}, initial)
+        self.assertIn({'assertVisible': {'text': '^Allow camera$'}}, initial)
         chrome = (runtime.ROOT / 'app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt').read_text()
         self.assertIn('.exposePerformanceTestTags()', chrome)
         self.assertIn('.testTag("qr_scanner.recovery")', chrome)
@@ -900,7 +900,7 @@ class RuntimeEvidenceTest(unittest.TestCase):
                                'maestro-2.11.0-qr-recovery-button.json').read_text())
         self.assertIs(captured['node']['enabled'], True)
         self.assertIs(captured['node']['clickable'], True)
-        self.assertEqual(captured['node']['children'][0]['attributes']['text'], 'Allow Camera')
+        self.assertEqual(captured['node']['children'][0]['attributes']['text'], 'Allow camera')
 
     def test_lightning_clear_retaps_remaining_suffix_and_requires_empty_actual_field(self):
         """A word selection deleted the prefix and left /path in the observed failure."""
@@ -1240,7 +1240,7 @@ class RuntimeEvidenceTest(unittest.TestCase):
         """A terminal Screen/Sheet match must not hide menus or named dialog and picker content."""
         catalog = {screen['symbol']: screen for screen in inventory()['screen_catalog']}
         for name in ('ChatContextMenu', 'GlobalSearchFilterMenu', 'ComposerAttachmentMenu',
-                     'MessageActionMenu', 'KeyboardSafePopup', 'MessageDeleteDialogContent',
+                     'MessageActionMenu', 'KeyboardSafePopup', 'MessageDeleteConfirmationDialog',
                      'AddAccountSheetContent', 'ForwardMessagePickerContent', 'QrScannerSheetContent',
                      'ShareChatPickerFullScreenContent', 'SmartFolderRulePanel', 'KeyPackagesScreenForAccount'):
             with self.subTest(surface=name):
@@ -2038,7 +2038,7 @@ class RuntimeEvidenceTest(unittest.TestCase):
         self.assertEqual(returned[-1], {'assertVisible': 'Maestro group'})
         switch = (root / 'runtime/search-library-empty-account-switch.yaml').read_text()
         self.assertLess(switch.index('- tapOn: Maestro Carol'), switch.index('- tapOn: Maestro Alice'))
-        self.assertIn('- assertVisible: No Chats', switch)
+        self.assertIn('- assertVisible: Start your first conversation', switch)
         self.assertIn('- assertNotVisible: Maestro group', switch)
         query = (root / 'runtime/search-library-empty-query-clear.yaml').read_text()
         self.assertIn('- inputText: Maestro absent attachment 934867', query)
@@ -2167,11 +2167,14 @@ class RuntimeEvidenceTest(unittest.TestCase):
         self.assertIn('runCatchingCancellable { native.revealNsec(target) }.getOrNull()', source)
         self.assertNotRegex(source, r'\$\{?(?:expected|secret|clip|item)\b')
 
-    def test_settings_entry_uses_real_multi_identity_selector(self):
-        """Regress the hosted tree where the avatar says Switch Profile rather than Open settings."""
-        helper = (runtime.ROOT / '.maestro/fixtures/open-settings.yaml').read_text()
-        self.assertIn('Switch Profile, Maestro (Alice|Bob|Carol)', helper)
-        self.assertIn('- tapOn: "Settings"', helper)
+    def test_settings_entry_handles_both_avatar_destinations(self):
+        """Quick switching opens Settings directly; the selector offers its own Settings action."""
+        helper = runtime.ROOT / '.maestro/fixtures/open-settings.yaml'
+        _, commands = list(yaml.safe_load_all(helper.read_text()))
+        self.assertEqual(commands[0], {'tapOn': {'id': 'chats.switchProfile'}})
+        self.assertIn({'runFlow': {'when': {'visible': {'id': 'account-selector-content'}},
+                                  'commands': [{'tapOn': 'Settings'}]}}, commands)
+        self.assertEqual(commands[-1], {'assertVisible': {'id': 'settings-home-content'}})
         for path in (runtime.ROOT / '.maestro/runtime').glob('*.yaml'):
             self.assertNotIn('Open settings.*', path.read_text(), path.name)
 

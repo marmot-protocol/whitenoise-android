@@ -27,6 +27,14 @@ internal val PEER_B = "b2".repeat(32)
 internal val GROUP_A = "c2".repeat(32)
 internal val GROUP_B = "c3".repeat(32)
 
+/** The fixture's retained window holds every chat, with no additional account-wide rows. */
+internal fun completeRetainedChatList() =
+    ChatListLiveSubscriptions(
+        openChatListWindow = { _, _ -> error("No live window in the retained-chat fixture") },
+        openChats = { _, _ -> error("No live feed in the retained-chat fixture") },
+        presentedChatList = { _, _ -> emptyList() },
+    )
+
 internal fun appStateWithDirectChat(
     groupId: String,
     peerId: String,

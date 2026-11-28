@@ -47,6 +47,12 @@ REQUIRED_ELF_EXPORTS = (
     b"Java_io_crates_keyring_Keyring_00024Companion_initializeNdkContext",
 )
 PAYLOAD_FILES = (*KOTLIN_FILES, *JNI_FILES, ELF_METADATA_FILE, "manifest.json")
+PREPARED_METADATA_FILES = {
+    ".prepared.json",
+    "marmotkit-api-signature.txt",
+    "prepared-files.sha256",
+    "native-provenance.json",
+}
 MANIFEST_CONTENTS = (KOTLIN_FILES[0], *JNI_FILES)
 REQUIRED_PROPERTIES = {
     "schema",
@@ -88,8 +94,14 @@ class HttpsOnlyRedirectHandler(urllib.request.HTTPRedirectHandler):
 
 
 def parse_properties(path: Path) -> dict[str, str]:
+    """Read and validate a MarmotKit lock from disk."""
+    return parse_lock_text(path.read_text(encoding="utf-8"), path)
+
+
+def parse_lock_text(text: str, path: Path) -> dict[str, str]:
+    """Validate the exact lock snapshot supplied by the caller."""
     properties: dict[str, str] = {}
-    for line_number, raw_line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+    for line_number, raw_line in enumerate(text.splitlines(), 1):
         line = raw_line.strip()
         if not line or line.startswith("#"):
             continue
@@ -275,22 +287,35 @@ def safe_archive_files(archive: zipfile.ZipFile, root: str) -> dict[str, zipfile
     return entries
 
 
-def validate_manifest(archive: zipfile.ZipFile, entry: zipfile.ZipInfo, properties: dict[str, str]) -> None:
-    if properties["manifest-schema"] != "mdk-android-v1":
-        raise PreparationError(f"unsupported artifact manifest schema: {properties['manifest-schema']}")
-
+def read_json_object(data: bytes, name: str) -> dict:
+    """Read a JSON object with exactly one value for each key."""
     def reject_duplicate_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
         result: dict[str, object] = {}
         for key, value in pairs:
             if key in result:
-                raise PreparationError(f"duplicate artifact manifest key: {key}")
+                raise PreparationError(f"duplicate {name} key: {key}")
             result[key] = value
         return result
 
     try:
-        manifest = json.loads(archive.read(entry), object_pairs_hook=reject_duplicate_keys)
+        value = json.loads(data, object_pairs_hook=reject_duplicate_keys)
     except (json.JSONDecodeError, UnicodeDecodeError) as error:
-        raise PreparationError(f"malformed artifact manifest: {error}") from error
+        raise PreparationError(f"malformed {name}: {error}") from error
+    if not isinstance(value, dict):
+        raise PreparationError(f"{name} must be an object")
+    return value
+
+
+def read_manifest(archive: zipfile.ZipFile, entry: zipfile.ZipInfo) -> dict:
+    """Read the Android artifact manifest from its validated ZIP entry."""
+    return read_json_object(archive.read(entry), "artifact manifest")
+
+
+def validate_manifest(archive: zipfile.ZipFile, entry: zipfile.ZipInfo, properties: dict[str, str]) -> None:
+    """Match the archive's manifest with the lock and Android bundle layout."""
+    if properties["manifest-schema"] != "mdk-android-v1":
+        raise PreparationError(f"unsupported artifact manifest schema: {properties['manifest-schema']}")
+    manifest = read_manifest(archive, entry)
     expected = {
         "name": "marmotkit-android",
         "version": properties["artifact-id"],
@@ -307,7 +332,7 @@ def validate_manifest(archive: zipfile.ZipFile, entry: zipfile.ZipInfo, properti
     if manifest.get("elf_validation") != ELF_METADATA_FILE:
         raise PreparationError(f"manifest elf_validation must name {ELF_METADATA_FILE}")
     cargo_lock = manifest.get("cargo_lock_sha256", "")
-    if len(cargo_lock) != 64 or any(character not in "0123456789abcdef" for character in cargo_lock):
+    if not isinstance(cargo_lock, str) or not re.fullmatch(r"[0-9a-f]{64}", cargo_lock):
         raise PreparationError("manifest cargo_lock_sha256 is invalid")
     for key in ("rustc", "cargo", "android_ndk_home"):
         if not isinstance(manifest.get(key), str) or not manifest[key].strip():
@@ -520,7 +545,8 @@ def helper_api_declarations(prepared_root: Path) -> list[str]:
     return sorted(set(declarations))
 
 
-def api_signature(prepared_root: Path, properties: dict[str, str]) -> str:
+def read_api_declarations(prepared_root: Path) -> tuple[list[str], list[str], list[str]]:
+    """Read the generated Kotlin types, helper declarations, and UniFFI checksums."""
     binding = prepared_root / KOTLIN_FILES[0]
     source = binding.read_text(encoding="utf-8")
     types = sorted(
@@ -546,6 +572,12 @@ def api_signature(prepared_root: Path, properties: dict[str, str]) -> str:
     )
     if not types or not checksums:
         raise PreparationError("generated Kotlin has no inspectable public API signature")
+    return types, helpers, checksums
+
+
+def api_signature(prepared_root: Path, properties: dict[str, str]) -> str:
+    """Render the API signature after checking the declaration counts in the lock."""
+    types, helpers, checksums = read_api_declarations(prepared_root)
     expected_type_count = int(properties["api-type-count"])
     expected_checksum_count = int(properties["api-checksum-count"])
     expected_helper_count = int(properties["api-helper-declaration-count"])
@@ -616,6 +648,14 @@ def validate_prepared(output: Path, properties: dict[str, str], archive_hashes: 
     marker_files = metadata.get("files")
     if marker_files != archive_hashes:
         return False
+    # Gradle compiles every file under the prepared tree and follows links, so a cached tree with
+    # extra files or any symlink is rebuilt.
+    entries = list(output.rglob("*"))
+    if output.is_symlink() or any(path.is_symlink() for path in entries):
+        return False
+    present = {path.relative_to(output).as_posix() for path in entries if not path.is_dir()}
+    if not present <= set(archive_hashes) | PREPARED_METADATA_FILES:
+        return False
     try:
         for relative, expected_sha in archive_hashes.items():
             path = output / relative
@@ -671,7 +711,9 @@ def extract_atomically(archive_path: Path, output: Path, properties: dict[str, s
             + "\n",
             encoding="utf-8",
         )
-        if output.exists():
+        if output.is_symlink():
+            output.unlink()
+        elif output.exists():
             shutil.rmtree(output)
         os.replace(temporary, output)
     finally:
@@ -754,6 +796,8 @@ def prepare(args: argparse.Namespace) -> Path:
                 raise PreparationError("prepared artifact failed its final validation")
         provenance = native_provenance(output, properties, sha256(args.lock))
         pending = output / ".native-provenance.tmp"
+        # A fresh file: an existing name could share its inode with a verified payload file.
+        pending.unlink(missing_ok=True)
         pending.write_text(json.dumps(provenance, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         os.replace(pending, output / "native-provenance.json")
     return output

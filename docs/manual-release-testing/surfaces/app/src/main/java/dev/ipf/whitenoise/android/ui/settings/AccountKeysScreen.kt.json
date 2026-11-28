@@ -20,14 +20,6 @@
         ]
       },
       {
-        "surface": "ProfileKeySupportingText",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
-        "anchor": "fun ProfileKeySupportingText(",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
         "surface": "ProfileKeyValueRow",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
         "anchor": "fun ProfileKeyValueRow(",
@@ -114,6 +106,15 @@
         "anchor": "R.string.explanation_account_keys_wipe",
         "test_ids": [
           "ACC-023"
+        ]
+      },
+      {
+        "surface": "Account keys helper explainers",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "SettingsExplainer(stringResource(R.string.profile_public_key_help))",
+        "test_ids": [
+          "SET-001",
+          "SET-072"
         ]
       }
     ],
@@ -352,15 +353,6 @@
       }
     ],
     "source_coverage": [
-      {
-        "surface": "Key export file save runs off the main thread and keeps export locked until it ends",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
-        "anchor": "fun saveExport(",
-        "test_ids": [
-          "ACC-010",
-          "ACC-011"
-        ]
-      },
       {
         "surface": "R.string.explanation_organize_keys_copy_public",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",

@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.audio
 
-import android.app.ForegroundServiceStartNotAllowedException
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -13,6 +12,7 @@ import dev.ipf.whitenoise.android.WhiteNoiseApplication
 import dev.ipf.whitenoise.android.notifications.BackgroundConnectionNotification
 import dev.ipf.whitenoise.android.notifications.ForegroundStartTrigger
 import dev.ipf.whitenoise.android.notifications.NotificationStreamForegroundService
+import dev.ipf.whitenoise.android.notifications.QueuedStartShadowService
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -49,6 +49,7 @@ internal class ConversationDictationForegroundServiceTest : ConversationDictatio
             0,
             1,
         )
+        assertNull(shadowOf(service as Service).lastForegroundNotification)
         assertNull(application.initializedAppState())
         lifecycle.destroy()
         assertNull(application.initializedAppState())
@@ -397,6 +398,28 @@ internal class ConversationDictationForegroundServiceTest : ConversationDictatio
             }
         }
 
+    /** Past the App Lock boundary, notification Send keeps the transcript in the draft and sends nothing. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun appLockTurnsNotificationSendIntoPaste() =
+        runTest {
+            val harness = DictationForegroundTestHost(this)
+            harness.notificationSendAllowed = false
+            ConversationDictationForegroundService.hostResolver = { harness }
+            val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
+            val service = lifecycle.get()
+            service.onStartCommand(startIntent(service, harness), 0, 1)
+
+            val send = actionCommand(service, harness, ConversationDictationForegroundService.ACTION_SEND)
+            service.onStartCommand(send, 0, 2)
+            harness.platform.listener.onResult("spoken while locked")
+            runCurrent()
+
+            assertEquals(emptyList<String>(), harness.sent)
+            assertEquals("spoken while locked", harness.draft.text)
+            lifecycle.destroy()
+        }
+
     /** Hiding the drawer card is presentation only: explicit in-app completion still owns the session. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
@@ -464,7 +487,7 @@ internal class ConversationDictationForegroundServiceTest : ConversationDictatio
 }
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+@Config(sdk = [34], shadows = [QueuedStartShadowService::class])
 internal class ConversationDictationForegroundServiceStartTest : ConversationDictationForegroundTestCase() {
     /** A terminal retained-audio failure removes microphone controls without discarding Retry data. */
     @Test
@@ -600,106 +623,6 @@ internal class ConversationDictationForegroundServiceStartTest : ConversationDic
         val context = RejectingForegroundStartContext(RuntimeEnvironment.getApplication())
 
         assertFalse(ConversationDictationForegroundService.start(context, "test-token"))
-    }
-
-    /** Verifies a stale queued start cannot promote an orphan service after controller failure. */
-    @Test
-    fun queuedStartAfterControllerFailureDoesNotPromoteAnOrphanService() {
-        val harness = installHost()
-        harness.failRecognition()
-        assertTrue(harness.conversationDictation.hasPendingSession)
-        assertFalse(harness.conversationDictation.hasDurableSession)
-        val serviceController = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
-        val service = serviceController.get()
-
-        val result = service.onStartCommand(startIntent(service, harness), 0, 1)
-
-        assertEquals(Service.START_NOT_STICKY, result)
-        assertNull(shadowOf(service as Service).lastForegroundNotification)
-        assertTrue(shadowOf(service).isStoppedBySelf)
-        serviceController.destroy()
-    }
-
-    /** Verifies platform foreground-promotion rejection cancels capture and stops the service. */
-    @Test
-    fun foregroundPromotionRejectionCancelsCaptureAndStopsTheService() {
-        listOf<RuntimeException>(
-            SecurityException("blocked"),
-            ForegroundServiceStartNotAllowedException("blocked"),
-        ).forEach { failure ->
-            val harness = DictationForegroundTestHost(autoReady = false)
-            ConversationDictationForegroundService.hostResolver = { harness }
-            ConversationDictationForegroundService.foregroundPromoter = { _, _, _ -> throw failure }
-            val serviceController =
-                Robolectric
-                    .buildService(NotificationStreamForegroundService::class.java)
-                    .create()
-            val service = serviceController.get()
-
-            val result = service.onStartCommand(startIntent(service, harness), 0, 1)
-
-            assertEquals(Service.START_NOT_STICKY, result)
-            assertTrue(harness.conversationDictation.state is ConversationDictationState.Failed)
-            assertFalse(harness.conversationDictation.hasDurableSession)
-            assertTrue(shadowOf(service as Service).isStoppedBySelf)
-            serviceController.destroy()
-        }
-    }
-
-    @Test
-    fun ownershipLostDuringPromotionCannotBePublishedOrStartCapture() {
-        val harness = DictationForegroundTestHost(autoReady = false)
-        ConversationDictationForegroundService.hostResolver = { harness }
-        ConversationDictationForegroundService.foregroundPromoter = { _, _, _ ->
-            harness.conversationDictation.cancel()
-        }
-        val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
-        val service = lifecycle.get()
-
-        service.onStartCommand(startIntent(service, harness), 0, 1)
-
-        assertTrue(harness.conversationDictation.state is ConversationDictationState.Idle)
-        assertEquals(0, harness.platform.sessionsCreated)
-        assertTrue(shadowOf(service as Service).isStoppedBySelf)
-        lifecycle.destroy()
-    }
-
-    /** Native capture begins strictly after foreground promotion returns, never on enqueue alone. */
-    @Test
-    fun deferredCaptureStartsOnlyAfterSuccessfulPromotion() {
-        val harness = DictationForegroundTestHost(autoReady = false)
-        ConversationDictationForegroundService.hostResolver = { harness }
-        ConversationDictationForegroundService.foregroundPromoter = { service, notification, type ->
-            assertEquals(0, harness.platform.sessionsCreated)
-            assertFalse(harness.conversationDictation.ownsMicrophone)
-            defaultForegroundPromoter(service, notification, type)
-        }
-        val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
-        val service = lifecycle.get()
-        service.onStartCommand(startIntent(service, harness), 0, 1)
-        assertEquals(1, harness.platform.sessionsCreated)
-        assertTrue(harness.conversationDictation.ownsMicrophone)
-        lifecycle.destroy()
-    }
-
-    /** An unbound queued start cannot acknowledge the current session or leave an orphan FGS. */
-    @Test
-    fun unboundQueuedStartStopsWithoutOpeningMicrophone() {
-        val harness = DictationForegroundTestHost(autoReady = false)
-        ConversationDictationForegroundService.hostResolver = { harness }
-        val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
-        val service = lifecycle.get()
-        service.onStartCommand(
-            Intent(service, service::class.java).setAction(ConversationDictationForegroundService.ACTION_START),
-            0,
-            1,
-        )
-        assertEquals(0, harness.platform.sessionsCreated)
-        assertNull(shadowOf(service as Service).lastForegroundNotification)
-        assertTrue(shadowOf(service).isStoppedBySelf)
-        lifecycle.destroy()
-        assertTrue(harness.conversationDictation.hasDurableSession)
-        harness.conversationDictation.cancel()
     }
 
     /** Destruction is tied to the controller and token actually promoted by that service instance. */

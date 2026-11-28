@@ -10,7 +10,8 @@
         "test_ids": [
           "SET-006",
           "SET-007",
-          "SET-008"
+          "SET-008",
+          "SET-032"
         ]
       },
       {
@@ -36,7 +37,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseDialogs.kt",
         "anchor": "fun WhiteNoiseAlertDialog(",
         "test_ids": [
-          "SET-001"
+          "SET-001",
+          "SET-006"
         ]
       },
       {
@@ -47,6 +49,16 @@
           "SET-006",
           "SET-007",
           "SET-008"
+        ]
+      },
+      {
+        "surface": "WhiteNoiseChoiceRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseDialogs.kt",
+        "anchor": "fun WhiteNoiseChoiceRow(",
+        "test_ids": [
+          "DIC-001",
+          "NTF-051",
+          "SET-006"
         ]
       },
       {
@@ -66,6 +78,25 @@
         "test_ids": [
           "AXY-001",
           "AXY-002"
+        ]
+      },
+      {
+        "surface": "WhiteNoiseDialogToggleRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseDialogs.kt",
+        "anchor": "fun WhiteNoiseDialogToggleRow(",
+        "test_ids": [
+          "SET-010",
+          "SET-033",
+          "SEC-009",
+          "SET-072"
+        ]
+      },
+      {
+        "surface": "WhiteNoiseDialogSurface",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseDialogs.kt",
+        "anchor": "fun WhiteNoiseDialogSurface(",
+        "test_ids": [
+          "SET-001"
         ]
       }
     ],

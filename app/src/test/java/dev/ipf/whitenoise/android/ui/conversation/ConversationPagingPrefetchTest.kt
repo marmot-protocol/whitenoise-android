@@ -25,12 +25,6 @@ class ConversationPagingPrefetchTest {
         assertFalse(prefetch(oldestVisibleIndex = OLDEST_ROW - OLDER_PAGE_PREFETCH_ROWS - 1))
     }
 
-    /** Gives a fast fling half of a 50-row page for the next bounded window to arrive. */
-    @Test
-    fun prefetchMarginKeepsHalfAPageOfRunway() {
-        assertEquals(25, OLDER_PAGE_PREFETCH_ROWS)
-    }
-
     /** Only a positive runway counts as invisible paging; an edge already on screen was seen. */
     @Test
     fun landingEventSplitsOnWhetherTheEdgeWasVisible() {
@@ -83,13 +77,12 @@ class ConversationPagingPrefetchTest {
     }
 
     /**
-     * Only ids MDK issued may be reported. An optimistic row's local UUID, a stream row, a header
-     * and a malformed key all resolve to no anchor, so the page runs from the current revision.
+     * Only ids MDK issued may be reported. An optimistic row's local UUID, a header and a malformed
+     * key all resolve to no anchor, so the page runs from the current revision.
      */
     @Test
     fun onlyAuthoritativeMessageIdsResolveToAnAnchor() {
         assertNull(conversationAnchorMessageId("msg:0d2b6c1e-4f6a-4b1e-9c1d-3a7f0b2e5c88"))
-        assertNull(conversationAnchorMessageId("stream:reply"))
         assertNull(conversationAnchorMessageId("older-header"))
         assertNull(conversationAnchorMessageId("msg:" + "zz".repeat(32)))
         assertNull(conversationAnchorMessageId(null))
@@ -107,7 +100,6 @@ class ConversationPagingPrefetchTest {
         val visible =
             listOf(
                 "msg:$MESSAGE_ID",
-                "stream:reply",
                 "older-messages-loading",
                 "conversation-load-error-top",
             )

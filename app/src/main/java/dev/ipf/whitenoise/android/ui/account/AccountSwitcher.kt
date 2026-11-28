@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,7 +41,11 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.accountShowsUnreadDot
 import dev.ipf.whitenoise.android.state.otherAccountAvatars
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.SlotIconButton
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
+import dev.ipf.whitenoise.android.ui.emojiPlainText
+import dev.ipf.whitenoise.android.ui.rememberEmojiPlainText
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSizes
 
 internal const val ACTIVE_ACCOUNT_UNREAD_DOT_TAG = "active-account-unread-dot"
 
@@ -52,7 +55,7 @@ fun AccountAvatarButton(
     title: String,
     seed: String,
     pictureUrl: String?,
-    size: Dp = 40.dp,
+    size: Dp = WhiteNoiseSizes.AvatarCompact,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     // Per-account unread dot (#592, #805): a small accent dot on the active
@@ -71,14 +74,17 @@ fun AccountAvatarButton(
     val accountUnreadDescription =
         stringResource(R.string.account_unread_indicator)
     val safePictureUrl = ProfileSanitizer.protocolImageUrl(pictureUrl)
+    val spokenTitle = emojiPlainText(title)
     val avatarContentDescription =
         if (showUnreadDot) {
-            "$openSettingsDescription, $title, $accountUnreadDescription"
+            "$openSettingsDescription, $spokenTitle, $accountUnreadDescription"
         } else {
-            "$openSettingsDescription, $title"
+            "$openSettingsDescription, $spokenTitle"
         }
-    IconButton(
+    // A slot button, so the composer's 36 by 48 dp identity slot keeps a round highlight and its whole touch area.
+    SlotIconButton(
         onClick = onClick,
+        highlightMax = touchTargetSize,
         modifier =
             modifier
                 .size(touchTargetSize)
@@ -109,7 +115,7 @@ fun AccountAvatarButton(
                     modifier =
                         Modifier
                             .align(Alignment.BottomEnd)
-                            // Keep the complete marker inside IconButton's circular clip.
+                            // Inset so the whole marker sits on the avatar's edge.
                             .offset(x = (-2).dp, y = (-2).dp)
                             .size(12.dp)
                             .testTag(ACTIVE_ACCOUNT_UNREAD_DOT_TAG)
@@ -226,9 +232,10 @@ internal fun OtherAccountAvatarsRow(
     val currentOnOpenSwitcher by rememberUpdatedState(onOpenSwitcher)
     val switchAccountLabel = stringResource(R.string.switch_account)
     val unreadLabel = stringResource(R.string.account_unread_indicator)
+    val plainText = rememberEmojiPlainText()
     val actionLabels =
         shown.map { account ->
-            val title = appState.accountDisplayNameCached(account.accountIdHex)
+            val title = plainText(appState.accountDisplayNameCached(account.accountIdHex))
             buildString {
                 append(switchAccountLabel)
                 append(": ")

@@ -228,6 +228,8 @@ internal fun timelineRecord(
     plaintext: String = "body-$messageId",
 ): TimelineMessageRecordFfi =
     TimelineMessageRecordFfi(
+        agentItem = null,
+        agentItemFirstEventMissing = false,
         clientToken = null,
         messageIdHex = messageId,
         sourceMessageIdHex = messageId,
@@ -244,7 +246,7 @@ internal fun timelineRecord(
         replyPreview = null,
         mediaJson = null,
         media = emptyList(),
-        agentTextStreamJson = null,
+        thread = null,
         poll = null,
         groupSystem = null,
         hasReports = false,

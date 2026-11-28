@@ -39,6 +39,7 @@ internal const val OPEN_CONVERSATION_VISIBLE_TRACE = "benchmark:open-conversatio
 internal const val OPEN_CONVERSATION_SETTLED_TRACE = "benchmark:open-conversation-settled"
 internal const val OPEN_CONVERSATION_SETTINGS_TRACE = "benchmark:open-conversation-settings"
 internal const val WARM_RESUME_FIRST_USEFUL_FRAME_TRACE = "WhiteNoise.warmResume.firstUsefulFrame"
+internal const val WARM_RESUME_FIRST_ACCEPTED_INPUT_TRACE = "WhiteNoise.warmResume.firstAcceptedInput"
 private const val NETWORK_RECOVERY_ATTEMPT_TRACE = "WhiteNoise.recovery.network-attempt"
 private const val NETWORK_RECOVERY_CATCH_UP_TRACE = "WhiteNoise.recovery.catchUp.network-reconnect"
 private const val PUSH_WAKE_LOCK_TRACE = "WhiteNoise.recovery.push-wake-lock"
@@ -103,6 +104,33 @@ internal fun startupMetrics(): List<Metric> =
                 targetPackageOnly = true,
             )
         }
+
+internal const val STARTUP_LOCAL_CHECKPOINT_TRACE = "benchmark:startup-local-checkpoint"
+
+/** End-to-end launch and accessibility observation. StartupTimingMetric still measures the platform's first draw. */
+@OptIn(ExperimentalMetricApi::class)
+internal fun populatedStartupMetrics(): List<Metric> =
+    startupMetrics() +
+        listOf(
+            TraceSectionMetric(
+                sectionName = STARTUP_LOCAL_CHECKPOINT_TRACE,
+                mode = TraceSectionMetric.Mode.First,
+                label = "startupLocalCheckpointMs",
+                targetPackageOnly = false,
+            ),
+            TraceSectionMetric(
+                sectionName = "WhiteNoise.marmot.chatList",
+                mode = TraceSectionMetric.Mode.First,
+                label = "firstChatListRead",
+                targetPackageOnly = true,
+            ),
+            TraceSectionMetric(
+                sectionName = "WhiteNoise.marmot.userProfile",
+                mode = TraceSectionMetric.Mode.First,
+                label = "firstProfileRead",
+                targetPackageOnly = true,
+            ),
+        )
 
 @OptIn(ExperimentalMetricApi::class)
 internal fun journeyMetrics(sectionName: String): List<Metric> =
@@ -268,6 +296,17 @@ internal fun warmResumeMetrics(): List<Metric> =
             targetPackageOnly = true,
         ),
     )
+
+/** Warm resume to the first chat-row tap the app handled, retries included (#3780). */
+@OptIn(ExperimentalMetricApi::class)
+internal fun warmResumeInputMetrics(): List<Metric> =
+    warmResumeMetrics() +
+        TraceSectionMetric(
+            sectionName = WARM_RESUME_FIRST_ACCEPTED_INPUT_TRACE,
+            mode = TraceSectionMetric.Mode.First,
+            label = "firstAcceptedInputMs",
+            targetPackageOnly = true,
+        )
 
 /**
  * Resource signals for a validated offline-to-online recovery episode.

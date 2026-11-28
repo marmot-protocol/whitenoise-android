@@ -10,8 +10,9 @@ name: Android CI
 # separate workflow (see issue #247). Merge groups and full-matrix pull requests also
 # build both shipping R8 variants, unsigned, and fail on their post-R8 DEX method budgets.
 #
-# Activated queue mode uses compile/style/security PR prechecks and full
-# integration suites. Unset/unknown modes preserve prior PR validation.
+# Activated queue mode uses compile/style/security PR prechecks, which also verify
+# the Zapstore screenshot goldens, and full integration suites. Unset/unknown modes
+# preserve prior PR validation.
 # ci:full opts into the complete two-distribution core matrix. Every merge group,
 # nightly and dispatch run stays full (docs/ci-request-policy.md), and so does every
 # master push except one of a commit its merge group already validated, which reuses that
@@ -26,7 +27,7 @@ name: Android CI
 
 on:
   pull_request:
-    branches: [master]
+    branches: [master, develop]
     types: [opened, synchronize, reopened, ready_for_review]
   merge_group:
     types: [checks_requested]
@@ -76,6 +77,8 @@ jobs:
       reuse: ${{ steps.reuse.outputs.reuse }}
       reuse_run: ${{ steps.reuse.outputs.reuse_run }}
       tree: ${{ steps.reuse.outputs.tree }}
+      pr_base: ${{ steps.classify.outputs.pr_base }}
+      proof_base: ${{ steps.classify.outputs.proof_base }}
       lint_writer: ${{ steps.reuse.outputs.lint_writer }}
     steps:
       - name: Checkout
@@ -109,10 +112,10 @@ jobs:
       - name: Classify complete PR diff
         id: classify
         env:
-          ANDROID_CI_MODE: ${{ vars.ANDROID_CI_MODE }}
+          ANDROID_CI_MODE: ${{ github.base_ref == 'develop' && 'legacy' || vars.ANDROID_CI_MODE }}
           CI_CURRENT_LABELS: ${{ steps.labels.outputs.labels }}
           CI_EVENT: ${{ github.event_name }}
-          BASE_SHA: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha || github.event.before }}
+          BASE_SHA: ${{ github.event.merge_group.base_sha || github.event.before }}
           HEAD_SHA: ${{ github.event.merge_group.head_sha || github.event.pull_request.head.sha || github.sha }}
           GIT_NO_REPLACE_OBJECTS: '1'
         run: python3 -I scripts/check_ci_changes.py --event "$CI_EVENT" --base "$BASE_SHA" --head "$HEAD_SHA"
@@ -132,6 +135,8 @@ jobs:
           CI_MODE: ${{ steps.classify.outputs.ci_mode }}
           CI_DOCS_ONLY: ${{ steps.classify.outputs.docs_only }}
           CI_HEAD_SHA: ${{ github.sha }}
+          CI_BASE_REF: ${{ github.base_ref }}
+          CI_BASE_SHA: ${{ steps.classify.outputs.proof_base }}
           CI_BEFORE_SHA: ${{ github.event.before }}
           ANDROID_CI_REUSE: ${{ vars.ANDROID_CI_REUSE }}
           GIT_NO_REPLACE_OBJECTS: '1'
@@ -140,6 +145,7 @@ jobs:
           # The script bounds its own API time; this backstop keeps a hung call from using up the job.
           if ! timeout 300 python3 -I scripts/ci_reuse.py --repo "$CI_REPO" --event "$CI_EVENT" --action "$CI_ACTION" \
               --mode "$CI_MODE" --docs-only "$CI_DOCS_ONLY" --head-sha "$CI_HEAD_SHA" \
+              --base-ref "$CI_BASE_REF" --base-sha "$CI_BASE_SHA" \
               --before "$CI_BEFORE_SHA" --setting "$ANDROID_CI_REUSE"; then
             echo '::warning title=Validation reuse::The lookup failed, so this run validates in full.'
             printf 'reuse=none\nreuse_run=\ntree=\nlint_writer=false\n' >> "$GITHUB_OUTPUT"
@@ -147,6 +153,13 @@ jobs:
 
       # Other PR-controlled code runs only now, after the classifier and the lookup have written
       # their outputs, so it cannot alter them.
+      - name: Require Stable MarmotKit on master
+        if: >-
+          github.ref == 'refs/heads/master' ||
+          github.event.pull_request.base.ref == 'master' ||
+          github.event.merge_group.base_ref == 'refs/heads/master'
+        run: python3 -B scripts/check_marmotkit_release_channel.py
+
       - name: Test conservative CI classification
         run: python3 -m unittest scripts/test_check_ci_changes.py
 
@@ -207,16 +220,18 @@ jobs:
 
       - name: Validate manual release guide
         env:
-          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          CI_EVENT: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ needs.changes.outputs.pr_base }}
         run: |
           python3 scripts/check_manual_test_guide.py
-          if [[ -n "$PR_BASE_SHA" ]]; then
+          if [[ "$CI_EVENT" == pull_request ]]; then
+            : "${PR_BASE_SHA:?Could not verify the base of the checked-out PR merge}"
             python3 scripts/check_manual_test_guide.py --base "$PR_BASE_SHA"
           fi
 
       - name: Check the source file size baseline only shrinks
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          BASE_SHA: ${{ needs.changes.outputs.pr_base || github.event.merge_group.base_sha }}
         run: |
           python3 -m unittest scripts/test_check_source_size_baseline.py
           if [[ -n "$BASE_SHA" ]]; then
@@ -226,7 +241,7 @@ jobs:
       - name: Assemble the source-bound manual testing guide
         env:
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_BASE_SHA: ${{ needs.changes.outputs.pr_base }}
         run: |
           python3 scripts/check_manual_test_guide.py --output-dir build/manual-release-testing
           python3 scripts/maestro_coverage.py --require-screens --output build/manual-release-testing/campaign-inventory.json \
@@ -246,7 +261,7 @@ jobs:
       - name: Test PR GitHub scripts
         run: >-
           node --test .github/scripts/update-pr-screenshots.test.js .github/scripts/update-pr-preview-links.test.js
-          .github/scripts/check-invariant-gate.test.js
+          .github/scripts/check-invariant-gate.test.js .github/scripts/report-pr-merge-order.test.js
 
       - name: Test GitHub triage reconciliation
         run: python3 -m unittest scripts/test_check_github_triage.py
@@ -311,7 +326,9 @@ jobs:
         run: ./scripts/check-release-metadata.py
 
       - name: Test MarmotKit artifact preparation
-        run: ./scripts/test-prepare-marmotkit-artifact.sh
+        run: |
+          ./scripts/test-prepare-marmotkit-artifact.sh
+          bash .github/scripts/test-publish-marmotkit-rc.sh
 
       - name: Verify generated performance profiles
         run: |
@@ -354,11 +371,11 @@ jobs:
           persist-credentials: false
           ref: ${{ github.sha }}
 
-      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: '17'
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version: '1.24.11'
           cache: false
@@ -405,7 +422,7 @@ jobs:
 
       # AGP 9.x / Gradle 9.4.1 require JDK 17.
       - name: Set up JDK 17
-        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: '17'
@@ -757,7 +774,7 @@ jobs:
         run: printf 'WHITENOISE_MARMOTKIT_CACHE_DIR=%s\n' "$RUNNER_TEMP/marmotkit-cache" >> "$GITHUB_ENV"
 
       - name: Set up JDK 17
-        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: '17'
@@ -837,7 +854,8 @@ jobs:
           retention-days: 14
   # Prechecks compile every test source set here. Full runs compile main and unit-test
   # sources once per flavor and hand the new build-cache entries to the four unit shards,
-  # which would otherwise each repeat the same 5-7 minute compilation.
+  # which would otherwise each repeat the same 5-7 minute compilation. Prechecks hand
+  # Zapstore's entries to its screenshot shards the same way.
   compile-tests:
     needs: changes
     if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.reuse == 'none'
@@ -862,7 +880,7 @@ jobs:
 
       # AGP 9.x / Gradle 9.4.1 require JDK 17.
       - name: Set up JDK 17
-        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: '17'
@@ -888,9 +906,9 @@ jobs:
           key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
 
       # Four heavy Kotlin test compilations previously shared one compiler JVM.
-      # Each runner now owns one flavor and one active compiler task, using the
-      # existing configured heaps. Test execution remains in the full suites,
-      # where shard 0 still compiles androidTest sources.
+      # Each runner owns one flavor and one active compiler task. Give the Kotlin
+      # daemon room for test bytecode generation. Shard 0 still compiles
+      # androidTest sources when running the full suites.
       - name: Compile main and test source sets
         timeout-minutes: 25
         env:
@@ -909,11 +927,12 @@ jobs:
             )
           fi
           touch "$RUNNER_TEMP/compile-started"
-          ./gradlew "${tasks[@]}" --max-workers=1 --build-cache --profile --no-daemon --stacktrace
+          ./gradlew "${tasks[@]}" --max-workers=1 --build-cache --profile --no-daemon --stacktrace \
+            -Pkotlin.daemon.jvmargs=-Xmx5g
 
       # Only entries written by this compilation; the shards already restore the master cache.
       - name: Package new build-cache entries
-        if: success() && needs.changes.outputs.precheck != 'true'
+        if: success() && (needs.changes.outputs.precheck != 'true' || matrix.flavor == 'Zapstore')
         shell: bash
         run: |
           cd ~/.gradle/caches/build-cache-1
@@ -922,7 +941,7 @@ jobs:
           tar -tf "$RUNNER_TEMP/unit-compile-cache.tar" | wc -l
 
       - name: Share compiled outputs with the unit shards
-        if: success() && needs.changes.outputs.precheck != 'true'
+        if: success() && (needs.changes.outputs.precheck != 'true' || matrix.flavor == 'Zapstore')
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: unit-compile-cache-${{ matrix.flavor }}
@@ -1003,7 +1022,7 @@ jobs:
 
       # AGP 9.x / Gradle 9.4.1 require JDK 17.
       - name: Set up JDK 17
-        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: '17'
@@ -1088,10 +1107,12 @@ jobs:
   # top-level name hashes to its index (see ciTestShard in build.gradle.kts) and takes
   # its compiled sources from compile-tests' build-cache entries, so it runs about a
   # quarter of the suite without recompiling. The coverage job below merges every
-  # shard's screenshot summary and Kover binary report.
+  # shard's screenshot summary and Kover binary report. PR prechecks run only the tests
+  # that own committed goldens (config/screenshot-baseline-owners.txt), so a screenshot
+  # mismatch fails the PR instead of the merge group; coverage stays at integration.
   tests:
     needs: [changes, compile-tests]
-    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.reuse == 'none' && needs.changes.outputs.precheck != 'true'
+    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.reuse == 'none'
     name: Unit tests and screenshots (${{ matrix.flavor }}, shard ${{ matrix.shard }})
     runs-on: ubuntu-latest
     timeout-minutes: 40
@@ -1108,11 +1129,11 @@ jobs:
         flavor: ${{ fromJSON(github.event_name == 'pull_request' && needs.changes.outputs.full_matrix != 'true' && '["Zapstore"]' || '["Zapstore", "Play"]') }}
         shard: [0, 1, 2, 3]
     steps:
-      # Include checkout/setup time; never reset this budget when tests start.
+      # Include setup time and let the supervisor dump threads and clean up before the 30-minute step limit.
       - name: Reserve unit-test diagnostics and upload time
         shell: bash
         run: |
-          python3 -c 'import time; print("UNIT_TEST_DEADLINE_MONOTONIC=" + str(time.monotonic() + 32 * 60))' >> "$GITHUB_ENV"
+          python3 -c 'import time; print("UNIT_TEST_DEADLINE_MONOTONIC=" + str(time.monotonic() + 28 * 60))' >> "$GITHUB_ENV"
 
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -1126,7 +1147,7 @@ jobs:
 
       # AGP 9.x / Gradle 9.4.1 require JDK 17.
       - name: Set up JDK 17
-        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: '17'
@@ -1179,21 +1200,27 @@ jobs:
 
       # Shard 0 also compiles androidTest sources on full runs and, for Zapstore, writes
       # the Kover artifact that names the class directories the coverage job needs.
+      # Prechecks select only the registered golden owners and skip Kover.
       - name: Unit tests
         timeout-minutes: 30
         id: unit_tests
         env:
           CI_FULL_MATRIX: ${{ needs.changes.outputs.full_matrix }}
+          CI_PRECHECK: ${{ needs.changes.outputs.precheck }}
         run: |
           extra_tasks=()
+          test_filters=()
           if [[ "$ORG_GRADLE_PROJECT_ciTestShard" == 0 && "$CI_FULL_MATRIX" == true ]]; then
             extra_tasks+=(:app:compileDev${{ matrix.flavor }}DebugAndroidTestKotlin)
           fi
-          if [[ "$ORG_GRADLE_PROJECT_ciTestShard" == 0 && "${{ matrix.flavor }}" == Zapstore ]]; then
+          if [[ "$CI_PRECHECK" == true ]]; then
+            mapfile -t test_filters < <(python3 scripts/check_screenshot_baseline_owners.py --gradle-test-args)
+            (( ${#test_filters[@]} > 0 )) || { echo "The screenshot owner registry selected no tests" >&2; exit 1; }
+          elif [[ "$ORG_GRADLE_PROJECT_ciTestShard" == 0 && "${{ matrix.flavor }}" == Zapstore ]]; then
             extra_tasks+=(:app:koverGenerateArtifactDevZapstoreDebug)
           fi
           python3 scripts/run_unit_tests_with_diagnostics.py -- \
-            ./gradlew "${extra_tasks[@]}" :app:testDev${{ matrix.flavor }}DebugUnitTest \
+            ./gradlew "${extra_tasks[@]}" :app:testDev${{ matrix.flavor }}DebugUnitTest "${test_filters[@]}" \
             -Proborazzi.test.verify=true --build-cache --profile --no-daemon --stacktrace
 
       # Upload before later gates: a timed-out child must not lose its actual PNGs.
@@ -1233,7 +1260,7 @@ jobs:
           retention-days: 7
 
       - name: Upload shard coverage data
-        if: ${{ !cancelled() && matrix.flavor == 'Zapstore' && steps.unit_tests.outcome == 'success' }}
+        if: ${{ !cancelled() && needs.changes.outputs.precheck != 'true' && matrix.flavor == 'Zapstore' && steps.unit_tests.outcome == 'success' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: kover-binary-Zapstore-${{ matrix.shard }}
@@ -1242,11 +1269,11 @@ jobs:
           retention-days: 3
 
       - name: Pack Kover class directories
-        if: ${{ !cancelled() && matrix.flavor == 'Zapstore' && matrix.shard == 0 && steps.unit_tests.outcome == 'success' }}
+        if: ${{ !cancelled() && needs.changes.outputs.precheck != 'true' && matrix.flavor == 'Zapstore' && matrix.shard == 0 && steps.unit_tests.outcome == 'success' }}
         run: python3 scripts/kover_class_outputs.py pack app/build/kover/devZapstoreDebug.artifact build/kover-classes.tar
 
       - name: Upload Kover class directories
-        if: ${{ !cancelled() && matrix.flavor == 'Zapstore' && matrix.shard == 0 && steps.unit_tests.outcome == 'success' }}
+        if: ${{ !cancelled() && needs.changes.outputs.precheck != 'true' && matrix.flavor == 'Zapstore' && matrix.shard == 0 && steps.unit_tests.outcome == 'success' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: kover-classes-Zapstore
@@ -1298,9 +1325,11 @@ jobs:
   # Merge the unit-test shards: every committed golden must be compared by some shard,
   # and Zapstore coverage gates read all shards' binary reports. Kover runs against the
   # class directories shard 0 compiled, so this job neither recompiles nor reruns tests.
+  # Drafts and PR prechecks run only the golden check; in a precheck it catches a
+  # golden whose capturing test is missing from the owner registry.
   coverage:
     needs: [changes, tests]
-    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.reuse == 'none' && needs.changes.outputs.precheck != 'true'
+    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.reuse == 'none'
     name: Screenshot ownership and coverage
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -1329,28 +1358,28 @@ jobs:
           done
 
       - name: Configure MarmotKit cache directory
-        if: ${{ !github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true' }}
+        if: ${{ needs.changes.outputs.precheck != 'true' && (!github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true') }}
         shell: bash
         run: printf 'WHITENOISE_MARMOTKIT_CACHE_DIR=%s\n' "$RUNNER_TEMP/marmotkit-cache" >> "$GITHUB_ENV"
 
       # AGP 9.x / Gradle 9.4.1 require JDK 17.
       - name: Set up JDK 17
-        if: ${{ !github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true' }}
-        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        if: ${{ needs.changes.outputs.precheck != 'true' && (!github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true') }}
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: '17'
 
       # Report tasks only; the shards own the cache entries.
       - name: Set up Gradle
-        if: ${{ !github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true' }}
+        if: ${{ needs.changes.outputs.precheck != 'true' && (!github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true') }}
         uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
         with:
           cache-read-only: true
 
       - name: Read MarmotKit artifact pin
         id: marmotkit
-        if: ${{ !github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true' }}
+        if: ${{ needs.changes.outputs.precheck != 'true' && (!github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true') }}
         shell: bash
         run: |
           sha="$(awk -F= '$1 == "artifact-sha256" { print $2 }' app/src/main/marmotkit/MARMOT_VERSION)"
@@ -1358,21 +1387,21 @@ jobs:
           printf 'sha=%s\n' "$sha" >> "$GITHUB_OUTPUT"
 
       - name: Restore MarmotKit artifact
-        if: ${{ !github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true' }}
+        if: ${{ needs.changes.outputs.precheck != 'true' && (!github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true') }}
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/marmotkit-cache
           key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
 
       - name: Download shard coverage data
-        if: ${{ !github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true' }}
+        if: ${{ needs.changes.outputs.precheck != 'true' && (!github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true') }}
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           pattern: kover-binary-Zapstore-*
           path: build/kover-shards
 
       - name: Download Kover class directories
-        if: ${{ !github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true' }}
+        if: ${{ needs.changes.outputs.precheck != 'true' && (!github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true') }}
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: kover-classes-Zapstore
@@ -1380,7 +1409,7 @@ jobs:
 
       # Name each shard's report uniquely in one directory and require all four.
       - name: Restore shard coverage inputs
-        if: ${{ !github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true' }}
+        if: ${{ needs.changes.outputs.precheck != 'true' && (!github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true') }}
         run: |
           mkdir -p build/kover-shard-reports
           for shard in 0 1 2 3; do
@@ -1393,22 +1422,23 @@ jobs:
       # app/build.gradle.kts, then publish the HTML/XML report. DevZapstoreDebug only; the
       # aggregate kover tasks pull in release variants, whose packaging trips the
       # unsigned-release guard (no signing in CI). Compilation and tests are excluded:
-      # the restored classes and shard reports are the inputs.
+      # the restored classes and shard reports are the inputs. --continue still writes
+      # both reports when a floor fails, so a failing run has a report to upload.
       - name: Coverage gate and report (Kover)
-        if: ${{ !github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true' }}
+        if: ${{ needs.changes.outputs.precheck != 'true' && (!github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true') }}
         run: >-
           ./gradlew :app:koverVerifyDevZapstoreDebug :app:koverXmlReportDevZapstoreDebug
           :app:koverHtmlReportDevZapstoreDebug
           -x :app:testDevZapstoreDebugUnitTest -x :app:compileDevZapstoreDebugKotlin
           -x :app:compileDevZapstoreDebugJavaWithJavac
           -Pwhitenoise.koverShardReportsDir="$PWD/build/kover-shard-reports"
-          -Proborazzi.test.verify=true --profile --no-daemon --stacktrace
+          -Proborazzi.test.verify=true --continue --profile --no-daemon --stacktrace
 
       # Reuse the merged report; no extra Gradle invocation or tests.
       # Runtime listener: 16/17 lines (94.1176%), zero eligible branches.
       # Viewport family: 82/82 lines, 52/56 branches; preserve 100%/90% floors.
       - name: Runtime listener and viewport restoration coverage floors
-        if: ${{ !github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true' }}
+        if: ${{ needs.changes.outputs.precheck != 'true' && (!github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true') }}
         run: |
           python3 scripts/check_runtime_listener_coverage.py app/build/reports/kover/reportDevZapstoreDebug.xml
           python3 scripts/check_viewport_restoration_coverage.py app/build/reports/kover/reportDevZapstoreDebug.xml
@@ -1453,7 +1483,7 @@ jobs:
 
       # AGP 9.x / Gradle 9.4.1 require JDK 17.
       - name: Set up JDK 17
-        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: '17'
@@ -1500,8 +1530,10 @@ jobs:
             class="${class%.*}"
             filters+=(--tests "${class//\//.}")
           done
+          # Use the same compiler budget as the isolated test-source compilation.
           ./gradlew :app:compileDevPlayDebugAndroidTestKotlin :app:testDevPlayDebugUnitTest "${filters[@]}" \
-            -Proborazzi.test.verify=true --build-cache --profile --daemon --stacktrace
+            -Proborazzi.test.verify=true --max-workers=1 --build-cache --profile --no-daemon --stacktrace \
+            -Pkotlin.daemon.jvmargs=-Xmx5g
 
       - name: Upload reports
         if: failure()
@@ -1648,12 +1680,13 @@ jobs:
           JOB_RESULTS: ${{ toJSON(needs) }}
           CI_EVENT: ${{ github.event_name }}
           PR_DRAFT: ${{ github.event.pull_request.draft == true }}
-          ANDROID_CI_MODE: ${{ vars.ANDROID_CI_MODE }}
+          CI_BASE_REF: ${{ github.base_ref }}
+          ANDROID_CI_MODE: ${{ github.base_ref == 'develop' && 'legacy' || vars.ANDROID_CI_MODE }}
         shell: bash
         run: |
           set -euo pipefail
           printf '%s\n' "$JOB_RESULTS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
-          printf '%s\n' "$JOB_RESULTS" | jq -e --arg event "$CI_EVENT" --arg draft "$PR_DRAFT" --arg mode "$ANDROID_CI_MODE" '
+          printf '%s\n' "$JOB_RESULTS" | jq -e --arg event "$CI_EVENT" --arg draft "$PR_DRAFT" --arg mode "$ANDROID_CI_MODE" --arg base "$CI_BASE_REF" '
             (.changes.outputs.full_matrix == "true") as $full |
             ($event == "pull_request" and $draft == "true" and ($full | not)) as $is_draft |
             (.changes.outputs.precheck == "true") as $precheck |
@@ -1675,7 +1708,7 @@ jobs:
             (.changes.outputs.lint_writer == "true" or .changes.outputs.lint_writer == "false") and
             (($reuse == "push") or (.changes.outputs.lint_writer == "false")) and
             (($reuse != "tree") or ((.changes.outputs.ci_mode == "full" or .changes.outputs.ci_mode == "precheck") and
-              ($event == "pull_request" and $draft == "false"))) and
+              ($event == "pull_request" and $draft == "false" and $base == "master"))) and
             (($reuse != "push") or ($event == "push" and $full)) and
             (($reuse != "none") or (."tooling-contracts".result == "success")) and
             (.changes.outputs.docs_only == "true" or .changes.outputs.docs_only == "false") and
@@ -1691,35 +1724,41 @@ jobs:
                 elif .key == "compose-compiler" then .value.result == (if $campaigns == "false" then "skipped" else "success" end)
                 elif .key == "static-analysis" then .value.result == (if $lint == "true" then "success" else "skipped" end)
                 else .value.result == "skipped" end)
-              elif $precheck and (.key == "tests" or .key == "coverage" or .key == "static-analysis" or .key == "secondary-variant") then .value.result == "skipped"
+              elif $precheck and (.key == "static-analysis" or .key == "secondary-variant") then .value.result == "skipped"
               elif .key == "compose-compiler" and ($campaigns == "false" or $is_draft or $event == "pull_request" or $event == "merge_group") then .value.result == "skipped"
               elif .key == "secondary-variant" then .value.result == (if $is_ready then "success" else "skipped" end)
               else .value.result == "success" end) end)
           ' > /dev/null
 
-      # Real validation of a pull request tree becomes a proof for identical content: the
-      # queue and the ready-for-review run look this artifact up by its lane and tree
+      # Real validation of a master pull request tree becomes a proof for identical content.
+      # A ready-for-review run looks this artifact up by checked-out base, lane and tree
       # (scripts/ci_reuse.py re-verifies the producing run before trusting it). Only this
       # job's own success after real jobs ran records a proof, so reuse never chains from a skip.
       # A proof only saves time later, so a failed write or upload must never turn the required check red.
       - name: Write the validated tree proof
-        if: success() && github.event_name == 'pull_request' && needs.changes.outputs.reuse == 'none' && needs.changes.outputs.docs_only == 'false' && needs.changes.outputs.tree != '' && (needs.changes.outputs.ci_mode == 'precheck' || needs.changes.outputs.ci_mode == 'full')
+        if: success() && github.event_name == 'pull_request' && github.base_ref == 'master' && needs.changes.outputs.reuse == 'none' && needs.changes.outputs.docs_only == 'false' && needs.changes.outputs.proof_base != '' && needs.changes.outputs.tree != '' && (needs.changes.outputs.ci_mode == 'precheck' || needs.changes.outputs.ci_mode == 'full')
         continue-on-error: true
         env:
           PROOF_LANE: ${{ needs.changes.outputs.ci_mode }}
           PROOF_TREE: ${{ needs.changes.outputs.tree }}
+          PROOF_BASE: ${{ needs.changes.outputs.proof_base }}
           PROOF_HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
           mkdir -p build/validated-tree
-          printf '{"lane":"%s","tree":"%s","head":"%s","run":"%s"}\n' \
-            "$PROOF_LANE" "$PROOF_TREE" "$PROOF_HEAD" "$GITHUB_RUN_ID" > build/validated-tree/proof.json
+          printf '{"lane":"%s","tree":"%s","base":"%s","head":"%s","run":"%s"}\n' \
+            "$PROOF_LANE" "$PROOF_TREE" "$PROOF_BASE" "$PROOF_HEAD" "$GITHUB_RUN_ID" > build/validated-tree/proof.json
 
       - name: Retain the validated tree proof
-        if: success() && github.event_name == 'pull_request' && needs.changes.outputs.reuse == 'none' && needs.changes.outputs.docs_only == 'false' && needs.changes.outputs.tree != '' && (needs.changes.outputs.ci_mode == 'precheck' || needs.changes.outputs.ci_mode == 'full')
+        id: proof_upload
+        if: success() && github.event_name == 'pull_request' && github.base_ref == 'master' && needs.changes.outputs.reuse == 'none' && needs.changes.outputs.docs_only == 'false' && needs.changes.outputs.proof_base != '' && needs.changes.outputs.tree != '' && (needs.changes.outputs.ci_mode == 'precheck' || needs.changes.outputs.ci_mode == 'full')
         continue-on-error: true
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: android-ci-attest-${{ needs.changes.outputs.ci_mode }}-${{ needs.changes.outputs.tree }}
+          name: android-ci-attest-master-${{ needs.changes.outputs.proof_base }}-${{ needs.changes.outputs.ci_mode }}-${{ needs.changes.outputs.tree }}
           path: build/validated-tree/
           if-no-files-found: error
           retention-days: 7
+
+      - name: Record validated tree proof ${{ steps.proof_upload.outputs.artifact-id }}
+        if: steps.proof_upload.outcome == 'success' && steps.proof_upload.outputs.artifact-id != ''
+        run: ':'

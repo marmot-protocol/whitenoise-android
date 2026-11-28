@@ -37,17 +37,13 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -73,7 +69,6 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
@@ -89,13 +84,16 @@ import dev.ipf.whitenoise.android.media.editor.PhotoEditRecipe
 import dev.ipf.whitenoise.android.media.editor.PhotoEditorSourceInfo
 import dev.ipf.whitenoise.android.media.editor.PhotoStrokeMode
 import dev.ipf.whitenoise.android.state.MediaQuality
-import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
 import dev.ipf.whitenoise.android.ui.common.ChoiceDialog
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.nativePageBody
 import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
+import dev.ipf.whitenoise.android.ui.conversation.media.AttachmentViewerChrome
+import dev.ipf.whitenoise.android.ui.conversation.media.AttachmentViewerChromeDefaults
+import dev.ipf.whitenoise.android.ui.conversation.media.AttachmentViewerTitle
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 
@@ -242,7 +240,7 @@ internal fun PhotoEditorScreen(
     val currentOnCancel by rememberUpdatedState(onCancel)
     val discardEnabled by rememberUpdatedState(!state.isSaving && inputEnabled())
     if (showHelp) {
-        AnimatedAlertDialog(
+        WhiteNoiseAlertDialog(
             onDismissRequest = { showHelp = false },
             title = { Text(stringResource(R.string.help)) },
             text = {
@@ -257,7 +255,7 @@ internal fun PhotoEditorScreen(
     }
     if (showDiscardDialog) {
         key(stateHolder, discardEnabled) {
-            AnimatedAlertDialog(
+            WhiteNoiseAlertDialog(
                 onDismissRequest = { showDiscardDialog = false },
                 title = { Text(stringResource(R.string.photo_editor_discard_title)) },
                 text = { Text(stringResource(R.string.photo_editor_discard_message)) },
@@ -322,7 +320,7 @@ internal fun PhotoEditorScreen(
     }
 }
 
-/** Keeps cancel, history, quality and save on the app bar while the existing holder owns save acceptance. */
+/** The editor's viewer chrome: Close, title with history and quality, Save, then the existing More menu. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Suppress("LongMethod", "LongParameterList")
@@ -340,51 +338,46 @@ private fun PhotoEditorTopBar(
     var expanded by remember { mutableStateOf(false) }
     val resetLabel = stringResource(R.string.photo_editor_reset)
     val menuScrollState = rememberScrollState()
-    TopAppBar(
-        title = {
+    AttachmentViewerChrome(
+        title = stringResource(R.string.photo_editor_title),
+        onClose = onCancel,
+        closeEnabled = !saving,
+        windowInsets = AttachmentViewerChromeDefaults.topInsets(),
+        titleContent = {
             // The title slot receives only the width left after Close, More and Save, so the
             // history and quality actions sit here to give up the title's space before their own.
-            CompositionLocalProvider(LocalContentColor provides TopAppBarDefaults.topAppBarColors().actionIconContentColor) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    // A lone ellipsis beside More reads as another control, so the title stays
-                    // in semantics but is not drawn until at least one whole word fits.
-                    Column(
-                        Modifier.weight(1f).layout { measurable, constraints ->
-                            val placeable = measurable.measure(constraints)
-                            val wordFits = constraints.maxWidth >= measurable.minIntrinsicWidth(constraints.maxHeight)
-                            layout(placeable.width, placeable.height) {
-                                if (wordFits) placeable.place(0, 0) else placeable.placeWithLayer(0, 0) { alpha = 0f }
-                            }
-                        },
-                    ) {
-                        Text(
-                            stringResource(R.string.photo_editor_title),
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        if (frameCount > 1) {
-                            Text(
-                                stringResource(R.string.photo_editor_frame, frameIndex + 1),
-                                color = MaterialTheme.colorScheme.onSurface,
-                                style = MaterialTheme.typography.labelMedium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
+            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                // A lone ellipsis beside More reads as another control, so the title stays
+                // in semantics but is not drawn until at least one whole word fits.
+                Column(
+                    Modifier.weight(1f).layout { measurable, constraints ->
+                        val placeable = measurable.measure(constraints)
+                        val wordFits = constraints.maxWidth >= measurable.minIntrinsicWidth(constraints.maxHeight)
+                        layout(placeable.width, placeable.height) {
+                            if (wordFits) placeable.place(0, 0) else placeable.placeWithLayer(0, 0) { alpha = 0f }
                         }
-                    }
-                    EditorIconAction(R.drawable.ic_editor_undo, stringResource(R.string.photo_editor_undo), state.canUndo, holder::undo)
-                    EditorIconAction(R.drawable.ic_editor_redo, stringResource(R.string.photo_editor_redo), state.canRedo, holder::redo)
-                    PhotoEditorQualityAction(state.quality, !saving, onQuality)
+                    },
+                ) {
+                    AttachmentViewerTitle(
+                        title = stringResource(R.string.photo_editor_title),
+                        subtitle =
+                            if (frameCount > 1) stringResource(R.string.photo_editor_frame, frameIndex + 1) else null,
+                    )
                 }
-            }
-        },
-        navigationIcon = {
-            IconButton(onClick = onCancel, enabled = !saving) {
-                Icon(painterResource(R.drawable.ic_close), contentDescription = stringResource(R.string.close))
+                EditorIconAction(R.drawable.ic_editor_undo, stringResource(R.string.photo_editor_undo), state.canUndo, holder::undo)
+                EditorIconAction(R.drawable.ic_editor_redo, stringResource(R.string.photo_editor_redo), state.canRedo, holder::redo)
+                PhotoEditorQualityAction(state.quality, !saving, onQuality)
             }
         },
         actions = {
+            EditorIconAction(
+                R.drawable.ic_check,
+                stringResource(if (saving) R.string.photo_editor_saving_action else R.string.save),
+                !saving,
+                onSave,
+            )
+        },
+        overflow = {
             Box {
                 IconButton(onClick = { expanded = true }, enabled = !saving) {
                     Icon(painterResource(R.drawable.ic_more_horiz), stringResource(R.string.more_options))
@@ -413,12 +406,6 @@ private fun PhotoEditorTopBar(
                     )
                 }
             }
-            EditorIconAction(
-                R.drawable.ic_check,
-                stringResource(if (saving) R.string.photo_editor_saving_action else R.string.save),
-                !saving,
-                onSave,
-            )
         },
     )
 }

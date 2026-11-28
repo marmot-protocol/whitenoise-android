@@ -10,6 +10,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
@@ -33,11 +36,16 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.common.APP_MOTION_CLOSE_MILLIS
 import dev.ipf.whitenoise.android.ui.common.APP_MOTION_OPEN_MILLIS
+import dev.ipf.whitenoise.android.ui.common.AppMotionCloseEasing
 import dev.ipf.whitenoise.android.ui.common.AppMotionOpenEasing
+import dev.ipf.whitenoise.android.ui.common.motionBoundsOnScreen
+import dev.ipf.whitenoise.android.ui.common.visibleIn
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 import kotlin.math.ceil
 
@@ -58,8 +66,10 @@ internal class SettingsCardMorph(
     private val parent: SettingsCardMorph? = null,
 ) {
     val page: SettingsPageMorph? = if (fullScreen) SettingsPageMorph() else null
+
+    internal val topLevel = SettingsTopLevelHandoff()
     private val live = LinkedHashMap<Any, Rect>()
-    private val anchorOutlines = HashMap<SettingsMorphAnchor, SettingsContour>()
+    private val anchorOutlines = mutableStateMapOf<SettingsMorphAnchor, SettingsContour>()
     private val pictures = HashMap<Any, Picture>()
     private var host = Rect.Zero
     private var from: List<SettingsMorphCard> = emptyList()
@@ -68,13 +78,15 @@ internal class SettingsCardMorph(
     private var secureHolds = 0
     var captureContent = true
 
+    /** The top-level Settings frame a host's container closes with; purged by every secure hold. */
+    internal val routeSnapshot = SettingsCardSnapshot()
+
     /**
      * The control a whole route grows out of, such as a chat header. With an anchor on screen and no
      * cards, its one outline opens into the nearest group of the next route while the others arrive
      * on their own; going back, that group folds into the outline again.
      */
     var anchor: SettingsMorphAnchor? = null
-    var closingAnchor: SettingsMorphAnchor? = null
 
     /** Linear morph time from 0 to 1; read during draw so each frame follows the animation. */
     var time: () -> Float = { 1f }
@@ -88,11 +100,14 @@ internal class SettingsCardMorph(
 
     private val anchorBounds: Rect? get() = anchor?.let(live::get)?.takeIf(::onScreen)
 
-    private val anchorContour: SettingsContour? get() = anchor?.let(anchorOutlines::get)?.takeIf { onScreen(it.bounds) }
+    /** Where an opening route grows from when the click recorded no origin, as [beginPage] resolves it. */
+    internal val anchorOrigin: Rect? get() = anchorContour?.bounds ?: anchorBounds
+
+    internal val anchorContour: SettingsContour?
+        get() = anchor?.let(anchorOutlines::get)?.takeIf { onScreen(it.bounds) }
 
     init {
         page?.anchorContour = { anchorContour }
-        page?.closingAnchorContour = { closingAnchor?.let(anchorOutlines::get) ?: anchorContour }
     }
 
     private val folding: Boolean get() = gather != null || (!fan && anchorBounds != null && cardTokens.isEmpty())
@@ -106,12 +121,15 @@ internal class SettingsCardMorph(
     internal fun observeChildContours(): () -> Unit {
         val read = { page?.presentedContours(host, time()) }
         val bodyTop = { page?.bodyTop ?: 0f }
+        val cards = { page?.bubbleCards().orEmpty() }
         parent?.page?.childContours = read
         parent?.page?.childBodyTop = bodyTop
+        parent?.page?.childCards = cards
         return {
             parent?.page?.let {
                 if (it.childContours === read) it.childContours = null
                 if (it.childBodyTop === bodyTop) it.childBodyTop = null
+                if (it.childCards === cards) it.childCards = null
             }
         }
     }
@@ -170,6 +188,7 @@ internal class SettingsCardMorph(
         val releaseParent = parent?.holdSecure()
         from = from.map { SettingsMorphCard(it.bounds, null) }
         pictures.clear()
+        routeSnapshot.picture = null
         page?.clearPictures()
         return {
             secureHolds--
@@ -281,6 +300,9 @@ internal class SettingsCardMorph(
         host = bounds
     }
 
+    /** The route host's last measured bounds, in the same screen coordinates as reported origins. */
+    internal val hostBounds: Rect get() = host
+
     private fun onScreen(bounds: Rect): Boolean = host.isEmpty || bounds.overlaps(host)
 }
 
@@ -316,7 +338,7 @@ internal val LocalSettingsCardMorph = compositionLocalOf<SettingsCardMorph?> { n
 
 /**
  * Marks one Settings card (a row group or panel), or the [anchor] control a route grows from, as a
- * motion block. Fullscreen routes register geometry only; their page owns the sole permitted
+ * motion block. Fullscreen routes register geometry here and keep their sole permitted
  * picture. The non-page facade retains its existing card treatment. No effect outside a route host.
  */
 @Composable
@@ -327,7 +349,7 @@ internal fun Modifier.settingsCardMorph(anchor: SettingsMorphAnchor? = null): Mo
     val token = remember(morph, anchor) { anchor ?: Any() }
     DisposableEffect(morph, token) { onDispose { morph.remove(token) } }
     // Reported outside the card's own layer, so the bounds stay the settled ones while it travels.
-    val positioned = onGloballyPositioned { morph.report(token, it.settingsMorphBounds(view)) }
+    val positioned = onGloballyPositioned { morph.report(token, it.motionBoundsOnScreen(view)) }
     // An anchor only marks where routes grow from; it neither travels nor is recorded.
     return if (anchor != null || morph.page != null) {
         positioned
@@ -348,6 +370,7 @@ internal fun Modifier.settingsMorphAnchorOutline(
     shape: Shape,
     color: Color,
     width: Dp = 1.dp,
+    fill: Color = Color.Unspecified,
 ): Modifier {
     val morph = LocalSettingsCardMorph.current
     if (morph?.page == null) return this
@@ -356,28 +379,23 @@ internal fun Modifier.settingsMorphAnchorOutline(
     val direction = LocalLayoutDirection.current
     DisposableEffect(morph, anchor) { onDispose { morph.removeAnchorOutline(anchor) } }
     return onGloballyPositioned { coordinates ->
-        val bounds = coordinates.settingsMorphBounds(view)
+        val bounds = coordinates.motionBoundsOnScreen(view)
         val corners =
             when (val outline = shape.createOutline(bounds.size, direction, density)) {
                 is Outline.Rounded -> outline.roundRect
                 else -> RoundRect(Rect(Offset.Zero, bounds.size))
             }
         val stroke = with(density) { ceil(width.toPx()) }
-        morph.reportAnchorOutline(anchor, SettingsContour(bounds, corners, bounds, color, stroke))
+        morph.reportAnchorOutline(anchor, SettingsContour(bounds, corners, bounds, color, stroke, fill = fill))
     }
 }
-
-@Composable
-private fun permitsContourMotion(
-    morph: SettingsCardMorph?,
-    motion: Boolean,
-): Boolean = motion && (morph?.page == null || isAmoledSurfaceTheme())
 
 /**
  * Starts [morph] whenever [target] changes and returns whether it is running, with the host modifier
  * for the route layer. A null [morph] never morphs.
  */
 @Composable
+@Suppress("CyclomaticComplexMethod", "LongMethod")
 internal fun <T> rememberSettingsCardMorphHost(
     morph: SettingsCardMorph?,
     target: T,
@@ -387,14 +405,60 @@ internal fun <T> rememberSettingsCardMorphHost(
     captureContent: Boolean = true,
 ): Pair<Boolean, Modifier> {
     // Native control borders do not opt borderless settings themes into contour motion.
-    val animateContours = permitsContourMotion(morph, motion)
-    morph?.captureContent = captureContent
+    val contourTheme = morph?.page == null || isAmoledSurfaceTheme()
+    val animateContours = motion && contourTheme
+    // Only a contour transition replays the settled frame, so borderless themes never record it. Motion is not part
+    // of this: a leg entered without motion must still record for the next leave.
+    morph?.captureContent = captureContent && contourTheme
     DisposableEffect(morph, ownerKey) {
         val releaseChild = morph?.observeChildContours()
         onDispose {
             releaseChild?.invoke()
             morph?.finish()
             morph?.page?.cancel()
+        }
+    }
+    // Borderless themes have no outlines to morph, but their routes still move: one container from
+    // the activating control, or the existing slide without one. Live content only; nothing is captured.
+    val borderless = morph?.page != null && motion && !animateContours
+    val lastTarget = remember(morph, ownerKey) { arrayOf<Any?>(NoRouteTarget) }
+    val lastLeg = remember(morph, ownerKey) { BorderlessContainerLeg() }
+    // A route change while a container is still moving reverses it from its drawn bounds into the same origin.
+    val inFlight = remember(morph, ownerKey, target) { lastLeg.takeIf { it.moving } }
+    // Read before the page consumes the click's measured origin.
+    val borderlessOrigin =
+        remember(morph, ownerKey, target) {
+            val page = morph?.page?.takeIf { borderless && forward }
+            inFlight?.origin ?: page?.let { it.pendingOriginFor(target) ?: morph.anchorOrigin }
+        }
+    val borderlessProgress =
+        remember(morph, ownerKey, target, borderless) {
+            val changed = lastTarget[0] !== NoRouteTarget && lastTarget[0] != target
+            val resumeProgress = inFlight?.let { if (forward) it.presence else 1f - it.presence } ?: 0f
+            Animatable(if (borderless && changed) resumeProgress else 1f)
+        }
+    // Back from a container still growing shrinks it over the live parent; nothing of the old route is kept.
+    val resume =
+        remember(morph, ownerKey, target) {
+            SettingsContainerResume(
+                shrinking = inFlight != null && !forward,
+                resumedFrom = inFlight?.takeIf { forward && it.shrinking }?.presence,
+                shrinkFrom = inFlight?.takeIf { !forward }?.presence ?: 1f,
+            )
+        }
+    androidx.compose.runtime.SideEffect {
+        lastTarget[0] = target
+        lastLeg.progress = borderlessProgress
+        lastLeg.origin = borderlessOrigin
+        lastLeg.shrinking = resume.shrinking
+    }
+    LaunchedEffect(borderlessProgress) {
+        if (borderlessProgress.value < 1f) {
+            val millis = if (forward) APP_MOTION_OPEN_MILLIS else APP_MOTION_CLOSE_MILLIS
+            val easing = if (forward) AppMotionOpenEasing else AppMotionCloseEasing
+            // A resumed reversal covers only the remaining distance, at the same speed.
+            val remaining = (millis * (1f - borderlessProgress.value)).toInt().coerceAtLeast(1)
+            borderlessProgress.animateTo(1f, tween(remaining, easing = easing))
         }
     }
     // Runs while the new route composes, before the old route's cards have reported their removal.
@@ -441,10 +505,47 @@ internal fun <T> rememberSettingsCardMorphHost(
             outline = if (isAmoledSurfaceTheme()) MaterialTheme.colorScheme.outline else Color.Unspecified,
         )
     val view = LocalView.current
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    val edge = (if (forward) 1f else -1f) * (if (rtl) -1f else 1f)
+    val travel = with(LocalDensity.current) { SettingsRouteSlideTravel.toPx() } * edge
+    val borderlessMotion =
+        if (morph.page != null) {
+            Modifier.settingsBorderlessRouteMotion(
+                progress = { borderlessProgress.value },
+                origin = {
+                    val host = morph.hostBounds
+                    borderlessOrigin?.takeIf { it.visibleIn(host) }?.translate(-host.topLeft)
+                },
+                bodyTop = { morph.page.bodyTop - morph.hostBounds.top },
+                colors = colors,
+                travel = travel,
+                resume = resume,
+            )
+        } else {
+            Modifier
+        }
+    val containerMoving by remember(borderlessProgress) { derivedStateOf { borderlessProgress.value < 1f } }
     return morphing to
         Modifier
             .settingsCardMorphHost(morph, colors, view)
+            // Only a growing container clips live controls; a slide keeps them whole and usable.
+            .settingsTransitionInputGate(borderlessOrigin != null && containerMoving)
             .then(if (morph.blocksPointerInput) Modifier.clearAndSetSemantics {} else Modifier)
+            .then(borderlessMotion)
+}
+
+private object NoRouteTarget
+
+/** The last borderless container leg: its clock, the origin it grows from or shrinks into, and its direction. */
+private class BorderlessContainerLeg {
+    var progress: Animatable<Float, *>? = null
+    var origin: Rect? = null
+    var shrinking = false
+
+    /** How grown the container is drawn now. */
+    val presence: Float get() = (progress?.value ?: 1f).let { if (shrinking) 1f - it else it }
+
+    val moving: Boolean get() = origin != null && (progress?.value ?: 1f) < 1f
 }
 
 /**
@@ -456,7 +557,7 @@ internal fun Modifier.settingsCardMorphHost(
     colors: SettingsMorphColors,
     view: android.view.View? = null,
 ): Modifier =
-    onGloballyPositioned { morph.placeHost(if (view != null) it.settingsMorphBounds(view) else it.boundsInWindow()) }
+    onGloballyPositioned { morph.placeHost(if (view != null) it.motionBoundsOnScreen(view) else it.boundsInWindow()) }
         .onPreviewKeyEvent { morph.blocksPointerInput && it.key != Key.Back && it.key != Key.Escape }
         .pointerInput(morph) {
             awaitPointerEventScope {
@@ -469,3 +570,18 @@ internal fun Modifier.settingsCardMorphHost(
         // Full-screen pages already transform during draw and always have unit page alpha.
         // An extra retained layer here can hide nested redraws from an ancestor's recorder.
         .then(if (morph.page == null) Modifier.graphicsLayer { alpha = morph.pageAlpha() } else Modifier)
+
+/** Hidden or clipped controls are unavailable until the destination reaches its final bounds. */
+internal fun Modifier.settingsTransitionInputGate(blocked: Boolean): Modifier {
+    if (!blocked) return this
+    return this
+        .clearAndSetSemantics { hideFromAccessibility() }
+        .onPreviewKeyEvent { it.key != Key.Back && it.key != Key.Escape }
+        .pointerInput(Unit) {
+            awaitPointerEventScope {
+                while (true) {
+                    awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
+                }
+            }
+        }
+}

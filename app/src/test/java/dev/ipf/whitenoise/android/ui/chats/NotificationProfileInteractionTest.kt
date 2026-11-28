@@ -2,14 +2,20 @@ package dev.ipf.whitenoise.android.ui.chats
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertWidthIsAtLeast
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToKey
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.notifications.NotificationProfile
 import dev.ipf.whitenoise.android.notifications.NotificationProfileSchedule
 import dev.ipf.whitenoise.android.state.DraftStore
@@ -110,6 +116,22 @@ class NotificationProfileInteractionTest {
         composeRule.onNodeWithTag("notification-profile.day.MONDAY").performScrollTo().assertIsEnabled()
     }
 
+    /** On a 360 dp screen each weekday owns its full target and a tap at its edge toggles only that day. */
+    @Test
+    fun weekdayTargetsStayIndependentOnANarrowScreen() {
+        val toggled = mutableListOf<DayOfWeek>()
+        render(busy = false, onToggleDay = { toggled += it })
+        for (day in DayOfWeek.entries) {
+            composeRule
+                .onNodeWithTag("notification-profile.day.${day.name}")
+                .performScrollTo()
+                .assertWidthIsAtLeast(48.dp)
+                .assertHeightIsAtLeast(48.dp)
+                .performTouchInput { click(Offset(width - 1f, centerY)) }
+        }
+        composeRule.runOnIdle { assertEquals(DayOfWeek.entries.toList(), toggled) }
+    }
+
     @Test
     fun theChatListButtonAppearsOnlyAfterTheUserOptsIn() {
         val context = RuntimeEnvironment.getApplication()
@@ -140,7 +162,11 @@ class NotificationProfileInteractionTest {
         }
     }
 
-    private fun render(busy: Boolean) {
+    /** Renders the editor in its normal lazy list, with an optional weekday callback for tap assertions. */
+    private fun render(
+        busy: Boolean,
+        onToggleDay: (DayOfWeek) -> Unit = {},
+    ) {
         val form =
             NotificationProfileEditFormState(
                 isNew = false,
@@ -156,7 +182,10 @@ class NotificationProfileInteractionTest {
             )
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = false) {
-                NotificationProfileEditContent(form, NotificationProfileEditActions({}, {}, {}, {}, {}, {}, {}, {}, {}))
+                NotificationProfileEditContent(
+                    form,
+                    NotificationProfileEditActions({}, {}, {}, {}, {}, {}, {}, onToggleDay, {}),
+                )
             }
         }
     }

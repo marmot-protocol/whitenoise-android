@@ -4,7 +4,9 @@ import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.MarmotKitException
@@ -46,6 +48,8 @@ class NewMessageScreenshotTest {
 
     /** Blank discovery remains a usable action page without simulated contacts. */
     @Test fun blank() = capture("new_message_blank.png", query = "", people = emptyList())
+
+    @Test fun clearedRestoresShortcuts() = capture("new_message_cleared.png", clearQuery = true)
 
     /** Local people remain visible while native search is pending. */
     @Test fun searchingWithLocalPeople() =
@@ -118,10 +122,25 @@ class NewMessageScreenshotTest {
             lookupFailed = true,
         )
 
-    /** The new-message error for a recipient with no KeyPackage, in the light theme. */
+    /** A recipient with no KeyPackage is presented as an invitation with Send invite and Retry. */
     @Test fun missingKeyLight() =
         capture(
             "new_message_missing_key_light.png",
+            error = inviteError(MarmotKitException.MissingKeyPackage("ada", MissingKeyPackageReasonFfi.NOT_FOUND)),
+        )
+
+    @Test fun missingKeyAmoled() =
+        capture(
+            "new_message_missing_key_amoled.png",
+            dark = true,
+            amoled = true,
+            error = inviteError(MarmotKitException.MissingKeyPackage("ada", MissingKeyPackageReasonFfi.NOT_FOUND)),
+        )
+
+    @Test fun missingKeyLargeRtl() =
+        capture(
+            "new_message_missing_key_large_rtl.png",
+            largeRtl = true,
             error = inviteError(MarmotKitException.MissingKeyPackage("ada", MissingKeyPackageReasonFfi.NOT_FOUND)),
         )
 
@@ -153,7 +172,7 @@ class NewMessageScreenshotTest {
             "ada",
             error,
             "Ada Lovelace",
-            { "Ada Lovelace" },
+            displayName = { "Ada Lovelace" },
         )
 
     /** Canonical creation recovery exposes Open chat and safe diagnostic copying. */
@@ -191,6 +210,7 @@ class NewMessageScreenshotTest {
         identifier: Boolean = false,
         resolving: Boolean = false,
         lookupFailed: Boolean = false,
+        clearQuery: Boolean = false,
     ) {
         composeRule.setContent {
             CompositionLocalProvider(
@@ -215,6 +235,7 @@ class NewMessageScreenshotTest {
                 }
             }
         }
+        if (clearQuery) composeRule.onNodeWithContentDescription("Clear").performClick()
         composeRule.onNodeWithTag("new_message.screen").captureRoboImage("src/test/snapshots/$file")
     }
 

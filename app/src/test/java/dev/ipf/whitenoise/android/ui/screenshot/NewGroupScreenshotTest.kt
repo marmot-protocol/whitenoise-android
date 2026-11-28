@@ -3,8 +3,11 @@ package dev.ipf.whitenoise.android.ui.screenshot
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.core.RecipientSearch
@@ -68,7 +71,7 @@ class NewGroupScreenshotTest {
     /** Large RTL chips and field retain scrolling and native directionality. */
     @Test fun selectedLargeRtl() = picker("new_group_selected_large_rtl.png", selected = true, largeRtl = true)
 
-    /** Prototype centered avatar and two-field setup. */
+    /** The group name and selected identities lead the default form. */
     @Test fun setupLight() = setup("group_setup_light.png")
 
     /** Native read-only membership styling in dark setup. */
@@ -76,6 +79,23 @@ class NewGroupScreenshotTest {
 
     /** AMOLED setup and primary action. */
     @Test fun setupAmoled() = setup("group_setup_amoled.png", dark = true, amoled = true)
+
+    /** Optional photo, description and timer use the same form and retain the current draft. */
+    @Test fun setupCustomizedAmoled() =
+        setup(
+            "group_setup_customized_amoled.png",
+            dark = true,
+            amoled = true,
+            description = "A place to coordinate our next trip.",
+        )
+
+    /** An authored description reopens customization at large RTL text sizes. */
+    @Test fun setupCustomizedLargeRtl() =
+        setup(
+            "group_setup_customized_large_rtl.png",
+            largeRtl = true,
+            description = "A place to coordinate our next trip.",
+        )
 
     /** Native image work gets feedback and disabled competing controls. */
     @Test fun setupPreparing() = setup("group_setup_preparing.png", preparing = true)
@@ -116,6 +136,11 @@ class NewGroupScreenshotTest {
     /** Unknown identity offers manual editing without an invented recipient removal. */
     @Test fun setupUnattributedRecovery() = setup("group_setup_unattributed_recovery.png", unknown = true)
 
+    @Test
+    fun peopleKeyCopiesWithoutGrowingTheRow() {
+        picker("new_group_people_copied_key.png", copyKey = true)
+    }
+
     /** The real picker composable renders controlled display states, never a fake search provider. */
     private fun picker(
         file: String,
@@ -126,7 +151,10 @@ class NewGroupScreenshotTest {
         partial: Boolean = false,
         largeRtl: Boolean = false,
         addressFailed: Boolean = false,
+        copyKey: Boolean = false,
     ) {
+        val npub = "npub1424242424242424242424242424242424242424242424242424qamrcaj"
+        val shortKey = "npub142424…4qamrcaj"
         composeRule.setContent {
             CompositionLocalProvider(
                 LocalLayoutDirection provides if (largeRtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
@@ -137,6 +165,14 @@ class NewGroupScreenshotTest {
                         when {
                             empty -> emptyList()
                             addressFailed -> people().take(1).map { it.copy(subtitle = "Address not verified") }
+                            copyKey ->
+                                people().mapIndexed { index, person ->
+                                    if (index == 0) {
+                                        person.copy(candidate = person.candidate.copy(npub = npub), subtitle = shortKey)
+                                    } else {
+                                        person
+                                    }
+                                }
                             else -> people()
                         },
                         if (selected) people().take(2) else emptyList(),
@@ -150,6 +186,11 @@ class NewGroupScreenshotTest {
                     )
                 }
             }
+        }
+        if (copyKey) {
+            composeRule.onNodeWithText(shortKey, useUnmergedTree = true).performTouchInput { click(center) }
+            composeRule.onNodeWithText(npub.chunked(5).joinToString(" "), useUnmergedTree = true).assertDoesNotExist()
+            composeRule.onNodeWithText(shortKey, useUnmergedTree = true).assertExists()
         }
         composeRule.onNodeWithTag("new_group.screen").captureRoboImage("src/test/snapshots/$file")
     }
@@ -165,11 +206,12 @@ class NewGroupScreenshotTest {
         canonical: Boolean = false,
         recovery: Boolean = false,
         unknown: Boolean = false,
+        description: String = "",
     ) {
         val draft =
             NewGroupDraft(
                 TextFieldState("Weekend plans"),
-                TextFieldState("A place to coordinate our next trip."),
+                TextFieldState(description),
                 retryGroupIdHex = if (canonical) "canonical" else null,
                 imageNeedsReselection = reselect,
             )

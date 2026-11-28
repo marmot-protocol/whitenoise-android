@@ -11,6 +11,10 @@ MDK owns shared product logic and authoritative state. Follow [the agent guide](
 and [MDK's host boundary](https://github.com/marmot-protocol/mdk/blob/master/docs/marmot-architecture/overview/app-core-boundary.md#host-app-boundary)
 when choosing where to implement a change.
 
+For UI work, the [Android design guide](docs/android-ui-patterns.md) explains
+which choices come from Material, which belong to White Noise, and how to
+review them using examples from the app.
+
 ## Common Commands
 
 ```bash
@@ -70,7 +74,7 @@ batch related edits into one candidate push, reuse matching results, retry diagn
 transient failures selectively, and request preview APKs only when testing needs them.
 Core code validation and final readiness/merge requirements remain mandatory.
 
-Every pull request to `master` and every push to `master` starts
+Every pull request to `master` or `develop` and every push to `master` starts
 `.github/workflows/android-ci.yml`. The workflow uses read-only credentials and public build inputs. Existing detekt findings remain frozen in
 `config/detekt/detekt-baseline.xml`.
 
@@ -87,7 +91,8 @@ for their machine; agents run CI-covered checks on GitHub.
 The [CI request policy](docs/ci-request-policy.md#queue-gated-pr-feedback-and-full-integration)
 describes the opt-in `ANDROID_CI_MODE=merge-queue` mode. Ordinary PRs then use
 separate Zapstore and Play main/unit/Android-test Kotlin/Java compile jobs plus
-style, tooling and security checks. Full suites, goldens, Kover, lint and baseline
+style, tooling and security checks, and verify Zapstore screenshot goldens by
+running only their registered owner tests. Full suites, Kover, lint and baseline
 packaging run at integration. Every merge group runs the full core matrix;
 `ci:full`, risky inputs or unknown classification evidence also select it on PRs.
 Activation remains gated on native queue enforcement, independent integration
@@ -192,9 +197,12 @@ in every merge group and full-matrix pull request, `build-contracts` builds
 both shipping R8 variants and fails on an over-budget method (see
 [DEX method-size budgets](docs/performance.md#dex-method-size-budgets)).
 
-Pushes to `master` also run `.github/workflows/android-staging-apk.yml`, which
+Pushes to `develop` run `.github/workflows/android-staging-apk.yml`, which
 builds and uploads a signed `arm64-v8a` staging release APK for internal
-installation. That workflow is also manually runnable from GitHub Actions. Its
+installation. Download the `whitenoise-staging-v8a-release-*` artifact from the
+[latest successful `develop` run](https://github.com/marmot-protocol/whitenoise-android/actions/workflows/android-staging-apk.yml?query=branch%3Adevelop+is%3Asuccess)
+to update an existing Staging install. Maintainers can also dispatch this
+workflow on a reviewed branch for diagnostics. Its
 summary shows the APK's size by component (each native library and dex file,
 `resources.arsc`, `res/`, `assets/`, `META-INF/` and ZIP overhead), and the same
 report is kept as an `apk-size-staging-*` artifact. The production build workflow
@@ -263,9 +271,11 @@ test-JVM flags, not a screenshot mismatch; do not re-record baselines for it.
 Baseline PNGs live under `app/src/test/snapshots/` and are committed to git. CI
 runs the complete dev-debug unit suite with `-Proborazzi.test.verify=true`:
 ordinary pull requests run Zapstore only, and the merge queue, master pushes and
-full-matrix runs also run Play.
-The committed-baseline owner registry in `config/screenshot-baseline-owners.txt`
-remains a static coverage contract and provides focused local regeneration filters.
+full-matrix runs also run Play. In the merge-queue precheck mode, pull requests
+verify Zapstore goldens by running only the tests listed in the committed-baseline
+owner registry, `config/screenshot-baseline-owners.txt`, and fail if those tests
+leave any committed golden uncompared. The registry is also a static coverage
+contract and provides focused local regeneration filters.
 Tests named `*ScreenshotTest` are included automatically; a mixed-name test that
 owns committed baselines lists its golden-producing methods there.
 `scripts/check_screenshot_baseline_owners.py` fails the tooling job when a capturing

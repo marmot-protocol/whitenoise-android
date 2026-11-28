@@ -10,7 +10,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -29,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.TtsRatePreferences
 import dev.ipf.whitenoise.android.ui.common.AnimatedBasicAlertDialog
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDialogSurface
 import java.math.RoundingMode
 import java.text.NumberFormat
 import java.text.ParsePosition
@@ -83,10 +83,7 @@ internal fun TtsCustomRateDialog(
     onRateSelected: (Float) -> Unit,
 ) {
     AnimatedBasicAlertDialog(onDismissRequest = onDismiss) {
-        Surface(
-            shape = MaterialTheme.shapes.extraLarge,
-            tonalElevation = 6.dp,
-        ) {
+        WhiteNoiseDialogSurface {
             TtsCustomRateEditor(
                 initialRate = initialRate,
                 onDismiss = dismiss,

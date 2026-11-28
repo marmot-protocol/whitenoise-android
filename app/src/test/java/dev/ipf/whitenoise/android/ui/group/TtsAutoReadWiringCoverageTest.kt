@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.group
 
 import dev.ipf.whitenoise.android.functionBody
 import dev.ipf.whitenoise.android.motionOwnerSource
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -75,7 +76,7 @@ class TtsAutoReadWiringCoverageTest {
     @Test
     fun processOwnedLiveContinuationUsesNativeWindowsAndRejectsReplacedSessions() {
         val body = source("state/TtsAutoReadContinuation.kt")
-        val app = source("state/AppState.kt")
+        val app = source("state/AppReadAloud.kt")
 
         assertTrue(
             "both auto-read starts must attach their own native continuation",
@@ -174,7 +175,7 @@ class TtsAutoReadWiringCoverageTest {
             "if (!appState.confirmTtsPlaybackTrust(canCommit)) return@LaunchedEffect appState.speakAloudAutoRead(" in
                 resume.replace(Regex("\\s+"), " "),
         )
-        val message = source("ui/conversation/messages/MessageBubble.kt").functionBody("startSpeakAloud")
+        val message = source("ui/conversation/messages/MessageBubbleReadAloud.kt").functionBody("startSpeakAloud")
         val reader = source("ui/conversation/media/TextAttachmentSpeech.kt")
         val messageConsent = message.indexOf("confirmTtsPlaybackTrust(canCommit)")
         assertTrue(messageConsent in 0 until message.indexOf("speakAloudAutoRead("))
@@ -185,14 +186,14 @@ class TtsAutoReadWiringCoverageTest {
         assertTrue(
             "long-press must start through the consent-gated startSpeakAloud",
             "startSpeakAloud(pressState.longPressTtsStart?.renderedHit, press = pressState.longPressTtsStart)" in
-                source("ui/conversation/messages/MessageBubble.kt"),
+                source("ui/conversation/messages/MessageBubbleReadAloud.kt"),
         )
         // Resume (TtsController.resume) cannot reach a new connection: handle replacement stops the queue, so a
         // Paused session never survives onto an unapproved engine. Nothing to gate there.
         assertTrue("!appState.ttsEngineNeedsAcknowledgment()" in source("state/TtsAutoReadContinuation.kt"))
-        val appState = source("state/AppState.kt")
-        val replaceEngine = appState.functionBody("publishTtsResolution")
-        val ownership = source("state/AppStateTtsPlaybackOwnership.kt").functionBody("clearTtsPlaybackOwnership")
+        val readAloud = source("state/AppReadAloud.kt")
+        val replaceEngine = readAloud.functionBody("publishTtsResolution")
+        val ownership = readAloud.functionBody("clearTtsPlaybackOwnership")
         val released = replaceEngine.indexOf("clearTtsPlaybackOwnership()")
         assertTrue(released in 0 until replaceEngine.indexOf("ttsController.attachEngine("))
         assertTrue("ttsAutoReadSessionKey = null" in ownership)
@@ -211,11 +212,49 @@ class TtsAutoReadWiringCoverageTest {
         )
     }
 
+    /** Read-aloud follow keeps its keys outside the screen, and every screen event resolves ownership at call time. */
+    @Test
+    fun conversationScreenRoutesReadAloudFollowThroughItsKeyedHolder() {
+        val screen = ownSource("ui/conversation/ConversationScreen.kt")
+        val follow = ownSource("ui/conversation/ConversationReadAloudFollow.kt")
+
+        assertTrue(
+            "the holder must keep the handle's group key and be remembered on everything it holds",
+            "rememberConversationTtsFollowHandle(controller.group.groupIdHex)" in follow &&
+                "remember(appState, controller, handle)" in follow,
+        )
+        assertTrue(
+            "the speech-bounds collector must keep its keys",
+            "LaunchedEffect(timelineViewport, handle)" in follow.functionBody("speechBoundsEffect"),
+        )
+        assertTrue(
+            "the follow effects must receive the holder's handle",
+            "handle = handle," in follow.functionBody("followEffects"),
+        )
+        assertTrue(
+            "each event must read session ownership when it arrives",
+            listOf("suspendForDirectDrag", "onSentenceSeek", "revealCurrentPassage").all { event ->
+                "appState.ownsTtsAutoReadSession(controller.group.groupIdHex)" in follow.functionBody(event)
+            },
+        )
+        assertFalse("the screen must not bypass the holder", "ttsFollowHandle" in screen)
+        assertFalse("the screen must not call the follow effects directly", "ConversationTtsFollowEffects(" in screen)
+        val readingBounds = screen.indexOf("LaunchedEffect(timelineViewport, readAloudFollow.handle)")
+        val speechBounds = screen.indexOf("readAloudFollow.speechBoundsEffect(timelineViewport)")
+        val viewportEvidence = screen.indexOf("fun viewportEvidenceEffect()")
+        assertTrue(
+            "reading bounds, then speech bounds, then viewport evidence must launch in that order",
+            readingBounds >= 0 && speechBounds > readingBounds && viewportEvidence > speechBounds,
+        )
+        assertEquals(3, Regex("""readAloudFollow\.suspendForDirectDrag\(\)""").findAll(screen).count())
+    }
+
     @Test
     fun speakFromHereClaimsAutoReadOwnershipThroughAppState() {
-        val source = source("ui/conversation/messages/MessageBubble.kt")
+        val source = source("ui/conversation/messages/MessageBubbleReadAloud.kt")
         val body = source.functionBody("startSpeakAloud")
-        val entries = source.substringAfter("suspend fun speakFromHereEntries").substringBefore("fun startSpeakAloud")
+        val entries =
+            source.substringAfter("suspend fun Inputs.speakFromHereEntries").substringBefore("fun startSpeakAloud")
 
         assertTrue(
             "speak-from-here must build bounded candidates through the shared preparation helper",
@@ -233,7 +272,7 @@ class TtsAutoReadWiringCoverageTest {
 
     @Test
     fun asynchronousSpeechOwnershipUsesTheAccountCapturedBeforePreparation() {
-        val source = source("state/AppState.kt")
+        val source = source("state/AppReadAloud.kt")
 
         assertTrue(
             "both asynchronous manual-speech ownership writes must use the captured account",
@@ -247,18 +286,24 @@ class TtsAutoReadWiringCoverageTest {
 
     @Test
     fun literalCodeModeAppliesOnlyToTheSelectedSpeakFromHereEntry() {
-        val source = source("ui/conversation/messages/MessageBubble.kt")
+        val source = source("ui/conversation/messages/MessageBubbleReadAloud.kt")
         val body = source.functionBody("startSpeakAloud")
-        val entries = source.substringAfter("suspend fun speakFromHereEntries").substringBefore("fun startSpeakAloud")
+        val entries =
+            source.substringAfter("suspend fun Inputs.speakFromHereEntries").substringBefore("fun startSpeakAloud")
 
         assertTrue("the requested mode must reach preparation", "speakFromHereEntries(literalCode)" in body)
         assertTrue("the entry position must participate in mode selection", "mapIndexed" in entries)
         assertTrue("only the selected first entry may become literal code", "index == 0 && literalCode" in entries)
     }
 
-    private fun source(relativePath: String): String =
+    private fun source(relativePath: String): String = sourceFile(relativePath).motionOwnerSource()
+
+    /** One file without the declarations moved out of it. */
+    private fun ownSource(relativePath: String): String = sourceFile(relativePath).readText()
+
+    private fun sourceFile(relativePath: String): File =
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/$relativePath"),
             File("app/src/main/java/dev/ipf/whitenoise/android/$relativePath"),
-        ).firstOrNull(File::exists)?.motionOwnerSource() ?: error("Missing source file: $relativePath")
+        ).firstOrNull(File::exists) ?: error("Missing source file: $relativePath")
 }

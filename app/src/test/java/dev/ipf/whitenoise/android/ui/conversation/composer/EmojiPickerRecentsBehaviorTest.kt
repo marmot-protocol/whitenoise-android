@@ -12,8 +12,10 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalCursorBlinkEnabled
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -98,6 +100,30 @@ class EmojiPickerRecentsBehaviorTest {
         // The category rail follows Smileys, so scroll the grid back to Recent at its top.
         composeRule.onNodeWithTag(EMOJI_PICKER_GRID_TEST_TAG).performScrollToIndex(0)
         composeRule.onNodeWithText(string(R.string.emoji_category_recent)).assertIsDisplayed()
+    }
+
+    /** Each category toggle on the composer's emoji bar keeps a 48 dp target around its 36 dp selection disc. */
+    @Test
+    fun railTogglesHave48DpTargets() {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ComposerEmojiPickerPane(
+                    height = ComposerEmojiPickerFallbackHeight,
+                    alpha = 1f,
+                    recentEmojis = emptyList(),
+                    onEmojiUsed = {},
+                    onEmojiPicked = {},
+                    onBackspace = {},
+                    onSearchActiveChange = {},
+                    modifier = Modifier.width(360.dp),
+                )
+            }
+        }
+        waitForBrowseGrid()
+        composeRule
+            .onNodeWithTag(emojiPickerCategoryTestTag(EmojiCategory.SmileysAndPeople))
+            .assertWidthIsAtLeast(48.dp)
+            .assertHeightIsAtLeast(48.dp)
     }
 
     /** Search pick updates displayed recents immediately. */

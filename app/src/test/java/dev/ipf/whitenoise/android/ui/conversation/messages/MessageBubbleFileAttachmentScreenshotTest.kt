@@ -830,6 +830,8 @@ open class MessageBubbleFileAttachmentFixtures {
             )
         val projected =
             TimelineMessageRecordFfi(
+                agentItem = null,
+                agentItemFirstEventMissing = false,
                 clientToken = null,
                 messageIdHex = messageId,
                 sourceMessageIdHex = messageId,
@@ -849,7 +851,7 @@ open class MessageBubbleFileAttachmentFixtures {
                     MessageAttachments.acceptedOutcomes(
                         attachments.map { (name, attachmentMediaType) -> fileReference(name, attachmentMediaType) },
                     ),
-                agentTextStreamJson = null,
+                thread = null,
                 poll = null,
                 groupSystem = null,
                 hasReports = false,
@@ -930,6 +932,8 @@ open class MessageBubbleFileAttachmentFixtures {
     /** Provides a deterministic parent projection for the captioned reply case. */
     protected fun replyPreview() =
         TimelineReplyPreviewFfi(
+            retentionSeconds = null,
+            retentionExpiresAt = null,
             messageIdHex = PARENT_MESSAGE_ID,
             sender = SENDER_ID,
             plaintext = "Parent message",
@@ -937,7 +941,8 @@ open class MessageBubbleFileAttachmentFixtures {
             kind = 9uL,
             mediaJson = null,
             media = emptyList(),
-            agentTextStreamJson = null,
+            replyToMessageIdHex = null,
+            thread = null,
             deleted = false,
             deletionSource = DeletionSourceFfi.UNKNOWN,
             invalidationStatus = null,

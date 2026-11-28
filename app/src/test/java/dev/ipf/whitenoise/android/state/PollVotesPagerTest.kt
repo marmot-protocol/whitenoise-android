@@ -344,6 +344,8 @@ class PollVotesPagerTest {
     /** A timeline record with only the identity fields the poll watch reads. */
     private fun record(messageId: String) =
         TimelineMessageRecordFfi(
+            agentItem = null,
+            agentItemFirstEventMissing = false,
             clientToken = null,
             messageIdHex = messageId,
             sourceMessageIdHex = null,
@@ -361,7 +363,7 @@ class PollVotesPagerTest {
             replyPreview = null,
             mediaJson = null,
             media = emptyList(),
-            agentTextStreamJson = null,
+            thread = null,
             poll = null,
             groupSystem = null,
             hasReports = false,

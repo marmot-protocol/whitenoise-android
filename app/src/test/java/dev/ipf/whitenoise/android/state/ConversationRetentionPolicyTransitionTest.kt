@@ -137,6 +137,8 @@ class ConversationRetentionPolicyTransitionTest {
         retentionExpiresAt: ULong? = null,
     ): TimelineMessageRecordFfi =
         TimelineMessageRecordFfi(
+            agentItem = null,
+            agentItemFirstEventMissing = false,
             clientToken = null,
             messageIdHex = id,
             sourceMessageIdHex = id,
@@ -158,7 +160,7 @@ class ConversationRetentionPolicyTransitionTest {
             replyPreview = null,
             mediaJson = null,
             media = emptyList(),
-            agentTextStreamJson = null,
+            thread = null,
             poll = null,
             groupSystem = null,
             hasReports = false,

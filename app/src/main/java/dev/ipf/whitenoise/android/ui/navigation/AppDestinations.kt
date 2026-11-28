@@ -23,6 +23,7 @@ internal enum class SettingsDetail {
     ManageStorage,
     Profile,
     AccountKeys,
+    HistoryBackups,
     Relays,
     Support,
     SupportRelays,
@@ -34,6 +35,7 @@ internal enum class SettingsDetail {
     BlockedUsers,
     AiAgents,
     Donate,
+    VoiceNotes,
     TextToSpeech,
     Translation,
     Dictation,
@@ -47,6 +49,9 @@ internal enum class SettingsDetail {
     Chats,
     VoiceLanguage,
     HelpSupport,
+    LearnWhiteNoise,
     NotificationSounds,
     NotificationDelivery,
 }
+
+internal fun firstRunHelpDetail(team: Boolean) = if (team) SettingsDetail.Support else SettingsDetail.LearnWhiteNoise

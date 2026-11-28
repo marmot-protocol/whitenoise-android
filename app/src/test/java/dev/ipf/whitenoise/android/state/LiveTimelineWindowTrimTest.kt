@@ -109,6 +109,8 @@ class LiveTimelineWindowTrimTest {
         id: String,
         recordedAt: ULong,
     ) = TimelineMessageRecordFfi(
+        agentItem = null,
+        agentItemFirstEventMissing = false,
         clientToken = null,
         messageIdHex = id,
         sourceMessageIdHex = null,
@@ -125,7 +127,7 @@ class LiveTimelineWindowTrimTest {
         replyPreview = null,
         mediaJson = null,
         media = emptyList(),
-        agentTextStreamJson = null,
+        thread = null,
         poll = null,
         groupSystem = null,
         hasReports = false,

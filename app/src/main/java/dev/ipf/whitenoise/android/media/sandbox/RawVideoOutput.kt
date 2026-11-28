@@ -18,6 +18,9 @@ internal class RawVideoOutput(
 ) : AutoCloseable {
     private val lock = Any()
     private val paint = Paint(Paint.FILTER_BITMAP_FLAG)
+
+    @Volatile var surfaceRevision = 0L
+        private set
     private var output: Any? = null
     private var surface: Surface? = null
     private var ownedSurface = false
@@ -36,7 +39,7 @@ internal class RawVideoOutput(
             ) = updateHolder(holder)
 
             override fun surfaceDestroyed(holder: SurfaceHolder) {
-                synchronized(lock) { if (this@RawVideoOutput.holder === holder) surface = null }
+                synchronized(lock) { if (this@RawVideoOutput.holder === holder) releaseSurface() }
             }
         }
     private val textureCallback =
@@ -98,7 +101,9 @@ internal class RawVideoOutput(
      */
     private fun updateHolder(next: SurfaceHolder) {
         synchronized(lock) {
-            if (holder === next) surface = next.surface.takeIf { it.isValid }
+            if (holder !== next) return
+            surface = next.surface.takeIf { it.isValid }
+            surfaceRevision++
             if (surface != null) onAvailable()
         }
     }
@@ -121,13 +126,25 @@ internal class RawVideoOutput(
         }
     }
 
+    /** Publishes first-frame state only for the exact surface that accepted the post. */
+    fun withCurrentSurface(
+        expectedRevision: Long,
+        action: () -> Unit,
+    ) {
+        synchronized(lock) {
+            if (expectedRevision == surfaceRevision) action()
+        }
+    }
+
     /** The raw bitmap and rotation have already passed the parent protocol validator. */
     fun render(
         bitmap: Bitmap,
         rotation: Int,
         observation: RawAvPlaybackObservation? = null,
+        expectedRevision: Long = surfaceRevision,
     ): Boolean =
         synchronized(lock) {
+            if (expectedRevision != surfaceRevision) return false
             require(rotation in setOf(0, 90, 180, 270))
             val target = surface?.takeIf { it.isValid } ?: return false
             try {
@@ -166,6 +183,7 @@ internal class RawVideoOutput(
      * Releases only a texture wrapper owned here and forgets borrowed surface references.
      */
     private fun releaseSurface() {
+        surfaceRevision++
         if (ownedSurface) surface?.release()
         surface = null
         ownedSurface = false

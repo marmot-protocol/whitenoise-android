@@ -84,14 +84,6 @@
         ]
       },
       {
-        "surface": "Linked devices: R.string.explanation_linked_device_row",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDeviceDetail.kt",
-        "anchor": "R.string.explanation_linked_device_row",
-        "test_ids": [
-          "SET-064"
-        ]
-      },
-      {
         "surface": "Linked devices: R.string.link_request_add_to_chats",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDeviceDetail.kt",
         "anchor": "R.string.link_request_add_to_chats",
@@ -177,6 +169,16 @@
         "anchor": "fun RenameDeviceDialog(",
         "test_ids": [
           "SET-064"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Sign-in alerts: R.string.device_detail_remove_stolen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDeviceDetail.kt",
+        "anchor": "R.string.device_detail_remove_stolen",
+        "test_ids": [
+          "SET-078"
         ]
       }
     ]

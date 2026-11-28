@@ -4,7 +4,6 @@ import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import dev.ipf.marmotkit.AppMessageRecordFfi
-import dev.ipf.marmotkit.LocalSendStatusFfi
 import dev.ipf.marmotkit.MediaUploadResultFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
@@ -67,6 +66,7 @@ private fun ConversationController.commitPublishLock(
  * Uploads a send with file-backed items through MDK's file path, with the same commit lock,
  * cancellation check, retry capture and draft/admission rules as the in-memory path. While the
  * transfer holds the lock, the user's Cancel reaches it through [RetainedMediaUpload.requestTransferCancel].
+ * A send of stored draft files uploads from the draft instead, see [uploadDraftStoredRetained].
  */
 internal suspend fun ConversationController.uploadFileBackedRetained(
     account: String,
@@ -75,6 +75,7 @@ internal suspend fun ConversationController.uploadFileBackedRetained(
     retained: RetainedMediaUpload,
     startedAtMs: Long,
 ): MediaUploadResultFfi {
+    if (retained.isDraftStored) return uploadDraftStoredRetained(account, key, tempId, retained, startedAtMs)
     val batchCiphertextBytes =
         checkNotNull(withContext(Dispatchers.IO) { fileBatchCiphertextBytes() }) {
             "file-backed upload limits unavailable"
@@ -102,6 +103,7 @@ internal suspend fun ConversationController.uploadFileBackedRetained(
                                     request,
                                     control,
                                     tempId,
+                                    forceUploadOnly = retained.admitsPreparedMedia,
                                 )
                             }
                         }
@@ -110,6 +112,118 @@ internal suspend fun ConversationController.uploadFileBackedRetained(
                 }.also { outcome ->
                     outcome.captureForRetry(retained, appState.pendingSendDiagnostics, tempId, startedAtMs)
                 }.upload
+    }
+}
+
+/**
+ * Uploads a send of files the composer's draft stores, under the same commit lock, cancellation check, acceptance
+ * record, progress and retry capture as a file upload. The first attempt reads the draft's own copies, so nothing is
+ * read from the pick again. When it fails, the send copies its files out of the draft so a Retry needs nothing the
+ * draft still holds, and later attempts upload those copies. The draft send that follows admits the references.
+ */
+private suspend fun ConversationController.uploadDraftStoredRetained(
+    account: String,
+    key: String,
+    tempId: String,
+    retained: RetainedMediaUpload,
+    startedAtMs: Long,
+): MediaUploadResultFfi {
+    if (retained.ownsDraftCopies) return uploadOwnedDraftCopies(account, key, tempId, retained, startedAtMs)
+    val upload = DraftFilesUpload(retained.attachments, retained.caption)
+    return appState
+        .withGroupCommitLock(account, group.groupIdHex) {
+            requireOptimisticSendNotCancelled(key)
+            val outcome =
+                try {
+                    withNativeTransferControl(
+                        retained::attachTransferCancel,
+                        onProgress = retained::reportTransferProgress,
+                    ) { control ->
+                        appState.marmotIo(MarmotTraceSection.MEDIA_UPLOAD) {
+                            uploadComposerDraftFilesWithToken(
+                                account,
+                                group.groupIdHex,
+                                upload,
+                                control,
+                                tempId,
+                                verificationDirectory = uploadSourcesDirectory(appState.appContext.cacheDir),
+                            )
+                        }
+                    }
+                } catch (
+                    @Suppress("TooGenericExceptionCaught") failure: Throwable,
+                ) {
+                    // Copied under the lock, before another send of this chat can clear the draft.
+                    if (failure !is CancellationException &&
+                        failure !is UnverifiedStoredDraftPdf &&
+                        !retained.isTransferCancelRequested
+                    ) {
+                        keepDraftFiles(account, retained)
+                    }
+                    throw failure
+                }
+            // A send MDK already owns is recorded under the lock, as the file-backed path does.
+            outcome.acceptance?.let { recordRecoveredStoredDraft(key, it) }
+            outcome
+        }.also { outcome ->
+            retained.draftUploadRevision = outcome.draftRevision
+            outcome.captureForRetry(retained, appState.pendingSendDiagnostics, tempId, startedAtMs)
+        }.upload
+}
+
+/** Gives a send whose upload from the draft failed private copies of its stored files; a failed copy keeps none. */
+internal suspend fun ConversationController.keepDraftFiles(
+    account: String,
+    retained: RetainedMediaUpload,
+) {
+    val directory = uploadSourcesDirectory(appState.appContext.cacheDir)
+    retained.keepDraftCopies(appState::closeStagedUploadSourceOffMain) { copies ->
+        appState.marmotIo(MarmotTraceSection.MEDIA_UPLOAD) {
+            copyDraftFiles(account, group.groupIdHex, retained.attachments, directory, copies)
+        }
+    }
+}
+
+/**
+ * Uploads the private copies a failed send of stored draft files owns, as a file upload under the same lock, cancel,
+ * progress and retry capture. The upload revision it may consume is the one its first attempt captured.
+ */
+private suspend fun ConversationController.uploadOwnedDraftCopies(
+    account: String,
+    key: String,
+    tempId: String,
+    retained: RetainedMediaUpload,
+    startedAtMs: Long,
+): MediaUploadResultFfi {
+    val batchCiphertextBytes =
+        checkNotNull(withContext(Dispatchers.IO) { fileBatchCiphertextBytes() }) {
+            "file-backed upload limits unavailable"
+        }
+    val upload = DraftFilesUpload(retained.attachments, retained.caption)
+    val stagingDirectory = uploadSourcesDirectory(appState.appContext.cacheDir)
+    return withFileUploadRequest(
+        retained.ownedUploadAttachments(),
+        retained.caption,
+        stagingDirectory,
+        batchCiphertextBytes,
+    ) { request ->
+        appState
+            .withGroupCommitLock(account, group.groupIdHex) {
+                requireOptimisticSendNotCancelled(key)
+                val outcome =
+                    withNativeTransferControl(
+                        retained::attachTransferCancel,
+                        onProgress = retained::reportTransferProgress,
+                    ) { control ->
+                        appState.marmotIo(MarmotTraceSection.MEDIA_UPLOAD) {
+                            uploadOwnedDraftCopiesWithToken(account, group.groupIdHex, upload, request, control, tempId)
+                        }
+                    }
+                outcome.acceptance?.let { recordRecoveredStoredDraft(key, it) }
+                outcome
+            }.also { outcome ->
+                outcome.captureForRetry(retained, appState.pendingSendDiagnostics, tempId, startedAtMs)
+            }.upload
     }
 }
 
@@ -370,7 +484,6 @@ private fun ConversationController.updatePendingSendStage(
 }
 
 /** Settle a manual text retry without republishing an uncertain delivery. */
-@Suppress("LongMethod") // Each failure classification owns different cleanup and user-visible recovery state.
 internal fun ConversationController.handleFailedSendRetryFailure(
     throwable: Throwable,
     key: String,
@@ -382,15 +495,10 @@ internal fun ConversationController.handleFailedSendRetryFailure(
     retryTrace: PerformanceTrace?,
 ) {
     if (throwable is OptimisticSendCancelledException) {
-        discardedDuringRetry.remove(key)
-        removeCancelledOptimisticSend(key, tempId)
-        trimCancelledSendTombstones()
+        discardCancelledSendAttempt(key, tempId)
         return
     }
-    if (throwable is CancellationException && optimisticSendPhases[key] == OptimisticSendPhase.CANCELLED) {
-        discardedDuringRetry.remove(key)
-        trimCancelledSendTombstones()
-    }
+    retireCancelledSendTombstone(throwable, key)
     throwable.rethrowIfCancellation()
     if (BuildConfig.DEBUG) Log.w("DMConversation", "retryFailedSend failed", throwable)
     when {
@@ -404,19 +512,10 @@ internal fun ConversationController.handleFailedSendRetryFailure(
             markActiveAccountRemovedFromMembers(account)
         }
         isAmbiguousRelayDeliveryError(throwable) -> {
-            if (optimisticSendPhases[key] == OptimisticSendPhase.PRE_ACCEPTANCE) {
-                optimisticSendPhases[key] = OptimisticSendPhase.ACCEPTANCE_UNKNOWN
-            }
             // Publication may already have reached a relay. Keep the
             // existing row Pending; another high-level send could mint a
             // duplicate event.
-            sendTrace(
-                retryTrace,
-                PerformancePhase.DELIVERY_UNCERTAIN,
-                result = PerformanceResult.PENDING,
-                layer = PerformanceLayer.TRANSPORT,
-            )
-            appState.pendingSendDiagnostics.update(tempId, PerformanceSendStage.DELIVERY_UNCERTAIN)
+            markTextDeliveryUncertain(key, tempId, retryTrace)
             publishTimelineFromIndexes()
         }
         optimisticSendIsMdkOwnedOrUnknown(key) -> {
@@ -431,13 +530,7 @@ internal fun ConversationController.handleFailedSendRetryFailure(
                     timelineOrder = order,
                 )
             failOptimisticChatListPreview(tempId)
-            suppressProjectedTimelineItems(
-                unpublishedProjectionIdsMatchingMessage(
-                    timelineRecords = timelineRecords,
-                    message = refreshedRecord,
-                    activeAccountIdHex = conversationAccountIdHex,
-                ),
-            )
+            suppressUnpublishedCopiesOf(refreshedRecord)
             publishTimelineFromIndexes()
             appState.pendingSendDiagnostics.forget(tempId)
             presentSendFailure(appState, throwable, sendFailureAttempt(key))
@@ -477,7 +570,7 @@ internal suspend fun ConversationController.discardPendingEdit(
                 )
             }
         }
-        status == null || status == LocalSendStatusFfi.Rejected -> optimisticEdits.remove(target)
+        status == null || status.isTerminalLocalSendFailure -> optimisticEdits.remove(target)
         else -> optimisticEdits[target] = current.withNativeEditStatus(status)
     }
     publishTimelineFromIndexes()

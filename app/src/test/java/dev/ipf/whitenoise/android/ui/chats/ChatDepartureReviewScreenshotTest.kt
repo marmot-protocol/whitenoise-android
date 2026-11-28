@@ -114,8 +114,9 @@ class ChatDepartureReviewScreenshotTest {
         rule.onRoot().captureRoboImage("src/test/snapshots/group_departure_successor_review_amoled_large_rtl.png")
         rule.onNodeWithContentDescription("Public key (hex), ${successor.memberIdHex}").assertDoesNotExist()
         rule.onAllNodesWithText(successor.memberIdHex, substring = true).assertCountEquals(0)
+        // At twice the font size the member and the group don't fit on screen together, so reach each one.
         rule.onNodeWithText("Unknown").performScrollTo().assertIsDisplayed()
-        rule.onNodeWithText("Garden club").assertIsDisplayed()
+        rule.onNodeWithText("Garden club").performScrollTo().assertIsDisplayed()
         rule.onNodeWithText(context.getString(R.string.group_action_transfer_and_leave)).assertIsDisplayed()
         rule.onRoot().captureRoboImage("src/test/snapshots/group_departure_successor_identity_amoled_large_rtl.png")
     }

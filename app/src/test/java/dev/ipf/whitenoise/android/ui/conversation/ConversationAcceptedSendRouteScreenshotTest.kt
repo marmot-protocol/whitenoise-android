@@ -12,6 +12,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.LocalCursorBlinkEnabled
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
@@ -209,7 +210,7 @@ class ConversationAcceptedSendRouteScreenshotTest {
                 blankLinesBefore = ByteArray(0),
             )
         composeRule.runOnIdle {
-            conversation.testApplyLiveTimelineChangesAndRegisterStreams(
+            conversation.testApplyLiveTimelineChanges(
                 listOf(
                     dev.ipf.marmotkit.TimelineMessageChangeFfi.Upsert(
                         trigger = dev.ipf.marmotkit.TimelineUpdateTriggerFfi.NEW_MESSAGE,
@@ -398,9 +399,10 @@ class ConversationAcceptedSendRouteScreenshotTest {
         composeRule.onNodeWithText(expectedText).assertIsDisplayed()
         composeRule.onNodeWithTag("conversation.send.motion.active").assertDoesNotExist()
         if (retireDuringFlight) {
-            composeRule.onNode(hasSetTextAction()).performTextInput("Next draft")
-            composeRule.mainClock.advanceTimeByFrame()
-            composeRule.onNodeWithText("Next draft").assertIsDisplayed()
+            val editor = composeRule.onNode(hasSetTextAction())
+            editor.performTextInput("Next draft")
+            composeRule.mainClock.autoAdvance = true
+            editor.assertIsDisplayed().assertTextContains("Next draft")
         }
     }
 

@@ -3,11 +3,16 @@
 package dev.ipf.whitenoise.android.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import dev.ipf.whitenoise.android.core.linkedDevicesAvailable
 import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.ownsGroupChange
+import dev.ipf.whitenoise.android.state.signInAlerts
+import dev.ipf.whitenoise.android.ui.common.LocalTopNoticeHost
+import dev.ipf.whitenoise.android.ui.common.TopNoticeHost
+import dev.ipf.whitenoise.android.ui.devices.CompromiseAlertHost
 import dev.ipf.whitenoise.android.ui.devices.DeviceLinkOfferHost
 import dev.ipf.whitenoise.android.ui.devices.DeviceLinkRequestHost
 import dev.ipf.whitenoise.android.ui.devices.UnlinkedAccountPromptHost
@@ -19,7 +24,10 @@ import dev.ipf.whitenoise.android.ui.group.GroupChangeConfirmationDialog
  * requests and offers, which wait while the app is locked or a group change still needs its answer.
  */
 @Composable
-internal fun AppQuestionHosts(appState: WhiteNoiseAppState) {
+internal fun AppQuestionHosts(
+    appState: WhiteNoiseAppState,
+    topNoticeHost: TopNoticeHost,
+) {
     // A refused group change waits for the user's answer wherever it was started, even after its screen closed, but
     // only while its account and runtime are current: after a switch it is withdrawn as Wait, never shown to another.
     val groupChangeQuestion = appState.groupChangeConfirmations.pending
@@ -32,10 +40,17 @@ internal fun AppQuestionHosts(appState: WhiteNoiseAppState) {
     }
     // Link requests from any signed-in profile, held back while the app is locked or a group change waits on an answer.
     if (linkedDevicesAvailable() && appState.phase == AppPhase.Ready) {
-        val linkBlocked = appState.appLock.screenVisible || groupChangeQuestion != null
-        DeviceLinkRequestHost(appState, blocked = linkBlocked)
-        DeviceLinkOfferHost(appState, blocked = linkBlocked)
+        val questionsBlocked = appState.appLock.screenVisible || groupChangeQuestion != null
+        val alerts = appState.signInAlerts
+        val compromiseDue = alerts.snapshot(appState.activeAccountRef)?.alertDue?.isNotEmpty() == true
+        val linkBlocked = questionsBlocked || compromiseDue || alerts.devicesRequest != null
+        CompositionLocalProvider(LocalTopNoticeHost provides topNoticeHost) {
+            DeviceLinkRequestHost(appState, blocked = linkBlocked)
+        }
+        DeviceLinkOfferHost(appState, blocked = questionsBlocked)
         UnlinkedAccountPromptHost(appState, blocked = appState.appLock.screenVisible)
         UnlinkedProfileRemovalHost(appState, blocked = appState.appLock.screenVisible)
+        // Evidence that the key may be in someone else's hands interrupts once per item, after unlock.
+        CompromiseAlertHost(appState, blocked = questionsBlocked)
     }
 }

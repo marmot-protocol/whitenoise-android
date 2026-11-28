@@ -172,19 +172,18 @@
         ]
       },
       {
-        "surface": "DeviceLinkChoiceFields",
+        "surface": "DeviceLinkNameField",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkApproval.kt",
-        "anchor": "fun DeviceLinkChoiceFields(",
+        "anchor": "fun DeviceLinkNameField(",
         "test_ids": [
           "SET-061"
         ]
       },
       {
-        "surface": "Linked devices: R.string.explanation_link_request_options",
+        "surface": "DeviceLinkSharingChoices",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkApproval.kt",
-        "anchor": "R.string.explanation_link_request_options",
+        "anchor": "fun DeviceLinkSharingChoices(",
         "test_ids": [
-          "ACC-025",
           "SET-061"
         ]
       },
@@ -198,30 +197,19 @@
         ]
       },
       {
-        "surface": "Linked devices: R.string.link_request_options",
+        "surface": "DeviceLinkReportButton",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkApproval.kt",
-        "anchor": "R.string.link_request_options",
+        "anchor": "fun DeviceLinkReportButton(",
         "test_ids": [
-          "ACC-025",
-          "SET-061"
+          "SET-079"
         ]
       },
       {
-        "surface": "Linked devices: R.string.link_request_options_detail",
+        "surface": "Device linking consent: R.string.link_consent_did_not_start",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkApproval.kt",
-        "anchor": "R.string.link_request_options_detail",
+        "anchor": "R.string.link_consent_did_not_start",
         "test_ids": [
-          "ACC-025",
-          "SET-061"
-        ]
-      },
-      {
-        "surface": "DeviceLinkOptionsRow",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkApproval.kt",
-        "anchor": "fun DeviceLinkOptionsRow(",
-        "test_ids": [
-          "ACC-025",
-          "SET-061"
+          "SET-079"
         ]
       }
     ]

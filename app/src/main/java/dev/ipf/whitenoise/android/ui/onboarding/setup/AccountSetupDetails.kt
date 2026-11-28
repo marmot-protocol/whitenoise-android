@@ -22,9 +22,11 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.OnboardingActionFfi
 import dev.ipf.marmotkit.OnboardingFindingFfi
@@ -34,6 +36,7 @@ import dev.ipf.marmotkit.OnboardingRepairProposalFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.marmotkit.OnboardingStepStateFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.outlined.AccountCircle
 import dev.ipf.whitenoise.android.ui.icons.outlined.Security
@@ -45,8 +48,12 @@ import dev.ipf.whitenoise.android.ui.theme.Dimens
 internal fun SetupDecisionHeading(state: AccountSetupState) {
     val step = state.currentStep ?: return
     val proposal = state.snapshot?.proposal?.takeIf { it.step == step.step }
-    val title = setupPendingHeadingTitle(state, step, proposal) ?: setupDefaultHeadingTitle(step, proposal)
-    Text(stringResource(title), style = MaterialTheme.typography.titleLarge)
+    val title =
+        setupPendingHeadingTitle(state, step, proposal) ?: when {
+            state.focusesRelayTimeout() -> R.string.setup_relay_timeout_title
+            else -> setupDefaultHeadingTitle(step, proposal)
+        }
+    Text(stringResource(title), Modifier.semantics { heading() }, style = MaterialTheme.typography.titleLarge)
 }
 
 private fun setupPendingHeadingTitle(
@@ -114,7 +121,7 @@ internal fun SetupStageProgress(state: AccountSetupState) {
         stageLabel?.let {
             Text(it, style = MaterialTheme.typography.labelMedium, modifier = Modifier.clearAndSetSemantics {})
         }
-        completedLabel?.let {
+        completedLabel?.takeUnless { state.focusesRelayTimeout() }?.let {
             Text(
                 it,
                 style = MaterialTheme.typography.bodySmall,
@@ -197,18 +204,22 @@ internal fun SetupStepIcon(step: OnboardingStepFfi) {
  * note stays with the step, so Details does not repeat it.
  */
 @Composable
-internal fun SetupDetails(state: AccountSetupState) {
+internal fun SetupDetails(
+    state: AccountSetupState,
+    onAction: (SetupRequest) -> Unit,
+    onEdit: (OnboardingStepFfi, OnboardingActionFfi, ULong) -> Unit,
+) {
     Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceMd)) {
         state.snapshot?.let { snapshot ->
             snapshot.proposal?.takeIf { it.step == state.currentStep?.step }?.relayRepair?.let { repair ->
                 SetupRelayRepairDetails(repair, state.currentStep?.findings.orEmpty())
             }
             Text(stringResource(R.string.setup_checks), style = MaterialTheme.typography.titleMedium)
-            Text(state.accountLabel, style = MaterialTheme.typography.labelMedium)
+            EmojiLabel(state.accountLabel, style = MaterialTheme.typography.labelMedium)
             state.currentStep?.findings?.forEach { finding ->
                 SetupFindingContent(finding, showTitle = !snapshot.deviceNoticeCovers(state.currentStep?.step, finding))
             }
-            SetupChecklist(snapshot)
+            SetupChecklist(state, onAction, onEdit)
         }
     }
 }
@@ -234,12 +245,12 @@ internal fun SetupFindingContent(
                     it,
                     style =
                         MaterialTheme.typography.bodyMedium.copy(
-                            textDirection = androidx.compose.ui.text.style.TextDirection.Ltr,
+                            textDirection = TextDirection.Ltr,
                         ),
                 )
             }
             SetupFindingEvidence(finding)
-            if (showTitle) {
+            if (showTitle && !finding.isRepairDeclarationRefusal) {
                 Text(
                     stringResource(setupFindingTitle(finding.issue)),
                     style = MaterialTheme.typography.bodyMedium,

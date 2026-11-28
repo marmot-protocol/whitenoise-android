@@ -8,7 +8,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/FirstFrameDurableAvatars.kt",
         "anchor": "internal suspend fun WhiteNoiseAppState.prewarmFirstFrameDurableAvatars(",
         "test_ids": [
-          "CHL-023"
+          "CHL-023",
+          "CHL-017"
         ]
       },
       {

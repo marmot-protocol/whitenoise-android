@@ -2,6 +2,17 @@
 <resources>
     <string name="voice_review_title">Review voice message</string>
     <string name="voice_record_again">Record again</string>
-    <string name="voice_message_release_to_review">Release to review · slide off to cancel</string>
+    <string name="voice_message_slide_to_cancel">Slide off to cancel</string>
     <string name="voice_recording_stop">Stop recording</string>
+    <string name="voice_recording_pause">Pause recording</string>
+    <string name="voice_discard_title">Discard voice message?</string>
+    <string name="voice_discard_message">This recording hasn\'t been sent and will be deleted.</string>
+    <string name="voice_send_interrupted">Voice message wasn\'t sent</string>
+    <string name="voice_recording_elsewhere">A voice message is recording in another chat.</string>
+    <string name="voice_row_recording">Recording voice message</string>
+    <string name="voice_row_unsent">Unsent voice message</string>
+    <string name="voice_recording_paused">Voice recording paused</string>
+    <string name="voice_send_on_release">Send held voice notes on release</string>
+    <string name="voice_transcribe_automatically">Automatically transcribe received voice notes</string>
+    <string name="settings_voice_notes">Voice notes</string>
 </resources>

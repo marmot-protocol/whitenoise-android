@@ -112,6 +112,7 @@ private fun ConversationReadAnchorEffect(
                 val newest =
                     timelineViewport.readingLayoutInfo().newestReadRow(
                         timelineListIndices = trailingRowCount until trailingRowCount + renderedSize,
+                        leadingSenderGapPx = timelineViewport.senderGapMeasurements::get,
                     )
                 if (newest == null || renderedSize == 0) return@derivedStateOf -1
                 // Reversed layout, bottom to top: [maybe bottom error]

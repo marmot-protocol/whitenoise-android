@@ -1,0 +1,41 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/RetainedConversationStates.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Pending text keeps one bubble across chat reopen and resolves its delivered row",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/RetainedConversationStates.kt",
+        "anchor": "fun acceptedPendingTextOptimisticId(",
+        "test_ids": [
+          "CHL-002"
+        ]
+      },
+      {
+        "surface": "Queued upload protection through conversation-state overflow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/RetainedConversationStates.kt",
+        "anchor": "fun prune()",
+        "test_ids": [
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Evicted conversation releases retained upload sources",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/RetainedConversationStates.kt",
+        "anchor": "fun evict()",
+        "test_ids": [
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Account wipe drops retained pending sends",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/RetainedConversationStates.kt",
+        "anchor": "fun clearAll()",
+        "test_ids": [
+          "SYS-005"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

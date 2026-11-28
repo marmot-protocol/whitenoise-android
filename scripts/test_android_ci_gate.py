@@ -12,11 +12,13 @@ import time
 import unittest
 
 from scripts.check_fuzz_pr_triggers import pr_paths
+from scripts.check_screenshot_baseline_owners import gradle_test_args
 from scripts.check_runtime_listener_coverage import OWNER, check_coverage
 from scripts.select_instrumented_lanes import matches
 
 
-WORKFLOW = Path(__file__).resolve().parents[1] / '.github/workflows/android-ci.yml'
+ROOT = Path(__file__).resolve().parents[1]
+WORKFLOW = ROOT / '.github/workflows/android-ci.yml'
 PR_PRIMARY_MATRIX = (
     "        flavor: ${{ fromJSON(github.event_name == 'pull_request' && needs.changes.outputs.full_matrix != 'true' && '[\"Zapstore\"]' "
     "|| '[\"Zapstore\", \"Play\"]') }}\n"
@@ -110,11 +112,12 @@ class AndroidCiGateTest(unittest.TestCase):
         blocks = re.split(r'(?=^      - name: )', job, flags=re.MULTILINE)
         return [block for block in blocks if './gradlew' in block]
 
-    def run_gate(self, outcomes, event='pull_request', draft='false', mode=''):
+    def run_gate(self, outcomes, event='pull_request', draft='false', mode='', base='master'):
         """Run the production shell with synthetic, untrusted JSON input."""
         return subprocess.run(
             ['bash', '-c', self.script],
-            env={**os.environ, 'JOB_RESULTS': json.dumps(outcomes), 'CI_EVENT': event, 'PR_DRAFT': draft, 'ANDROID_CI_MODE': mode},
+            env={**os.environ, 'JOB_RESULTS': json.dumps(outcomes), 'CI_EVENT': event,
+                 'PR_DRAFT': draft, 'ANDROID_CI_MODE': mode, 'CI_BASE_REF': base},
             capture_output=True, text=True, check=False,
         )
 
@@ -224,7 +227,7 @@ class AndroidCiGateTest(unittest.TestCase):
     def test_fuzz_trigger_policy_runs_outside_filtered_fuzz_workflow(self):
         """A missing parser path cannot skip the policy check itself."""
         events = self.workflow.split('\non:\n', 1)[1].split('\nconcurrency:', 1)[0]
-        self.assertIn('  pull_request:\n    branches: [master]', events)
+        self.assertIn('  pull_request:\n    branches: [master, develop]', events)
         self.assertNotIn('paths:', events)
         self.assertNotIn('paths-ignore:', events)
         # Only a verified same-content reuse may skip this job, never a path filter.
@@ -293,7 +296,7 @@ class AndroidCiGateTest(unittest.TestCase):
     def test_unit_deadline_reserves_early_failure_artifact_upload(self):
         self.assertIn('timeout-minutes: 40', self.tests_job)
         anchor = self.named_step(self.tests_job, 'Reserve unit-test diagnostics and upload time')
-        self.assertIn('time.monotonic() + 32 * 60', anchor)
+        self.assertIn('time.monotonic() + 28 * 60', anchor)
         self.assertLess(self.tests_job.index('      - name: Reserve unit-test'),
                         self.tests_job.index('      - name: Checkout'))
         unit = self.named_step(self.tests_job, 'Unit tests')
@@ -330,7 +333,7 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('scripts/kover_class_outputs.py pack', self.tests_job)
         header = self.coverage.split('    steps:', 1)[0]
         self.assertIn('    needs: [changes, tests]\n', header)
-        self.assertIn("needs.changes.outputs.precheck != 'true'", header)
+        self.assertNotIn('precheck', header)
         coverage = self.named_step(self.coverage, 'Coverage gate and report (Kover)')
         for task in (':app:koverVerifyDevZapstoreDebug', ':app:koverXmlReportDevZapstoreDebug',
                      ':app:koverHtmlReportDevZapstoreDebug', '-x :app:testDevZapstoreDebugUnitTest',
@@ -347,6 +350,14 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('files(layout.projectDirectory.dir("src/test/snapshots").asFileTree)', self.app_build)
         self.assertIn('withPropertyName("roborazziSnapshots")', self.app_build)
         self.assertIn('withPathSensitivity(PathSensitivity.RELATIVE)', self.app_build)
+
+    def test_coverage_floor_failure_still_writes_the_reports(self):
+        """A failed coverage floor still lets Gradle write the XML and HTML reports the upload step publishes."""
+        coverage = self.named_step(self.coverage, 'Coverage gate and report (Kover)')
+        self.assertIn('--continue', coverage)
+        upload = self.named_step(self.coverage, 'Upload coverage report')
+        self.assertIn('if: always()', upload)
+        self.assertIn('app/build/reports/kover/', upload)
 
     def test_teardown_floor_reuses_report_and_propagates_report_failure(self):
         floor = self.named_step(self.coverage, 'Runtime listener and viewport restoration coverage floors')
@@ -367,7 +378,7 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('scripts/test_check_viewport_restoration_coverage.py', self.tooling_contracts)
 
     def test_full_suite_compares_every_committed_golden(self):
-        """Both full suites must prove complete golden coverage without filters."""
+        """Both full suites must prove complete golden coverage without filters (see the precheck test)."""
         self.assertIn(PR_PRIMARY_MATRIX, self.tests_job)
         self.assertNotIn('verifyRoborazziDev', self.workflow)
         self.assertNotIn('--tests ', self.tests_job)
@@ -471,6 +482,7 @@ class AndroidCiGateTest(unittest.TestCase):
         tree = self.reused_outcomes(self.successful_outcomes('merge_group'), 'tree')
         push = self.reused_outcomes(self.successful_outcomes('push'), 'push', self.PUSH_KEPT + ('compose-compiler',))
         self.assertEqual(self.run_gate(tree, 'pull_request').returncode, 0)
+        self.assertNotEqual(self.run_gate(tree, 'pull_request', base='develop').returncode, 0)
         for bad_run in ('', 'abc', '12x', None):
             for outcomes, event in ((tree, 'pull_request'), (push, 'push')):
                 changed = json.loads(json.dumps(outcomes))
@@ -520,6 +532,8 @@ class AndroidCiGateTest(unittest.TestCase):
             self.assertNotIn("reuse == 'none'", header, name)
         for output in ('reuse', 'reuse_run', 'tree', 'lint_writer'):
             self.assertIn(f'      {output}: ${{{{ steps.reuse.outputs.{output} }}}}\n', self.changes)
+        self.assertIn('      pr_base: ${{ steps.classify.outputs.pr_base }}\n', self.changes)
+        self.assertIn('      proof_base: ${{ steps.classify.outputs.proof_base }}\n', self.changes)
         self.assertIn('      actions: read\n', self.changes)
         self.assertNotIn('actions: write', self.changes)
         lookup = self.named_step(self.changes, 'Look for a verified result on identical content')
@@ -527,17 +541,31 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('scripts/ci_reuse.py', lookup)
         self.assertIn('--before "$CI_BEFORE_SHA"', lookup)
         self.assertIn('CI_BEFORE_SHA: ${{ github.event.before }}', lookup)
+        self.assertIn('CI_BASE_SHA: ${{ steps.classify.outputs.proof_base }}', lookup)
         self.assertIn("printf 'reuse=none\\nreuse_run=\\ntree=\\nlint_writer=false\\n' >> \"$GITHUB_OUTPUT\"", lookup)
         for name in ('Write the validated tree proof', 'Retain the validated tree proof'):
             step = self.named_step(self.gate, name)
             for condition in ('success()', "github.event_name == 'pull_request'",
+                              "github.base_ref == 'master'", "needs.changes.outputs.proof_base != ''",
                               "needs.changes.outputs.reuse == 'none'", "needs.changes.outputs.docs_only == 'false'"):
                 self.assertIn(condition, step, (name, condition))
             # A proof is an optimisation, so an artifact-service error must not fail the required check.
             self.assertIn('continue-on-error: true', step, name)
         proof = self.named_step(self.gate, 'Retain the validated tree proof')
-        self.assertIn('name: android-ci-attest-${{ needs.changes.outputs.ci_mode }}-${{ needs.changes.outputs.tree }}', proof)
+        self.assertIn('name: android-ci-attest-master-${{ needs.changes.outputs.proof_base }}-'
+                      '${{ needs.changes.outputs.ci_mode }}-${{ needs.changes.outputs.tree }}', proof)
         self.assertIn('retention-days: 7', proof)
+        self.assertIn('id: proof_upload', proof)
+        self.assertIn('name: Record validated tree proof ${{ steps.proof_upload.outputs.artifact-id }}', self.gate)
+        self.assertIn("steps.proof_upload.outcome == 'success'", self.gate)
+
+    def test_pr_tooling_uses_the_verified_checkout_base(self):
+        """Guide and source-size checks use the same verified base as PR classification."""
+        manual = self.named_step(self.tooling_contracts, 'Validate manual release guide')
+        size = self.named_step(self.tooling_contracts, 'Check the source file size baseline only shrinks')
+        self.assertIn('PR_BASE_SHA: ${{ needs.changes.outputs.pr_base }}', manual)
+        self.assertIn('${PR_BASE_SHA:?', manual)
+        self.assertIn('BASE_SHA: ${{ needs.changes.outputs.pr_base || github.event.merge_group.base_sha }}', size)
 
     def test_classifier_and_lookup_run_first_and_isolated_before_other_pr_code(self):
         """Nothing PR-controlled runs before the steps that decide the lane, the tree and the reuse."""
@@ -545,6 +573,7 @@ class AndroidCiGateTest(unittest.TestCase):
         classify = 'Classify complete PR diff'
         lookup = 'Look for a verified result on identical content'
         self.assertEqual(steps, ['Checkout', 'Read current full-CI override', classify, lookup,
+                                 'Require Stable MarmotKit on master',
                                  'Test conservative CI classification'])
         for name, command in ((classify, 'python3 -I scripts/check_ci_changes.py'),
                               (lookup, 'python3 -I scripts/ci_reuse.py')):
@@ -668,7 +697,8 @@ class AndroidCiGateTest(unittest.TestCase):
 
         Each writer adds a few hundred MB per master push. Matrix duplicates and
         master-only jobs read whichever entry is newest instead, so two pushes
-        fit in the repository cache quota.
+        fit in the repository cache quota. Jobs that decode a signing keystore
+        restore nothing, because preview builds run PR code on master's cache scope.
         """
         master_only = "github.ref != 'refs/heads/master' }}"
         expected = {
@@ -678,9 +708,9 @@ class AndroidCiGateTest(unittest.TestCase):
                 '${{ ' + master_only,
                 'true',
             ],
-            'android-production-release.yml': ['true'],
+            'android-production-release.yml': ['disabled'],
             'android-release-runtime.yml': ['true', 'true'],
-            'android-staging-apk.yml': ['true', 'true', 'true'],
+            'android-staging-apk.yml': ['disabled', 'true', 'true'],
             'codeql.yml': ['true'],
             'dependency-submission.yml': ['true'],
             'fuzz-scheduled.yml': ['true'],
@@ -693,7 +723,9 @@ class AndroidCiGateTest(unittest.TestCase):
                     workflow,
                 )
                 found = [
-                    match.group(1) if (match := re.search(r'cache-read-only: (.+)\n', step)) else None
+                    'disabled'
+                    if 'cache-disabled: true\n' in step
+                    else match.group(1) if (match := re.search(r'cache-read-only: (.+)\n', step)) else None
                     for step in steps
                 ]
                 self.assertEqual(found, values)
@@ -1064,7 +1096,7 @@ class AndroidCiGateTest(unittest.TestCase):
             self.assertIn('  workflow_dispatch:', events)
             self.assertIn('${{ github.event_name }}-${{ github.event_name ==', workflow)
             self.assertIn("'merge_group' && github.run_id || github.ref", workflow)
-            self.assertIn('  pull_request:\n    branches: [master]', events)
+            self.assertIn('  pull_request:\n    branches: [master, develop]', events)
             self.assertIn('    types: [opened, synchronize, reopened, ready_for_review]\n', events)
 
     def test_drafts_defer_only_heavy_lanes(self):
@@ -1077,7 +1109,8 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertNotIn('draft', self.named_step(self.coverage, 'Require every committed screenshot golden to be compared'))
         for name in ('Download shard coverage data', 'Coverage gate and report (Kover)',
                      'Runtime listener and viewport restoration coverage floors'):
-            self.assertIn("${{ !github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true' }}",
+            self.assertIn("${{ needs.changes.outputs.precheck != 'true' && "
+                          "(!github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true') }}",
                           self.named_step(self.coverage, name))
         self.assertNotIn('draft', self.named_step(self.tests_job, 'Unit tests'))
         self.assertIn('PR_DRAFT: ${{ github.event.pull_request.draft == true }}', self.gate)
@@ -1148,7 +1181,7 @@ class AndroidCiGateTest(unittest.TestCase):
     def precheck_outcomes(self, draft='false'):
         outcomes = self.successful_outcomes(draft=draft)
         outcomes['changes']['outputs'].update(precheck='true', ci_mode='precheck', supplemental_campaigns='false')
-        for job in ('tests', 'coverage', 'static-analysis', 'secondary-variant', 'compose-compiler'):
+        for job in ('static-analysis', 'secondary-variant', 'compose-compiler'):
             outcomes[job]['result'] = 'skipped'
         return outcomes
 
@@ -1266,8 +1299,11 @@ class AndroidCiGateTest(unittest.TestCase):
                 tasks = [line for line in result.stdout.splitlines() if line.startswith(':app:')]
                 self.assertEqual(len(tasks), 6 if android_test else 4, precheck)
                 self.assertEqual(any('AndroidTest' in task for task in tasks), android_test, precheck)
+                self.assertIn('-Pkotlin.daemon.jvmargs=-Xmx5g', result.stdout.splitlines())
         upload = self.named_step(self.compile_tests, 'Share compiled outputs with the unit shards')
-        self.assertIn("needs.changes.outputs.precheck != 'true'", upload)
+        shared = "(needs.changes.outputs.precheck != 'true' || matrix.flavor == 'Zapstore')"
+        self.assertIn(shared, upload)
+        self.assertIn(shared, self.named_step(self.compile_tests, 'Package new build-cache entries'))
         self.assertIn('name: unit-compile-cache-${{ matrix.flavor }}', upload)
         self.assertIn('retention-days: 1', upload)
         self.assertIn('overwrite: true', upload)
@@ -1286,7 +1322,6 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('--max-workers=1', step)
         self.assertIn('--no-daemon', step)
         self.assertNotIn('assemble', step)
-        self.assertNotIn('Xmx', step)
         self.assertIn('timeout-minutes: 25', step)
         self.assertIn('timeout-minutes: 35', self.compile_tests)
         tooling = self.named_step(self.build_contracts, 'Compile (Kotlin)')
@@ -1302,13 +1337,70 @@ class AndroidCiGateTest(unittest.TestCase):
         precheck = tooling.split('if [[ "$CI_PRECHECK" == true ]]; then', 1)[1].split('else', 1)[0]
         self.assertNotIn('assemble', precheck)
         self.assertIn("needs.changes.outputs.precheck == 'true'", self.build_contracts)
-        for job in (self.static_analysis, self.tests_job, self.secondary, self.compose_compiler):
+        for job in (self.static_analysis, self.secondary, self.compose_compiler):
             self.assertIn("needs.changes.outputs.precheck != 'true'", job.split('    steps:', 1)[0])
+        # Prechecks run the Zapstore screenshot shards and the golden check; Kover stays at integration.
+        self.assertNotIn('precheck', self.tests_job.split('    steps:', 1)[0])
+        self.assertNotIn('precheck', self.coverage.split('    steps:', 1)[0])
         self.assertIn("cancel-in-progress: ${{ github.event_name != 'merge_group' }}", self.workflow)
         for name in ('Upload reports', 'Upload Gradle timing reports',
                      'Verify selected dependency security floors'):
             self.named_step(self.compile_tests, name)
         self.assertIn('android-ci-reports-compile-tests-${{ matrix.flavor }}', self.compile_tests)
+
+    def run_recorded_step(self, job, step_name, flavor, precheck, full, shard='0'):
+        """Run one workflow step with a Gradle wrapper that prints its arguments."""
+        step = self.named_step(job, step_name)
+        script = textwrap.dedent(step.split('        run: |\n', 1)[1])
+        script = script.replace('${{ matrix.flavor }}', flavor)
+        with tempfile.TemporaryDirectory() as directory:
+            wrapper = Path(directory) / 'gradlew'
+            wrapper.write_text('#!/bin/bash\nprintf "%s\\n" "$@"\n')
+            wrapper.chmod(0o755)
+            for relative in ('scripts/run_unit_tests_with_diagnostics.py',
+                             'scripts/check_screenshot_baseline_owners.py',
+                             'config/screenshot-baseline-owners.txt'):
+                copy = Path(directory) / relative
+                copy.parent.mkdir(exist_ok=True)
+                copy.write_bytes((ROOT / relative).read_bytes())
+            result = subprocess.run(['bash', '-euo', 'pipefail', '-c', script],
+                cwd=directory, capture_output=True, text=True,
+                env={**os.environ, 'CI_PRECHECK': precheck, 'CI_FULL_MATRIX': full,
+                     'ORG_GRADLE_PROJECT_ciTestShard': shard,
+                     'UNIT_TEST_DEADLINE_MONOTONIC': str(time.monotonic() + 5)})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return result.stdout.splitlines()
+
+    def test_precheck_unit_shards_verify_only_registered_golden_owners(self):
+        """PR prechecks catch screenshot mismatches before the queue; full suites stay unfiltered."""
+        registry = (ROOT / 'config/screenshot-baseline-owners.txt').read_text()
+        expected = gradle_test_args(registry)
+        for shard in ('0', '3'):
+            arguments = self.run_recorded_step(self.tests_job, 'Unit tests', 'Zapstore', 'true', 'false', shard)
+            task = arguments.index(':app:testDevZapstoreDebugUnitTest')
+            self.assertEqual(arguments[task + 1:task + 1 + len(expected)], expected)
+            self.assertEqual(arguments.count('--tests'), expected.count('--tests'))
+            self.assertIn('-Proborazzi.test.verify=true', arguments)
+            self.assertFalse([argument for argument in arguments if 'kover' in argument.lower()], shard)
+        for flavor, full in (('Zapstore', 'false'), ('Zapstore', 'true'), ('Play', 'true')):
+            arguments = self.run_recorded_step(self.tests_job, 'Unit tests', flavor, 'false', full)
+            self.assertNotIn('--tests', arguments, (flavor, full))
+            self.assertEqual('Zapstore' == flavor, ':app:koverGenerateArtifactDevZapstoreDebug' in arguments)
+        for name in ('Upload shard coverage data', 'Pack Kover class directories', 'Upload Kover class directories'):
+            self.assertIn("needs.changes.outputs.precheck != 'true'", self.named_step(self.tests_job, name))
+        upload = self.named_step(self.tests_job, 'Upload reports')
+        self.assertIn('if: always()', upload)
+        self.assertIn('app/build/outputs/roborazzi/', upload)
+        # A registry gap fails the precheck: coverage compares the shards' union, without Kover.
+        steps = re.findall(r'^      - name: (.+)$', self.coverage, re.MULTILINE)
+        ungated = {'Checkout', 'Download shard golden comparison evidence',
+                   'Require every committed screenshot golden to be compared',
+                   'Upload coverage report', 'Upload Gradle timing reports'}
+        self.assertLess(ungated, set(steps))
+        for name in set(steps) - ungated:
+            self.assertIn("if: ${{ needs.changes.outputs.precheck != 'true' && ", self.named_step(self.coverage, name), name)
+        for name in ungated - {'Upload coverage report', 'Upload Gradle timing reports'}:
+            self.assertNotIn('precheck', self.named_step(self.coverage, name), name)
 
     def test_instrumented_compile_tasks_have_one_owner_per_mode(self):
         """Execute real task selectors with a recording wrapper, never Android tooling."""
@@ -1319,26 +1411,10 @@ class AndroidCiGateTest(unittest.TestCase):
                 (self.tests_job, 'Unit tests', 'Zapstore'),
                 (self.tests_job, 'Unit tests', 'Play'),
             ):
-                if precheck == 'true' and job == self.tests_job:
+                if precheck == 'true' and job == self.tests_job and flavor == 'Play':
                     continue
-                step = self.named_step(job, step_name)
-                script = textwrap.dedent(step.split('        run: |\n', 1)[1])
-                script = script.replace('${{ matrix.flavor }}', flavor)
-                with tempfile.TemporaryDirectory() as directory:
-                    wrapper = Path(directory) / 'gradlew'
-                    wrapper.write_text('#!/bin/bash\nprintf "%s\\n" "$@"\n')
-                    wrapper.chmod(0o755)
-                    diagnostics = Path(directory) / 'scripts/run_unit_tests_with_diagnostics.py'
-                    diagnostics.parent.mkdir()
-                    diagnostics.write_bytes(Path(__file__).with_name('run_unit_tests_with_diagnostics.py').read_bytes())
-                    result = subprocess.run(['bash', '-euo', 'pipefail', '-c', script],
-                        cwd=directory, capture_output=True, text=True,
-                        env={**os.environ, 'CI_PRECHECK': precheck, 'CI_FULL_MATRIX': full,
-                             'ORG_GRADLE_PROJECT_ciTestShard': '0',
-                             'UNIT_TEST_DEADLINE_MONOTONIC': str(time.monotonic() + 5)})
-                    self.assertEqual(result.returncode, 0, result.stderr)
-                    owners.extend(argument for argument in result.stdout.splitlines()
-                                  if argument.endswith('AndroidTestKotlin'))
+                arguments = self.run_recorded_step(job, step_name, flavor, precheck, full)
+                owners.extend(argument for argument in arguments if argument.endswith('AndroidTestKotlin'))
             expected = ([] if precheck == 'true' else
                         [':app:compileDevZapstoreDebugAndroidTestKotlin'] if full == 'false' else
                         [':app:compileDevZapstoreDebugAndroidTestKotlin',

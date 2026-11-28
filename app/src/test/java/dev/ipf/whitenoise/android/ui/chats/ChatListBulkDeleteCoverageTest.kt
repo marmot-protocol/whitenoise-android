@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.chats
 
+import dev.ipf.whitenoise.android.appModuleSource
 import dev.ipf.whitenoise.android.audio.kotlinFunctionBody
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -13,12 +14,8 @@ import java.io.File
 class ChatListBulkDeleteCoverageTest {
     @Test
     fun bulkDeleteConfirmUsesPureLocalWipePath() {
-        val source = chatsScreenSource().readText()
-        val confirmBlock =
-            source.requiredSection(
-                start = "pendingBulkDelete?.let { request ->",
-                end = "\n}\n\n/**\n * Resolution state for a chat-list search query",
-            )
+        val confirmBlock = localDeleteConfirmationSource()
+        assertTrue("ChatListLocalDeleteConfirmation(" in chatsScreenSource().readText())
 
         assertTrue(
             "bulk delete confirm must call the pure local wipe helper",
@@ -105,18 +102,19 @@ class ChatListBulkDeleteCoverageTest {
         assertTrue("!item.isDm()" in menu)
         assertTrue("!item.group.leaveRequestPending" in menu)
         assertTrue("item.projection?.leaveRequestPending != true" in menu)
-        val departure = source.requiredSection("pendingLeaveAndDelete?.let", "pendingBulkDelete?.let")
+        val departure = source.requiredSection("pendingLeaveAndDelete?.let", "ChatListLocalDeleteConfirmation(")
         assertTrue("ChatDepartureBatchDialog(" in departure)
         assertTrue("request.targets.none { it.groupId in leavingAndDeleting }" in departure)
         assertTrue("leavingAndDeleting.add(target.groupId)" in departure)
         assertTrue("leavingAndDeleting.remove(target.groupId)" in departure)
-        val localDelete =
-            source.requiredSection(
-                "pendingBulkDelete?.let",
-                "onDismiss = { if (pendingBulkDelete === request) pendingBulkDelete = null }",
-            )
-        assertTrue("request.groupIds.any { it in leavingAndDeleting }" in localDelete)
+        val localDelete = localDeleteConfirmationSource()
+        assertTrue("if (pendingRequest.value !== request) return@ChatDeleteConfirmationDialog" in localDelete)
+        assertTrue("request.groupIds.any { it in busyChats }" in localDelete)
+        assertTrue("busyChats = leavingAndDeleting" in source)
     }
+
+    private fun localDeleteConfirmationSource(): String =
+        appModuleSource("src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListLocalDeleteConfirmation.kt")
 
     private fun chatsScreenSource(): File =
         listOf(

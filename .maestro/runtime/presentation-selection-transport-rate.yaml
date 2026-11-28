@@ -2,6 +2,19 @@ appId: dev.ipf.whitenoise.android.maestrolab
 name: presentation-selection-transport-rate
 ---
 - runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible: Previous sentence
+- assertVisible: Next sentence
+- tapOn: More options
+- assertVisible: Previous message
+- assertVisible: Next message
+- back
+- assertNotVisible: Next message
+- tapOn: More options
+- tapOn: Previous message
+- assertNotVisible: Previous message
+- tapOn: More options
+- tapOn: Next message
+- assertNotVisible: Next message
 - assertVisible: Speech rate, current .*
 - tapOn: Speech rate, current .*
 - assertVisible: System \(follow device setting\)

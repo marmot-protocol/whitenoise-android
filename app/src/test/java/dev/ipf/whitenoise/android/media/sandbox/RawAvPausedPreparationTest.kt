@@ -2,22 +2,35 @@ package dev.ipf.whitenoise.android.media.sandbox
 
 import android.app.Application
 import android.content.ContentResolver
+import android.content.Intent
 import android.graphics.Bitmap
+import android.media.AudioManager
 import android.net.Uri
+import android.os.Looper
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import com.google.common.util.concurrent.SettableFuture
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import java.io.FileNotFoundException
+import java.io.IOException
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -45,6 +58,7 @@ class RawAvPausedPreparationTest {
                     resolver: ContentResolver,
                     uri: Uri,
                     edge: Int,
+                    playbackColors: Boolean,
                 ): MediaProbe {
                     calls.incrementAndGet()
                     entered.countDown()
@@ -70,7 +84,7 @@ class RawAvPausedPreparationTest {
             assertTrue(engine.snapshot().prepared)
             assertFalse(engine.snapshot().playWhenReady)
             assertEquals(RawAvPlaybackEngine.Status.Ready, engine.snapshot().status)
-            assertSame(bitmap, field(engine, "lastBitmap"))
+            assertSame(bitmap, (field(engine, "presenter") as RawVideoPresenter).retainedBitmap())
             assertFalse(bitmap.isRecycled)
             assertEquals(1, calls.get())
             assertNull(field(engine, "pendingSeek"))
@@ -91,6 +105,7 @@ class RawAvPausedPreparationTest {
                     resolver: ContentResolver,
                     uri: Uri,
                     edge: Int,
+                    playbackColors: Boolean,
                 ): MediaProbe {
                     entered.countDown()
                     check(release.await(3, TimeUnit.SECONDS))
@@ -113,7 +128,7 @@ class RawAvPausedPreparationTest {
             release.countDown()
             engine.prepare().get(2, TimeUnit.SECONDS)
             awaitProbeIdle(engine)
-            assertNull(field(engine, "lastBitmap"))
+            assertNull((field(engine, "presenter") as RawVideoPresenter).retainedBitmap())
             assertTrue(bitmap.isRecycled)
         } finally {
             release.countDown()
@@ -134,6 +149,7 @@ class RawAvPausedPreparationTest {
                     resolver: ContentResolver,
                     uri: Uri,
                     edge: Int,
+                    playbackColors: Boolean,
                 ) = MediaProbe(2, 2, 4000, initial)
 
                 override fun probeUriAt(
@@ -141,9 +157,11 @@ class RawAvPausedPreparationTest {
                     uri: Uri,
                     positionMs: Long,
                     edge: Int,
+                    playbackColors: Boolean,
                 ): MediaProbe {
                     calls.incrementAndGet()
                     assertEquals(1500L, positionMs)
+                    assertTrue(playbackColors)
                     entered.countDown()
                     check(release.await(3, TimeUnit.SECONDS))
                     return MediaProbe(2, 2, 4000, sought)
@@ -167,8 +185,7 @@ class RawAvPausedPreparationTest {
             assertEquals(revision, field(engine, "revision"))
             release.countDown()
             completion.get(2, TimeUnit.SECONDS)
-            assertSame(sought, field(engine, "lastBitmap"))
-            assertTrue(initial.isRecycled)
+            assertSame(sought, (field(engine, "presenter") as RawVideoPresenter).retainedBitmap())
             assertFalse(sought.isRecycled)
             assertEquals(1500L, engine.positionMs())
             assertEquals(1, calls.get())
@@ -176,6 +193,90 @@ class RawAvPausedPreparationTest {
         } finally {
             release.countDown()
         }
+    }
+
+    @Test
+    fun missingFileDuringPausedSeekKeepsCacheRecoveryErrorCode() {
+        val missing = FileNotFoundException("Deleted cached file")
+        IsolatedMediaDecoder.installTestTransport(
+            object : ProbeTransport() {
+                override fun probeUri(
+                    resolver: ContentResolver,
+                    uri: Uri,
+                    edge: Int,
+                    playbackColors: Boolean,
+                ) = MediaProbe(2, 2, 4000, Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888))
+
+                override fun probeUriAt(
+                    resolver: ContentResolver,
+                    uri: Uri,
+                    positionMs: Long,
+                    edge: Int,
+                    playbackColors: Boolean,
+                ): MediaProbe = throw missing
+            },
+        )
+        val player = player()
+        val engine = field(player, "engine") as RawAvPlaybackEngine
+        player.prepare()
+        engine.prepare().get(2, TimeUnit.SECONDS)
+        val completion = engine.seekToAsync(1500L)
+        val refused = assertThrows(ExecutionException::class.java) { completion.get(2, TimeUnit.SECONDS) }
+        assertSame(missing, refused.cause)
+        assertSame(missing, engine.snapshot().error)
+        assertEquals(0L, engine.positionMs())
+        val mapError = player.javaClass.getDeclaredMethod("playbackError", IOException::class.java)
+        mapError.isAccessible = true
+        val error = mapError.invoke(player, missing) as PlaybackException
+        assertEquals(PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND, error.errorCode)
+    }
+
+    @Test
+    fun playerPublishesUnsolicitedPauseAndRetryWhileTheSeekWorkerIsHeld() {
+        val player = player()
+        val engine = field(player, "engine") as RawAvPlaybackEngine
+        val worker = checkNotNull((field(engine, "scope") as CoroutineScope).coroutineContext[Job])
+        runBlocking { worker.cancelAndJoin() }
+        setField(engine, "headerReady", true)
+        setField(engine, "status", RawAvPlaybackEngine.Status.Ready)
+        setField(engine, "width", 2)
+        setField(engine, "height", 2)
+        setField(engine, "durationUs", 4_000_000L)
+        setField(engine, "pausedUs", 800_000L)
+        setField(engine, "playIntent", true)
+        assertTrue(player.isPlaying)
+
+        player.seekTo(1500L)
+        assertEquals(800L, player.currentPosition)
+        (field(engine, "focus") as RawAvAudioFocus).started()
+        RuntimeEnvironment.getApplication().sendBroadcast(Intent(AudioManager.ACTION_AUDIO_BECOMING_NOISY))
+        val main = shadowOf(Looper.getMainLooper())
+        main.idle()
+        assertFalse(player.playWhenReady)
+        assertEquals(800L, player.currentPosition)
+        assertFalse(currentPoster(engine).completion.isDone)
+
+        assertFalse(engine.posterResult(currentPoster(engine), null))
+        main.idle()
+        val failedSeek = player.playerError?.cause as RawPausedSeekFailure
+        assertEquals(1500L, failedSeek.positionMs)
+        assertEquals(800L, player.currentPosition)
+        player.seekTo(failedSeek.positionMs)
+        assertNull(player.playerError)
+        assertEquals(800L, player.currentPosition)
+
+        val poster = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
+        assertTrue(engine.posterResult(currentPoster(engine), MediaProbe(2, 2, 4000, poster)))
+        main.idle()
+        assertEquals(1500L, player.currentPosition)
+        assertFalse(player.playWhenReady)
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun currentPoster(engine: RawAvPlaybackEngine): RawAvPausedSeekRequest {
+        val intent = engine.intent()
+        val target = RawAvPosterTarget(RawAvGeneration(intent.activation, intent.seek), intent.positionUs / 1000)
+        return RawAvPausedSeekRequest(target, field(engine, "pendingSeek") as SettableFuture<Void?>)
     }
 
     /** Real Pause Still Revokes Playing Generation And Repeated Pause Clears Transient Resume. */

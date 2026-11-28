@@ -1,21 +1,7 @@
 package dev.ipf.whitenoise.android.ui.onboarding
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.consumeWindowInsets
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.material3.Text
@@ -28,7 +14,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -37,11 +22,8 @@ import dev.ipf.whitenoise.android.core.IdentityEntryInput
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
-import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
-import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
+import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.isBunkerLink
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.drop
 
@@ -71,6 +53,7 @@ internal fun SignInContent(
     onLoginWithAmber: () -> Unit = {},
     onSignInValue: ((String) -> Unit)? = null,
     onSystemBackWhileBusy: (() -> Unit)? = null,
+    onUseRemoteSigner: ((String?) -> Unit)? = null,
 ) {
     WindowSecureFlag()
     // The real onboarding owner supplies the native state; the fallback retains existing standalone callers/tests.
@@ -101,6 +84,10 @@ internal fun SignInContent(
         val value = key.text.toString()
         // Flush a just-typed edit before native work; its queued observer cannot erase the resulting error or consent.
         reportKeyEdit(value)
+        if (onUseRemoteSigner != null && isBunkerLink(value)) {
+            onUseRemoteSigner(value.trim())
+            return
+        }
         when (IdentityEntryInput.classify(value)) {
             IdentityEntryInput.Kind.Invalid -> onErrorChange(R.string.identity_entry_error_invalid_key)
             IdentityEntryInput.Kind.PublicKey -> onErrorChange(R.string.sign_in_error_public_key)
@@ -114,69 +101,47 @@ internal fun SignInContent(
     BackHandler {
         if (busy) onSystemBackWhileBusy?.invoke() else onBack()
     }
-    WhiteNoiseScaffold(
-        modifier = Modifier.fillMaxSize(),
-        contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
-        topBar = { WhiteNoiseTopBar(stringResource(R.string.sign_in), onBack = { if (!busy) onBack() }) },
-        bottomBar = {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .imePadding()
-                    .padding(WhiteNoiseSpacing.PinnedActionInset),
-                contentAlignment = Alignment.Center,
-            ) {
-                Column(
-                    Modifier.widthIn(max = OnboardingMaxContentWidth).fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
+    OnboardingPinnedActionPage(
+        title = stringResource(R.string.sign_in),
+        onBack = { if (!busy) onBack() },
+        actions = {
+            if (amberSignerAvailable) {
+                WhiteNoiseOutlinedButton(
+                    onClick = onLoginWithAmber,
+                    enabled = !busy,
+                    modifier = Modifier.fillMaxWidth().testTag("onboarding.sign_in.amber"),
                 ) {
-                    if (amberSignerAvailable) {
-                        WhiteNoiseOutlinedButton(
-                            onClick = onLoginWithAmber,
-                            enabled = !busy,
-                            modifier = Modifier.fillMaxWidth().testTag("onboarding.sign_in.amber"),
-                        ) {
-                            Text(
-                                stringResource(
-                                    when {
-                                        loggingInWithAmber && amberSignInStage == 1 ->
-                                            R.string.amber_signin_waiting_request
-                                        loggingInWithAmber && amberSignInStage != null ->
-                                            R.string.amber_signin_waiting_proof
-                                        else -> R.string.onboarding_login_with_amber
-                                    },
-                                ),
-                            )
-                        }
-                    }
-                    WhiteNoiseButton(
-                        onClick = ::submit,
-                        enabled = canSignIn,
-                        loading = busy && !loggingInWithAmber,
-                        loadingLabel = stringResource(R.string.onboarding_signing_in),
-                        modifier = Modifier.fillMaxWidth().testTag("onboarding.sign_in.action"),
-                    ) { Text(stringResource(R.string.sign_in)) }
+                    Text(
+                        stringResource(
+                            when {
+                                loggingInWithAmber && amberSignInStage == 1 ->
+                                    R.string.amber_signin_waiting_request
+                                loggingInWithAmber && amberSignInStage != null ->
+                                    R.string.amber_signin_waiting_proof
+                                else -> R.string.onboarding_login_with_amber
+                            },
+                        ),
+                    )
                 }
             }
+            WhiteNoiseButton(
+                onClick = ::submit,
+                enabled = canSignIn,
+                loading = busy && !loggingInWithAmber,
+                loadingLabel = stringResource(R.string.onboarding_signing_in),
+                modifier = Modifier.fillMaxWidth().testTag("onboarding.sign_in.action"),
+            ) { Text(stringResource(R.string.sign_in)) }
         },
-    ) { padding ->
-        Box(
-            Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding),
-            contentAlignment = Alignment.TopCenter,
-        ) {
-            Column(
-                Modifier
-                    .widthIn(max = OnboardingMaxContentWidth)
-                    .fillMaxSize()
-                    .whiteNoiseVerticalScroll(rememberScrollState())
-                    .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin, vertical = WhiteNoiseSpacing.Section),
-                verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
-            ) {
-                SignInKeyField(key, busy, errorRes, ::reportKeyEdit, onErrorChange, ::submit)
-                if (offlineErrorVisible) OnboardingOfflineNotice(onOfflineRetry)
-            }
+    ) {
+        SignInKeyField(key, busy, errorRes, ::reportKeyEdit, onErrorChange, ::submit)
+        if (onUseRemoteSigner != null) {
+            WhiteNoiseOutlinedButton(
+                onClick = { onUseRemoteSigner(null) },
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth().testTag("onboarding.sign_in.remote_signer"),
+            ) { Text(stringResource(R.string.remote_signer_use)) }
         }
+        if (offlineErrorVisible) OnboardingOfflineNotice(onOfflineRetry)
     }
     if (recoveryConsentVisible && !busy) {
         WhiteNoiseAlertDialog(

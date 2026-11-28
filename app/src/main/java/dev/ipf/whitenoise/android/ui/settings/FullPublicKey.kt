@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.settings
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,6 +13,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -24,12 +29,17 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.text
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.Explanation
+import dev.ipf.whitenoise.android.ui.common.animatePublicKeyExpansion
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.isCanonicalNpub
 
@@ -86,25 +96,65 @@ internal fun FullPublicKey(
     }
 }
 
+/** Groups at each end of the key that its short form keeps: `npub1` plus five characters, and the last eight. */
+private const val PUBLIC_KEY_SHORT_HEAD_GROUPS = 2
+private const val PUBLIC_KEY_SHORT_TAIL_GROUPS = 2
+
 /**
- * The person profile's one public-key presentation (#3565): the whole key in smaller monospace groups beside a copy
- * glyph, which turns into a check while [copied]. Text and glyph are one button that runs [onCopy], so the key has a
- * single accessible Copy public key action and its spoken value is the canonical contiguous [npub]. A reference that
- * is not a complete npub is shown as inert text with no copy action, so an unresolved value is never handed out.
+ * The short form of [npub]: its first two and last two display groups around an ellipsis, so the abbreviation is
+ * exactly the emphasized ends of the expanded key. A value too short to abbreviate is returned whole.
+ */
+internal fun publicKeyShortForm(npub: String): String {
+    val groups = publicKeyDisplayGroups(npub)
+    if (groups.size <= PUBLIC_KEY_SHORT_HEAD_GROUPS + PUBLIC_KEY_SHORT_TAIL_GROUPS) return npub
+    return groups.take(PUBLIC_KEY_SHORT_HEAD_GROUPS).joinToString("") + "…" +
+        groups.takeLast(PUBLIC_KEY_SHORT_TAIL_GROUPS).joinToString("")
+}
+
+/**
+ * The grouped [npub] with the groups its short form keeps drawn in [emphasis], so the expanded key visibly contains
+ * the abbreviation it replaced.
+ */
+private fun groupedPublicKeyText(
+    npub: String,
+    emphasis: SpanStyle,
+): AnnotatedString {
+    val groups = publicKeyDisplayGroups(npub)
+    val abbreviates = groups.size > PUBLIC_KEY_SHORT_HEAD_GROUPS + PUBLIC_KEY_SHORT_TAIL_GROUPS
+    return buildAnnotatedString {
+        groups.forEachIndexed { index, group ->
+            if (index > 0) append(' ')
+            val kept = index < PUBLIC_KEY_SHORT_HEAD_GROUPS || index >= groups.size - PUBLIC_KEY_SHORT_TAIL_GROUPS
+            if (abbreviates && kept) withStyle(emphasis) { append(group) } else append(group)
+        }
+    }
+}
+
+/**
+ * The one public-key presentation of an identity screen: profile, direct-chat details, Share & Connect and the QR
+ * sheet. The key starts short, and a tap copies the complete key and expands it in place into monospace groups of five
+ * for comparison (#3321, #3565). It stays expanded while the screen shows this key; later taps copy again. The copy
+ * glyph turns into a check while [copied]. Text and glyph are one button, so the key has a single accessible Copy
+ * public key action, and its spoken value is always the canonical contiguous [npub]. A reference that is not a
+ * complete npub is shown whole as inert text with no copy action, so an unresolved value is never handed out.
  */
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable
-internal fun CopyableFullPublicKey(
+internal fun CopyablePublicKey(
     npub: String,
     copied: Boolean,
     onCopy: () -> Unit,
     modifier: Modifier = Modifier,
     targetTestTag: String? = null,
     textTestTag: String? = null,
+    @StringRes explanationRes: Int = R.string.explanation_organize_copy_public_key,
 ) {
     val copyable = isCanonicalNpub(npub)
+    var expanded by rememberSaveable(npub) { mutableStateOf(false) }
+    val showFull = expanded || !copyable
     val copyLabel = stringResource(R.string.copy_public_key)
     val state = stringResource(if (copied) R.string.copied else R.string.not_copied)
+    val emphasis = SpanStyle(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
     Row(
         modifier =
             modifier
@@ -116,9 +166,12 @@ internal fun CopyableFullPublicKey(
                             .explainOnLongPress(
                                 Explanation(
                                     copyLabel,
-                                    stringResource(R.string.explanation_organize_copy_public_key),
+                                    stringResource(explanationRes),
                                 ),
-                            ).clickable(role = Role.Button, onClickLabel = copyLabel, onClick = onCopy)
+                            ).clickable(role = Role.Button, onClickLabel = copyLabel) {
+                                onCopy()
+                                expanded = true
+                            }
                     } else {
                         base
                     }
@@ -131,10 +184,11 @@ internal fun CopyableFullPublicKey(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = publicKeyDisplayGroups(npub).joinToString(" "),
+            text = if (showFull) groupedPublicKeyText(npub, emphasis) else AnnotatedString(publicKeyShortForm(npub)),
             modifier =
                 Modifier
                     .weight(1f, fill = false)
+                    .animatePublicKeyExpansion(expanded)
                     .let { base -> textTestTag?.let(base::testTag) ?: base },
             style =
                 MaterialTheme.typography.bodySmall.copy(

@@ -4,6 +4,14 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "Empty timeline recovery clears the composer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": ".padding(bottom = overlayPadding)",
+        "test_ids": [
+          "GRP-039"
+        ]
+      },
+      {
         "surface": "share_import_recovered_limit",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
         "anchor": "R.string.share_import_recovered_limit",
@@ -57,35 +65,19 @@
         ]
       },
       {
+        "surface": "Compact conversation keyboard shortcut ownership",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "ChatsReturnShortcut(",
+        "test_ids": [
+          "AXY-021"
+        ]
+      },
+      {
         "surface": "Logical destination navigation motion",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
-        "anchor": "val transcriptRouteMotion =",
+        "anchor": "rememberConversationSettingsMotion(",
         "test_ids": [
           "CON-037"
-        ]
-      },
-      {
-        "surface": "Foreground voice recording ownership and automatic-stop notices",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
-        "anchor": "VoiceRecordingLifecycleEffect(voiceRecordingController)",
-        "test_ids": [
-          "MED-008"
-        ]
-      },
-      {
-        "surface": "Interrupted recording save failure",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
-        "anchor": "R.string.voice_recording_save_failed",
-        "test_ids": [
-          "MED-008"
-        ]
-      },
-      {
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
-        "surface": "Holding the jump to mention pill explains it",
-        "anchor": "R.string.explanation_conversation_jump_to_mention",
-        "test_ids": [
-          "CON-049"
         ]
       }
     ],
@@ -96,15 +88,6 @@
         "anchor": "R.string.close",
         "test_ids": [
           "MED-008"
-        ]
-      },
-      {
-        "surface": "string:conversation_jump_to_mention",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
-        "anchor": "R.string.conversation_jump_to_mention",
-        "test_ids": [
-          "CON-028",
-          "CON-031"
         ]
       },
       {
@@ -137,14 +120,6 @@
         "anchor": "R.string.you",
         "test_ids": [
           "MED-008"
-        ]
-      },
-      {
-        "surface": "Search result unavailable notice",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
-        "anchor": "R.string.search_result_unavailable",
-        "test_ids": [
-          "FIND-019"
         ]
       }
     ],
@@ -185,14 +160,6 @@
         "surface": "R.string.send_failed",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
         "anchor": "R.string.send_failed",
-        "test_ids": [
-          "MED-008"
-        ]
-      },
-      {
-        "surface": "R.string.voice_message_failed",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
-        "anchor": "R.string.voice_message_failed",
         "test_ids": [
           "MED-008"
         ]
@@ -283,22 +250,6 @@
         "anchor": "R.string.toast_couldnt_decode_image",
         "test_ids": [
           "STB-001"
-        ]
-      },
-      {
-        "surface": "Reversed conversation physical-edge selection and post-scroll endpoint",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
-        "anchor": "fun messageDragSelectionEffects()",
-        "test_ids": [
-          "MSG-004"
-        ]
-      },
-      {
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
-        "surface": "Message collapse retires deferred foreground correction before viewport settlement",
-        "anchor": "onBeforeBodyCollapse = {",
-        "test_ids": [
-          "CON-033"
         ]
       },
       {

@@ -9,7 +9,6 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
 import dev.ipf.marmotkit.OnboardingActionFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
@@ -96,7 +95,7 @@ class AccountSetupChecklistPresentationTest {
                 )
             }
         }
-        composeRule.onNodeWithTag("setup-action-RECONNECT_SIGNER").performScrollTo().performClick()
+        composeRule.onNodeWithTag("setup-action-RECONNECT_SIGNER").scrollToIfScrollable().performClick()
         assertEquals(1, calls)
     }
 

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Shown once, before Android's notification permission dialog, when someone opens a chat or shares an invite. -->
+    <string name="notification_permission_ask_title">Know when someone replies</string>
+    <string name="notification_permission_ask_message">Turn on notifications to see new messages and chat invitations without opening White Noise.</string>
+    <string name="notification_permission_ask_confirm">Turn on notifications</string>
+    <string name="notification_permission_ask_not_now">Not now</string>
+</resources>

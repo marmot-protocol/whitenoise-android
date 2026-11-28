@@ -206,7 +206,10 @@ internal fun NotificationSoundsScreen(
     SettingsScaffold(title = stringResource(R.string.notification_sounds_vibration), onBack = onBack) {
         SettingsList {
             item(key = "search.NotificationSounds.1") {
-                SettingsSection(stringResource(R.string.notification_categories))
+                SettingsSection(
+                    title = stringResource(R.string.notification_categories),
+                    explanation = stringResource(R.string.notification_categories_detail),
+                )
             }
             item(key = "search.NotificationSounds.2") {
                 GlobalNotificationCategories(
@@ -215,14 +218,13 @@ internal fun NotificationSoundsScreen(
                     destination = SettingsDetail.NotificationSounds,
                 )
             }
-            item(key = "search.NotificationSounds.3") {
-                SettingsExplainer(stringResource(R.string.notification_categories_detail))
+            item(key = "search.NotificationSounds.4") {
+                SettingsSection(
+                    title = stringResource(R.string.notification_tones),
+                    explanation = stringResource(R.string.notification_tone_scope),
+                )
             }
-            item(key = "search.NotificationSounds.4") { SettingsSection(stringResource(R.string.notification_tones)) }
             item(key = "search.NotificationSounds.5") { NotificationToneControl() }
-            item(key = "search.NotificationSounds.6") {
-                SettingsExplainer(stringResource(R.string.notification_tone_scope))
-            }
             item(key = "search.NotificationSounds.7") { SpokenAudioAlertControl() }
         }
     }
@@ -477,8 +479,9 @@ private fun notificationChannelTitle(channel: NotificationChannelSpec): String =
             NotificationChannelSpec.REACTIONS -> R.string.notification_channel_reactions
             NotificationChannelSpec.INVITES -> R.string.notification_channel_invites
             NotificationChannelSpec.GROUP_MEMBERSHIP -> R.string.notification_channel_group_membership
-            NotificationChannelSpec.AGENT_ACTIVITY -> R.string.notification_channel_agent_activity
             NotificationChannelSpec.APP_UPDATES -> R.string.notification_channel_app_updates
+            NotificationChannelSpec.SIGN_IN_REVIEW -> R.string.sign_in_alert_badge_review
+            NotificationChannelSpec.ACCOUNT_SECURITY -> R.string.notification_channel_account_security
             NotificationChannelSpec.USER_EVENT_SUMMARY -> R.string.notification_channel_summary
         },
     )

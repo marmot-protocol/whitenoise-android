@@ -2,12 +2,9 @@ package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -17,7 +14,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -25,7 +21,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
@@ -39,8 +34,7 @@ import dev.ipf.whitenoise.android.state.updateChatBubbleColor
 import dev.ipf.whitenoise.android.state.updateGlobalBubbleColor
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.conversation.messages.BubblePresentation
 import dev.ipf.whitenoise.android.ui.conversation.messages.BubblePresentationTokens
@@ -48,10 +42,12 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.colorFromArgb
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleBorder
 import dev.ipf.whitenoise.android.ui.conversation.messages.resolveBubblePresentationArgb
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 /**
  * Chat bubble colour editor for the account's theme defaults or, with [groupIdHex], one conversation's override.
- * Both sides are drafted locally, previewed in the pinned header and written together on Save.
+ * Both sides are drafted locally, previewed in the pinned header and written together on Save; Reset clears both
+ * drafts from below the pickers.
  */
 @Suppress("FunctionNaming")
 @Composable
@@ -117,7 +113,6 @@ private fun ChatBubbleColorEditor(
     var resetRevision by rememberSaveable { mutableIntStateOf(0) }
     var mineValid by rememberSaveable { mutableStateOf(true) }
     var otherValid by rememberSaveable { mutableStateOf(true) }
-    var menuOpen by remember { mutableStateOf(false) }
     val mineSelected = (if (reset) null else initial.mine) ?: inherited.mine
     val otherSelected = (if (reset) null else initial.other) ?: inherited.other
     val canReset = mine != null || other != null || !mineValid || !otherValid
@@ -126,48 +121,6 @@ private fun ChatBubbleColorEditor(
     SettingsScaffold(
         title = stringResource(R.string.chat_bubble_colors),
         onBack = onBack,
-        topBarActions = {
-            // The overflow holds only Reset, so it appears only once there is something to reset.
-            if (canReset) {
-                Box {
-                    IconButton(
-                        onClick = { menuOpen = true },
-                        modifier =
-                            Modifier
-                                .testTag("bubble_colors.menu")
-                                .explainOnLongPress(
-                                    Explanation(
-                                        stringResource(R.string.more_options),
-                                        stringResource(R.string.explanation_appearance_bubble_colors_menu),
-                                    ),
-                                ),
-                    ) {
-                        Icon(painterResource(R.drawable.ic_more_vert), stringResource(R.string.more_options))
-                    }
-                    WhiteNoiseDropdownMenu(
-                        expanded = menuOpen,
-                        onDismissRequest = { menuOpen = false },
-                        items =
-                            listOf(
-                                WhiteNoiseMenuItem(
-                                    label =
-                                        stringResource(
-                                            if (perChat) R.string.reset_to_global_colors else R.string.reset_to_default,
-                                        ),
-                                    onClick = {
-                                        mine = null
-                                        other = null
-                                        mineValid = true
-                                        otherValid = true
-                                        reset = true
-                                        resetRevision++
-                                    },
-                                ),
-                            ),
-                    )
-                }
-            }
-        },
         bottomBar = {
             SettingsBottomAction {
                 WhiteNoiseButton(
@@ -243,6 +196,18 @@ private fun ChatBubbleColorEditor(
                     }
                 }
             }
+            if (canReset) {
+                item(key = "reset") {
+                    BubbleColorsResetButton(perChat) {
+                        mine = null
+                        other = null
+                        mineValid = true
+                        otherValid = true
+                        reset = true
+                        resetRevision++
+                    }
+                }
+            }
             item {
                 SettingsExplainer(
                     if (theme == BubbleTheme.Amoled) {
@@ -267,6 +232,31 @@ private fun ChatBubbleColorEditor(
             }
         }
     }
+}
+
+/**
+ * The editor's full-width outlined Reset, placed at the screen margin below both pickers like Action color's
+ * Reset. [perChat] resets to the account's colours, otherwise to the theme defaults.
+ */
+@Suppress("FunctionNaming")
+@Composable
+private fun BubbleColorsResetButton(
+    perChat: Boolean,
+    onReset: () -> Unit,
+) {
+    val label = stringResource(if (perChat) R.string.reset_to_global_colors else R.string.reset_to_default)
+    WhiteNoiseOutlinedButton(
+        onClick = onReset,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)
+                .padding(top = WhiteNoiseSpacing.Related)
+                .testTag("bubble_colors.reset")
+                .explainOnLongPress(
+                    Explanation(label, stringResource(R.string.explanation_appearance_bubble_colors_reset)),
+                ),
+    ) { Text(label) }
 }
 
 /** Received bubble at the start, then the sent bubble at the end, coloured exactly as a real chat would. */

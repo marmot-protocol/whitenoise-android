@@ -1,7 +1,5 @@
 package dev.ipf.whitenoise.android.ui.settings
 
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.clickable
@@ -44,6 +42,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
@@ -61,12 +60,13 @@ internal fun AiAgentsScreen(
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
+    val clipboard = rememberClipboardCopier()
     val active = appState.activeAccount
     val npub = active?.let { appState.npub(it.accountIdHex) }?.takeIf { it.startsWith(NPUB_PREFIX) }
     AiAgentsContent(
         npub = npub,
         onBack = onBack,
-        onCopy = { label, value -> copyAgentValue(context, label, value) },
+        onCopy = { label, value -> clipboard.copy(value, label) },
         onOpenDocs = { openAgentConnectorDocs(context) },
     )
 }
@@ -80,7 +80,7 @@ internal fun AiAgentsScreen(
 internal fun AiAgentsContent(
     npub: String?,
     onBack: () -> Unit,
-    onCopy: (String, String) -> Unit,
+    onCopy: (String, String) -> Boolean,
     onOpenDocs: () -> Boolean,
 ) {
     var selectedConnectorId by rememberSaveable(npub) { mutableStateOf<String?>(null) }
@@ -133,8 +133,7 @@ internal fun AiAgentsContent(
                             title = stringResource(R.string.copy_public_key),
                             onClick = {
                                 npub?.let {
-                                    onCopy(publicKeyLabel, it)
-                                    feedback = R.string.public_key_copied
+                                    if (onCopy(publicKeyLabel, it)) feedback = R.string.public_key_copied
                                 }
                             },
                             modifier = Modifier.testTag("ai_agents.copy_public_key"),
@@ -197,7 +196,7 @@ private fun AgentSetupSheet(
     connector: AgentConnector,
     npub: String,
     onDismiss: () -> Unit,
-    onCopy: (String, String) -> Unit,
+    onCopy: (String, String) -> Boolean,
 ) {
     val name = stringResource(connector.nameRes)
     val title = stringResource(R.string.ai_agents_setup_title, name)
@@ -206,8 +205,7 @@ private fun AgentSetupSheet(
     val manualSetup = stringResource(R.string.ai_agents_manual_setup_body, stringResource(R.string.new_message))
     val copyLabel = stringResource(R.string.ai_agents_copy_prompt)
     val copyPrompt = {
-        onCopy(title, prompt)
-        copied = true
+        if (onCopy(title, prompt)) copied = true
     }
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val terminal = rememberSheetTerminalMotion(sheet)
@@ -253,7 +251,7 @@ private fun AgentSetupSheet(
                 SettingsExplainer(manualSetup)
                 SettingsExplainer(stringResource(R.string.ai_agents_project_groups_tip))
             }
-            SettingsBottomAction(color = MaterialTheme.colorScheme.surfaceContainerLow, tonalElevation = 0.dp) {
+            SettingsBottomAction(color = MaterialTheme.colorScheme.surfaceContainerLow, elevated = false) {
                 if (copied) {
                     Text(
                         text = stringResource(R.string.ai_agents_prompt_copied),
@@ -303,16 +301,6 @@ private fun documentationOutcome(opened: Boolean): Int {
 private fun abbreviatedNpub(npub: String): String {
     if (npub.length <= NPUB_PREFIX_CHARS + NPUB_SUFFIX_CHARS) return npub
     return "${npub.take(NPUB_PREFIX_CHARS)}…${npub.takeLast(NPUB_SUFFIX_CHARS)}"
-}
-
-/** Public values only: the npub and the setup prompt that embeds it, never a private key. */
-private fun copyAgentValue(
-    context: Context,
-    label: String,
-    value: String,
-) {
-    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-    clipboard.setPrimaryClip(ClipData.newPlainText(label, value))
 }
 
 /** Reports whether a browser accepted the documentation hand-off, so the screen can state the outcome. */

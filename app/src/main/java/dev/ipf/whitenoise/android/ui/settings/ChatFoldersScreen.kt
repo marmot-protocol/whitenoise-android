@@ -16,8 +16,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
@@ -51,14 +49,15 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.chatFolderSource
 import dev.ipf.whitenoise.android.state.nativeFolderMembership
 import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.Explanation
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
+import dev.ipf.whitenoise.android.ui.emojiPlainText
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import java.util.Locale
@@ -217,20 +216,15 @@ internal fun ChatFolderDeleteDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    WhiteNoiseAlertDialog(
+    ConfirmDialog(
         modifier = Modifier.testTag("folder.delete_dialog"),
-        onDismissRequest = onDismiss,
-        title = { EmojiLabel(stringResource(R.string.folder_delete_title, folderName)) },
-        text = { Text(stringResource(R.string.folder_delete_detail)) },
-        confirmButton = {
-            TextButton(
-                modifier = Modifier.testTag("folder.delete_confirm"),
-                onClick = { close(onConfirm) },
-            ) { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) }
-        },
-        dismissButton = {
-            TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
-        },
+        title = stringResource(R.string.folder_delete_title, folderName),
+        message = stringResource(R.string.folder_delete_detail),
+        confirmLabel = stringResource(R.string.delete),
+        onConfirm = onConfirm,
+        onDismiss = onDismiss,
+        destructive = true,
+        confirmTag = "folder.delete_confirm",
     )
 }
 
@@ -347,6 +341,7 @@ private fun FolderManageRow(
 ) {
     var menu by remember(folder.id) { mutableStateOf(false) }
     val name = folder.displayName()
+    val spokenName = emojiPlainText(name)
     val editLabel = stringResource(R.string.folder_edit)
     val choices =
         buildList {
@@ -395,7 +390,7 @@ private fun FolderManageRow(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         },
-        supportingContent = { Text(supporting) },
+        supportingContent = { EmojiLabel(supporting) },
         trailingContent = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
@@ -408,13 +403,14 @@ private fun FolderManageRow(
                     )
                 }
                 Box {
-                    val actionsLabel = stringResource(R.string.actions_for, name)
+                    val actionsTitle = stringResource(R.string.actions_for, name)
+                    val actionsLabel = stringResource(R.string.actions_for, spokenName)
                     IconButton(
                         onClick = { menu = true },
                         modifier =
                             Modifier.explainOnLongPress(
                                 Explanation(
-                                    actionsLabel,
+                                    actionsTitle,
                                     stringResource(R.string.explanation_organize_folder_actions),
                                 ),
                             ),
@@ -431,7 +427,7 @@ private fun FolderManageRow(
             }
         },
     ) {
-        Text(name, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        EmojiLabel(name, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }
 

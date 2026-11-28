@@ -162,6 +162,12 @@ internal class CoalescingMessageDraftWriter(
         }
     }
 
+    /** Waits for the queued save of one draft, leaving every other draft's debounce running. */
+    suspend fun flush(
+        accountRef: String,
+        groupIdHex: String,
+    ) = flush(Key(accountRef, groupIdHex))
+
     /** Flush accepted edits, retry each retained failure once, and report unsaved text before deactivation. */
     suspend fun flushAccount(accountRef: String): Boolean {
         val retried = mutableSetOf<Key>()
@@ -225,14 +231,26 @@ internal class CoalescingMessageDraftWriter(
         }
     }
 
+    /** Clears the accepted draft, or just its text, releasing only its own hydration fence on success. */
     suspend fun deleteIfCurrent(
         accountRef: String,
         groupIdHex: String,
         generation: MessageDraftGeneration,
+        keepAttachments: Boolean = false,
     ): MessageDraftConditionalDeleteResult {
         val key = Key(accountRef, groupIdHex)
         flush(key)
-        val deletion = drafts.coordinated.deleteIf(accountRef, groupIdHex, generation)
+        val deletion =
+            if (keepAttachments) {
+                val saved = drafts.coordinated.saveAcceptedTextIfCurrent(accountRef, groupIdHex, "", generation)
+                when (saved) {
+                    is MessageDraftConditionalSaveResult.Applied ->
+                        MessageDraftConditionalDeleteResult.Applied(saved.result)
+                    MessageDraftConditionalSaveResult.Superseded -> MessageDraftConditionalDeleteResult.Superseded
+                }
+            } else {
+                drafts.coordinated.deleteIf(accountRef, groupIdHex, generation)
+            }
         if (deletion is MessageDraftConditionalDeleteResult.Applied &&
             deletion.result is MessageDraftMutationResult.Success
         ) {
@@ -394,7 +412,7 @@ internal class CoalescingMessageDraftWriter(
                     activeMerges[key]?.latestResult = result
                     activeMerges[key]?.latestContent = content
                     state.lastResult = result
-                    drafts.coordinated.isCurrent(
+                    drafts.coordinated.isTextCurrent(
                         key.accountRef,
                         key.groupIdHex,
                         MessageDraftGeneration(generation),
@@ -429,13 +447,22 @@ internal class CoalescingMessageDraftWriter(
         if (state.job == null) state.job = scope.launch { drain(key, state) }
     }
 
+    /**
+     * Whether hydrating [key] at [generation] would overwrite text the native draft does not hold yet: a send or
+     * cleanup blocked that generation, or a failed text save is retained while its text is still current.
+     * Attachment-only mutations leave that text current, so a failed save keeps blocking across them.
+     */
     private fun isHydrationBlocked(
         key: Key,
         generation: MessageDraftGeneration,
     ): Boolean =
         synchronized(lock) {
             val failed = pending[key]?.takeIf { it.lastResult is MessageDraftMutationResult.Failure }
-            hydrationBlockedGenerations[key] == generation || failed?.generation == generation.value
+            val failedText = failed?.let { MessageDraftGeneration(it.generation) }
+            hydrationBlockedGenerations[key] == generation ||
+                failed?.generation == generation.value ||
+                failedText != null &&
+                drafts.coordinated.isTextCurrent(key.accountRef, key.groupIdHex, failedText)
         }
 
     private data class Key(

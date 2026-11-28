@@ -107,6 +107,8 @@ class PollMessageEligibilityTest : PollMessageTestFixtures() {
                 replyToMessageIdHex = item.record.messageIdHex,
                 replyPreview =
                     TimelineReplyPreviewFfi(
+                        retentionSeconds = null,
+                        retentionExpiresAt = null,
                         messageIdHex = item.record.messageIdHex,
                         sender = item.record.sender,
                         plaintext = item.record.plaintext,
@@ -114,7 +116,8 @@ class PollMessageEligibilityTest : PollMessageTestFixtures() {
                         kind = item.record.kind,
                         mediaJson = null,
                         media = emptyList(),
-                        agentTextStreamJson = null,
+                        replyToMessageIdHex = null,
+                        thread = null,
                         deleted = false,
                         deletionSource = DeletionSourceFfi.UNKNOWN,
                         invalidationStatus = null,

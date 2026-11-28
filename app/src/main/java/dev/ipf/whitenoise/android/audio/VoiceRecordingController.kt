@@ -5,7 +5,6 @@ import android.media.AudioManager
 import android.os.SystemClock
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -49,6 +48,8 @@ class VoiceRecordingController internal constructor(
     private val recorderDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val elapsedRealtime: () -> Long = SystemClock::elapsedRealtime,
     private val onAutomaticStop: (VoiceRecordingStopReason) -> Unit = {},
+    private val onRecordingStarted: () -> Unit = {},
+    private val afterHeldRelease: (() -> ((File, Long) -> Unit)?)? = null,
 ) {
     companion object {
         // Keep the existing capture budget; the strip warns before this limit
@@ -86,7 +87,7 @@ class VoiceRecordingController internal constructor(
     var locked: Boolean by mutableStateOf(false)
         private set
 
-    /** True while another in-app sound holds focus; the take keeps its place until [resume]. */
+    /** True while the user or another in-app sound paused the take; it keeps its place until [resume]. */
     var isPaused: Boolean by mutableStateOf(false)
         private set
 
@@ -95,20 +96,18 @@ class VoiceRecordingController internal constructor(
 
     /** True until every stopped take has released the microphone. */
     val isFinalizing: Boolean get() = finalizingTakes > 0
+    private var closingTakes by mutableIntStateOf(0)
+
+    /** True from Stop until the take is offered for review; a cancelled take never closes. */
+    val isClosing: Boolean get() = closingTakes > 0
 
     private val _elapsedMs = mutableLongStateOf(0L)
     val elapsedMs: Long get() = _elapsedMs.longValue
     val remainingMs: Long get() = (MAX_RECORDING_MS - elapsedMs).coerceAtLeast(0L)
     val isNearLimit: Boolean get() = isRecording && remainingMs <= LIMIT_WARNING_MS
 
-    var dragOffsetPx: Float by mutableFloatStateOf(0f)
-        private set
-    var verticalOffsetPx: Float by mutableFloatStateOf(0f)
-        private set
-    var willCancel: Boolean by mutableStateOf(false)
-        private set
-    var willLock: Boolean by mutableStateOf(false)
-        private set
+    /** Finger travel of the current unlocked hold. */
+    val hold = VoiceHoldGestureState()
 
     private var recorder: VoiceRecordingSession? = null
     private var tickJob: Job? = null
@@ -127,11 +126,7 @@ class VoiceRecordingController internal constructor(
 
     init {
         AudioFocusOwner.attach(context)
-        // Best-effort startup cleanup: a filesystem hiccup (e.g. a
-        // SecurityException from listFiles on a restricted directory) must not
-        // reach the scope's default handler and crash controller construction.
-        // Swallow non-cancellation failures; stale temp files get swept on a
-        // later init.
+        // A filesystem failure during this best-effort sweep can wait for the next controller.
         recorderScope.launch {
             try {
                 sweepStaleVoiceTempFiles(outputDirectory)
@@ -143,22 +138,25 @@ class VoiceRecordingController internal constructor(
         }
     }
 
-    // The in-flight stop() finalize (the post-release tail + encoder stop) and a
-    // signal to cut its tail short when a new recording starts during it.
+    // A new recording can cut short the in-flight stop's trailing audio window.
     private var finalizeJob: Job? = null
     private var tailCut: CompletableDeferred<Unit>? = null
     private var restarting = false
     private var restartJob: Job? = null
     private var startJob: Job? = null
+    private var released = false
 
     // A discarded take's native close. A new take waits for it before opening a recorder (#3707).
     private var discardJob: Job? = null
     private val startRequests = StalenessGuard()
 
-    /** Starts or resumes the single recording request accepted by this controller. */
+    /** A released recorder cannot request permission or regain the microphone. */
+    private fun requestStartPermission(): Boolean = !released && onPermissionRequest()
+
+    /** Starts capture only while this recorder still has a live owner and permission. */
     fun start(): Boolean {
         if (isRecording) return true
-        if (!onPermissionRequest()) return false
+        if (!requestStartPermission()) return false
         if (!acquireMicrophoneLease()) {
             onError(IllegalStateException("Microphone is already in use"))
             return false
@@ -166,17 +164,10 @@ class VoiceRecordingController internal constructor(
 
         val pending = finalizeJob?.takeIf { it.isActive }
         if (pending != null) {
-            // A previous take is still finalizing its tail and holds the mic and
-            // audio focus. Cut the tail to release the mic now, reuse that focus,
-            // and open the new recorder only once the old one has stopped —
-            // opening a second recorder mid-capture throws "mic busy" on devices
-            // without concurrent capture.
+            // Finish the previous recorder before opening another under the same microphone lease.
             restarting = true
             tailCut?.complete(Unit)
-            VoicePlaybackController.pause()
-            isRecording = true
-            resetRecordingUiState()
-            val generation = nextStartGeneration()
+            val generation = announceRecordingStart()
             restartJob =
                 scope.launch(mainDispatcher) {
                     try {
@@ -190,20 +181,13 @@ class VoiceRecordingController internal constructor(
             return true
         }
 
-        // Request transient audio focus AFTER permission is confirmed (a denied
-        // prompt shouldn't disturb playback). Focus pauses other apps' media for
-        // the duration of the capture and resumes it when abandoned on
-        // stop/cancel. A denied grant means the mic is unavailable (e.g. an
-        // active call) — surface it rather than capture competing audio.
+        // Ask for focus after permission so a denied prompt leaves playback alone.
         if (!requestRecordingFocus()) {
             releaseMicrophoneLeaseUnlessDiscarding()
             onError(IllegalStateException("Couldn't start recording — audio is in use"))
             return false
         }
-        VoicePlaybackController.pause()
-        isRecording = true
-        resetRecordingUiState()
-        val generation = nextStartGeneration()
+        val generation = announceRecordingStart()
         val discarding = discardJob?.takeIf { it.isActive }
         val launched =
             scope.launch(mainDispatcher) {
@@ -223,6 +207,15 @@ class VoiceRecordingController internal constructor(
             }
         }
         return true
+    }
+
+    /** Moves either start path into capture and gives its native start a fresh generation. */
+    private fun announceRecordingStart(): Long {
+        VoicePlaybackController.pause()
+        isRecording = true
+        onRecordingStarted()
+        resetRecordingUiState()
+        return startRequests.advance()
     }
 
     /** Clears restart bookkeeping and releases the microphone lease after a stopped restart. */
@@ -297,8 +290,8 @@ class VoiceRecordingController internal constructor(
             }
     }
 
-    /** Another in-app sound took focus: pause the take and keep its place. */
-    private fun pauseCapture() {
+    /** The user or another in-app sound paused the take: keep its place until [resume]. */
+    internal fun pauseCapture() {
         val r = recorder
         if (r == null) {
             // Nothing captured yet (still preparing or restarting): end the pending start.
@@ -334,8 +327,8 @@ class VoiceRecordingController internal constructor(
         }
     }
 
-    /** Accepts a new recorder-start request and returns its token. */
-    private fun nextStartGeneration(): Long = startRequests.advance()
+    /** Identifies this recorder's current start request across an eviction readback. */
+    internal val captureGeneration: Long get() = startRequests.capture()
 
     /** Makes any recorder still preparing in the background ineligible to publish. */
     private fun invalidatePendingStart() {
@@ -352,10 +345,7 @@ class VoiceRecordingController internal constructor(
         locked = false
         isPaused = false
         _elapsedMs.longValue = 0L
-        dragOffsetPx = 0f
-        verticalOffsetPx = 0f
-        willCancel = false
-        willLock = false
+        hold.reset()
     }
 
     // A restart deferred the new recorder's creation while isRecording is already
@@ -378,11 +368,15 @@ class VoiceRecordingController internal constructor(
     /** Finalizes an ordinary release after its short trailing-audio window. */
     fun stop() = finish()
 
-    /** Preserve captured audio before Android can silence a background microphone. */
+    internal fun stopHeld() = finish(deliverImmediately = afterHeldRelease?.invoke())
+
     fun interrupt() = finish(VoiceRecordingStopReason.Interrupted)
 
     /** Detaches capture once and starts review finalization, skipping the tail for automatic stops. */
-    private fun finish(reason: VoiceRecordingStopReason? = null) {
+    private fun finish(
+        reason: VoiceRecordingStopReason? = null,
+        deliverImmediately: ((File, Long) -> Unit)? = null,
+    ) {
         if (abortPendingRestart()) return
         val r =
             recorder ?: run {
@@ -402,32 +396,26 @@ class VoiceRecordingController internal constructor(
         isRecording = false
         locked = false
         isPaused = false
-        dragOffsetPx = 0f
-        verticalOffsetPx = 0f
-        willCancel = false
-        willLock = false
-        // Finalize off the main thread: MediaRecorder.stop() flushes/finalizes
-        // the MP4 container and can block for tens-to-hundreds of ms (worse on
-        // slow storage), causing jank/ANR exactly as the record bar animates
-        // away. UI state is already reset above; deliver the result on Main once
-        // the container is finalized. See #372.
+        hold.reset()
+        // MediaRecorder.stop flushes the container on IO before delivery on Main (#372).
         val cut = CompletableDeferred<Unit>()
         tailCut = cut
         finalizeJob =
             scope.launch(mainDispatcher, start = CoroutineStart.UNDISPATCHED) {
-                finalizeRecording(r, cut, reason)
+                finalizeRecording(r, cut, reason, deliverImmediately)
             }
     }
 
-    /** Finalized bytes belong either to review or to this cleanup, even if Main is cancelled. */
     private suspend fun finalizeRecording(
         recording: VoiceRecordingSession,
         cut: CompletableDeferred<Unit>,
         reason: VoiceRecordingStopReason?,
+        deliverImmediately: ((File, Long) -> Unit)?,
     ) {
         var finalized: VoiceRecordingResult? = null
         var delivered = false
         finalizingTakes++
+        closingTakes++
         try {
             if (reason == null) withTimeoutOrNull(RECORDING_TAIL_MS) { cut.await() }
             val result =
@@ -445,7 +433,7 @@ class VoiceRecordingController internal constructor(
             } else {
                 // The callback owns the bytes from this point (including rejection).
                 delivered = true
-                onRecordingComplete(result.file, result.durationMs)
+                (deliverImmediately ?: onRecordingComplete)(result.file, result.durationMs)
                 if (reason != null) onAutomaticStop(reason)
             }
         } catch (c: CancellationException) {
@@ -470,6 +458,7 @@ class VoiceRecordingController internal constructor(
                     releaseMicrophoneLease()
                 }
                 finalizingTakes--
+                closingTakes--
             }
         }
     }
@@ -492,10 +481,7 @@ class VoiceRecordingController internal constructor(
         isRecording = false
         locked = false
         isPaused = false
-        dragOffsetPx = 0f
-        verticalOffsetPx = 0f
-        willCancel = false
-        willLock = false
+        hold.reset()
         // Abandon focus unconditionally: during a restart the previous recorder
         // is already null while the reused focus is still held, so a teardown
         // here (e.g. composition disposal mid-restart) must release the focus
@@ -595,10 +581,7 @@ class VoiceRecordingController internal constructor(
     fun lock() {
         if (!isRecording || locked) return
         locked = true
-        dragOffsetPx = 0f
-        verticalOffsetPx = 0f
-        willCancel = false
-        willLock = false
+        hold.reset()
     }
 
     fun updateDrag(
@@ -608,16 +591,13 @@ class VoiceRecordingController internal constructor(
         lockThresholdPx: Float,
     ) {
         if (!isRecording || locked) return
-        dragOffsetPx = deltaX.coerceAtMost(0f)
-        verticalOffsetPx = deltaY.coerceAtMost(0f)
-        willCancel = (-deltaX) > cancelThresholdPx
-        // Match the actual lock gesture, which also requires staying out of the
-        // cancel zone; otherwise the hint shows "armed" in the up+left overlap
-        // region where release would actually cancel.
-        willLock = (-deltaY) > lockThresholdPx && (-deltaX) <= cancelThresholdPx
+        hold.update(deltaX, deltaY, cancelThresholdPx, lockThresholdPx)
     }
 
+    /** Revokes future starts and suppresses any take still closing during a restart. */
     fun release() {
+        released = true
         cancel()
+        finalizeJob?.cancel()
     }
 }

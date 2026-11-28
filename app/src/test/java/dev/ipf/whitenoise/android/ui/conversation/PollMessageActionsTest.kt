@@ -32,8 +32,10 @@ import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.ui.conversation.composer.EMOJI_PICKER_TEST_TAG
 import dev.ipf.whitenoise.android.ui.conversation.messages.MESSAGE_DETAILS_TAG
+import dev.ipf.whitenoise.android.ui.conversation.messages.messageAction
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleRowTestTag
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -58,7 +60,7 @@ private const val UNTOUCHED_CLIPBOARD = "untouched"
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
 @OptIn(ExperimentalCoroutinesApi::class)
-class PollMessageActionsTest : PollMessageTestFixtures() {
+class PollMessageActionsTest : PollMessageTestFixtures(Dispatchers.Unconfined) {
     @get:Rule val composeRule = createComposeRule(effectContext = UnconfinedTestDispatcher())
     private val menuOpen = mutableStateOf(false)
     private val mounted = mutableStateOf(true)
@@ -108,9 +110,11 @@ class PollMessageActionsTest : PollMessageTestFixtures() {
         composeRule
             .onNodeWithTag(messageBubbleRowTestTag(item.record.messageIdHex))
             .performSemanticsAction(SemanticsActions.OnLongClick) { it() }
+        // Open the full set first so a hidden Forward or Read Aloud row would be found.
+        val info = composeRule.messageAction("Info")
         composeRule.onNodeWithText("Forward").assertDoesNotExist()
-        composeRule.onNodeWithText("Speak aloud").assertDoesNotExist()
-        composeRule.onNodeWithText("Info").performClick()
+        composeRule.onNodeWithText("Read Aloud").assertDoesNotExist()
+        info.performClick()
         composeRule.onNodeWithTag(MESSAGE_DETAILS_TAG).assertExists()
         composeRule.onNodeWithText("private-envelope", substring = true).assertDoesNotExist()
         composeRule.onNodeWithText("Poll").assertExists()
@@ -159,7 +163,7 @@ class PollMessageActionsTest : PollMessageTestFixtures() {
             .onNodeWithTag(messageBubbleRowTestTag(item.record.messageIdHex))
             .performSemanticsAction(SemanticsActions.OnLongClick) { it() }
         composeRule.onNodeWithText("Reply").assertDoesNotExist()
-        composeRule.onNodeWithText("Delete").performClick()
+        composeRule.messageAction("Delete").performClick()
         composeRule.onNodeWithText("Delete for me").assertExists()
         assertTrue(recordedCalls().none { it.first == "reactToMessage" || it.first == "castPollVote" })
     }
@@ -278,7 +282,7 @@ class PollMessageActionsTest : PollMessageTestFixtures() {
     @Test fun failedPollOffersNoCopy() {
         val item = render(invalidation = "UnknownEngineReason")
         openMenu(item)
-        composeRule.onNodeWithText("Delete").assertExists()
+        composeRule.messageAction("Delete").assertExists()
         composeRule.onNodeWithText("Copy").assertDoesNotExist()
     }
 

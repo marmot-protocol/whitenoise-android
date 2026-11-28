@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.settings
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -14,15 +15,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -34,15 +32,15 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -60,13 +58,16 @@ import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.AdaptiveContent
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.COPIED_FEEDBACK_MILLIS
 import dev.ipf.whitenoise.android.ui.common.Explanation
-import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
+import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
 import dev.ipf.whitenoise.android.ui.profile.ProfileQrGallerySave
 import dev.ipf.whitenoise.android.ui.qr.QrScanOutcome
@@ -85,7 +86,6 @@ private object ShareConnectDefaults {
     val AvatarMaxSize = 152.dp
     val ErrorMaxWidth = 440.dp
     val IconSize = 24.dp
-    const val COPIED_RESET_MILLIS = 2_000L
 }
 
 /**
@@ -126,7 +126,7 @@ internal fun ShareConnectScreen(
         )
     val link = remember(npub) { ProfileLink.parse(npub) }
     val context = LocalContext.current
-    val clipboard = LocalClipboardManager.current
+    val clipboard = rememberClipboardCopier()
     val shareProfileTitle = stringResource(R.string.share_profile)
     var copied by rememberSaveable(accountIdHex) { mutableStateOf(false) }
     var scannerSession by remember(accountIdHex, runtime) { mutableStateOf<Long?>(null) }
@@ -139,7 +139,7 @@ internal fun ShareConnectScreen(
 
     LaunchedEffect(copied) {
         if (copied) {
-            delay(ShareConnectDefaults.COPIED_RESET_MILLIS)
+            delay(COPIED_FEEDBACK_MILLIS)
             copied = false
         }
     }
@@ -155,6 +155,7 @@ internal fun ShareConnectScreen(
         onSaveToGallery = save@{
             val exportInProgress = pictureShareInProgress || gallerySave.inProgress
             if (!ownsScreen() || exportInProgress || link == null) return@save
+            appState.noteNotificationMoment()
             val spec =
                 QrShareCardSpec(
                     headline = profileCardHeadline,
@@ -183,6 +184,7 @@ internal fun ShareConnectScreen(
         },
         onShareUrl = share@{
             if (!ownsScreen()) return@share
+            appState.noteNotificationMoment()
             launchOutboundShare(
                 context,
                 outboundShareIntent(link?.uri ?: npub, emptyList()),
@@ -193,6 +195,7 @@ internal fun ShareConnectScreen(
             val exportInProgress = pictureShareInProgress || gallerySave.inProgress
             if (!ownsScreen() || exportInProgress || link == null) return@picture
             pictureShareInProgress = true
+            appState.noteNotificationMoment()
             appState.launchMutation {
                 runCatchingCancellable {
                     val staged =
@@ -220,8 +223,7 @@ internal fun ShareConnectScreen(
         },
         onCopy = copy@{
             if (!ownsScreen()) return@copy
-            clipboard.setText(AnnotatedString(npub))
-            copied = true
+            if (clipboard.copy(npub)) copied = true
         },
         onOpenScanner = {
             if (ownsScreen() && scannerSession == null) {
@@ -269,8 +271,7 @@ internal data class ShareConnectProfile(
     val nostrAddress: String,
 )
 
-/** Share & Connect as the prototype lays it out: centered top bar with share, identity column, pinned scan button. */
-@OptIn(ExperimentalMaterial3Api::class)
+/** Share & Connect: the shared top bar with a share action, identity column and pinned scan button. */
 @Suppress("FunctionNaming", "LongMethod", "LongParameterList") // Single visual surface with one anchored share menu.
 @Composable
 internal fun ShareConnectContent(
@@ -293,16 +294,10 @@ internal fun ShareConnectContent(
         contentWindowInsets = WindowInsets.safeDrawing,
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text(stringResource(R.string.share_and_connect)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_arrow_back),
-                            contentDescription = stringResource(R.string.back),
-                        )
-                    }
-                },
+            WhiteNoiseTopBar(
+                title = stringResource(R.string.share_and_connect),
+                onBack = onBack,
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
                 actions = {
                     ShareConnectShareAction(
                         pictureShareInProgress = pictureShareInProgress,
@@ -313,18 +308,12 @@ internal fun ShareConnectContent(
                         onSaveToGallery = onSaveToGallery,
                     )
                 },
-                colors =
-                    TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                        scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                    ),
-                scrollBehavior = LocalWhiteNoiseHeaderScroll.current,
             )
         },
-        bottomBar = { ShareConnectBottomAction(onClick = onOpenScanner) },
+        bottomBar = { ShareConnectBottomAction(scanInvalid = scanInvalid, onClick = onOpenScanner) },
     ) { innerPadding ->
         AdaptiveContent(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            ShareProfileContent(profile, qrContent, copied, scanInvalid, onCopy)
+            ShareProfileContent(profile, qrContent, copied, onCopy)
         }
     }
 }
@@ -442,10 +431,8 @@ private fun ShareProfileContent(
     profile: ShareConnectProfile,
     qrContent: String,
     copied: Boolean,
-    scanInvalid: Boolean,
     onCopy: () -> Unit,
 ) {
-    val copyState = stringResource(if (copied) R.string.copied else R.string.not_copied)
     BoxWithConstraints(
         modifier = Modifier.fillMaxSize().whiteNoiseVerticalScroll(rememberScrollState()),
         contentAlignment = Alignment.TopCenter,
@@ -490,25 +477,13 @@ private fun ShareProfileContent(
                 )
             }
             SettingsSearchRowReveal("copy_public_key", modifier = Modifier.padding(top = 4.dp)) {
-                IdentifierCopyCapsule(
-                    value = profile.npub,
+                // One key: short until tapped, then copied and expanded in full for comparison (#3321).
+                CopyablePublicKey(
+                    npub = profile.npub,
                     copied = copied,
                     onCopy = onCopy,
-                    copyContentDescription = stringResource(R.string.copy_public_key),
-                    copiedContentDescription = stringResource(R.string.copied),
-                    notCopiedStateDescription = copyState,
-                    copiedStateDescription = copyState,
                     targetTestTag = "share_connect.copy_public_key",
-                    visualTestTag = "share_connect.copy_public_key.visual",
-                )
-            }
-            // The capsule abbreviates; the whole key stays readable for comparison (#3321).
-            if (profile.npub.isNotBlank()) {
-                FullPublicKey(
-                    npub = profile.npub,
-                    modifier = Modifier.padding(top = 8.dp),
-                    testTag = "share_connect.full_public_key",
-                    label = stringResource(R.string.public_key),
+                    textTestTag = "share_connect.full_public_key",
                 )
             }
             IdentityQrCodeSurface(
@@ -524,37 +499,40 @@ private fun ShareProfileContent(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyLarge,
             )
-            if (scanInvalid) {
-                Text(
-                    text = stringResource(R.string.error_not_white_noise_profile_qr),
-                    modifier =
-                        Modifier
-                            .padding(top = WhiteNoiseSpacing.Related)
-                            .widthIn(max = ShareConnectDefaults.ErrorMaxWidth),
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodyMedium,
-                    textAlign = TextAlign.Center,
-                )
-            }
         }
     }
 }
 
-/** Pinned full-width "Scan QR Code" task button above the navigation bar. */
+/** Keeps the scan result visible beside the next scan action when the scanner closes. */
 @Suppress("FunctionNaming")
 @Composable
-private fun ShareConnectBottomAction(onClick: () -> Unit) {
+private fun ShareConnectBottomAction(
+    scanInvalid: Boolean,
+    onClick: () -> Unit,
+) {
     val scanLabel = stringResource(R.string.scan_qr_code)
     Surface(color = MaterialTheme.colorScheme.surfaceContainerLow) {
         AdaptiveContent {
-            Box(
+            Column(
                 modifier =
                     Modifier
                         .fillMaxWidth()
                         .navigationBarsPadding()
                         .padding(WhiteNoiseSpacing.PinnedActionInset),
-                contentAlignment = Alignment.Center,
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
             ) {
+                if (scanInvalid) {
+                    WhiteNoiseCallout(
+                        text = stringResource(R.string.error_not_white_noise_profile_qr),
+                        modifier =
+                            Modifier
+                                .widthIn(max = ShareConnectDefaults.ErrorMaxWidth)
+                                .semantics { liveRegion = LiveRegionMode.Polite },
+                        icon = R.drawable.ic_error,
+                        isError = true,
+                    )
+                }
                 SettingsSearchRowReveal("scan_qr_code", modifier = Modifier.fillMaxWidth()) {
                     WhiteNoiseButton(
                         onClick = onClick,

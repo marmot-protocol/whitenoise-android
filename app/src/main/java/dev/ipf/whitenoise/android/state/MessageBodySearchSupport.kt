@@ -50,6 +50,7 @@ internal fun searchableTimelineRecord(record: TimelineMessageRecordFfi): ChatLis
         private val accepted = MessageAttachments.acceptedReferences(record.media)
         override val mediaTypes = accepted.map { it.mediaType }
         override val mediaLabels = accepted.map { it.fileName.ifBlank { it.mediaType } }
+        override val inThread = record.thread != null
     }
 
 /** Needle searches highlight the hit; filter-only searches show the leading body or attachment label. */
