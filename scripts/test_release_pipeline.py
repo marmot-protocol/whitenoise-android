@@ -697,6 +697,15 @@ class BundleSignatureTests(unittest.TestCase):
 
 
 class WorkflowBoundaryTests(unittest.TestCase):
+    def test_hosted_release_leaves_live_promotion_validation_to_release_script(self):
+        """Reject duplicate MDK API reads while keeping the early Stable pin check."""
+        workflow = (ROOT / '.github/workflows/android-production-release.yml').read_text()
+        before_signing, signing_step, bundle = workflow.partition('- name: Require production release secrets')
+        self.assertTrue(signing_step)
+        self.assertIn('run: python3 -B scripts/check_marmotkit_release_channel.py', before_signing)
+        self.assertIn('run: ./scripts/prepare-production-release.sh ', bundle)
+        self.assertNotIn('check_marmotkit_stable_promotion.py', workflow)
+
     def test_stable_marmotkit_gate_rejects_prerelease_or_mixed_coordinates(self):
         """The production pin must name one formal release and its exact Android archive."""
         current = ROOT / 'app/src/main/marmotkit/MARMOT_VERSION'

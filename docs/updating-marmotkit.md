@@ -176,6 +176,35 @@ evidence with the pin PR and add `--verified-features` to the apply command.
 Open the pin PR against `develop`, adapt Android callers as needed and get fresh
 Android CI. Production on `master` requires a Stable pin.
 
+### Verify a Stable promotion for production
+
+Choose the staging tag for the build that was tested. Once MDK promotes that
+RC, pin the Stable Android bundle in `MARMOT_VERSION` and commit
+`app/src/main/marmotkit/STABLE_PROMOTION.json` alongside it with these fields:
+
+```json
+{
+  "staging_tag": "staging/2026.11.28-1910",
+  "staging_commit": "<full Android commit SHA that the staging tag points to>",
+  "mdk_meta_commit": "<full rc-meta commit SHA from MDK's Stable promotion summary>"
+}
+```
+
+CI checks Stable pins on `develop` and `master`. The hosted workflow validates
+the Stable pin format before loading signing files. Hosted and local production
+builds verify the public promotion evidence once through `scripts/release.sh`
+before Gradle runs. The check reads that exact verified
+revision of `stable/latest.json` on MDK's `rc-meta` history. It verifies that the recorded
+tag still points to a commit from `develop` and that its RC version and MDK
+source match the promotion. A separate MDK release commit must have the tested
+source as its only parent. Both Android ZIP digests must match the published
+RC and Stable records. Keep the selection with the pin so production rebuilds use
+the same evidence after MDK publishes a newer Stable release.
+
+Before building production locally with a promoted pin, fetch the staging tag
+and `origin/develop` (`git fetch origin develop --tags`). The check reads MDK's
+public promotion evidence even when the MarmotKit ZIP is already cached.
+
 ### Inspect a release by hand
 
 Prefer a formal `marmotkit-v<version>` release. Record its exact tag, asset URL,

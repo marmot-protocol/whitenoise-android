@@ -194,8 +194,7 @@ case "$FLAVOR" in
 esac
 
 if [[ "$FLAVOR" != staging ]]; then
-  python3 -B "$REPO_DIR/scripts/check_marmotkit_release_channel.py" \
-    "$REPO_DIR/app/src/main/marmotkit/MARMOT_VERSION"
+  python3 -B "$REPO_DIR/scripts/check_marmotkit_stable_promotion.py"
 fi
 
 if [[ -n "$GRADLE_INIT_SCRIPT" ]]; then
