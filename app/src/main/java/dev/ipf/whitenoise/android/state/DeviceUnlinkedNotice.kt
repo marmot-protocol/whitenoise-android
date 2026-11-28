@@ -48,10 +48,14 @@ internal suspend fun WhiteNoiseAppState.presentDeviceUnlinked(
     }
     // Beginning a switch supersedes one the user has pending, so an outdated handler must not begin it at all, and
     // the switch is decided before the cleanup below suspends, so it cannot override a choice the user makes meanwhile.
-    if (active && next != null && copies.isCurrent(accountRef, copy)) {
-        setActiveAccount(next, shouldActivate = { copies.isCurrent(accountRef, copy) })
+    // A switch that fails still leaves the account's notifications to clear.
+    try {
+        if (active && next != null && copies.isCurrent(accountRef, copy)) {
+            setActiveAccount(next, shouldActivate = { copies.isCurrent(accountRef, copy) })
+        }
+    } finally {
+        clearUnlinkedAccountNotifications(accountRef, copy, listed)
     }
-    clearUnlinkedAccountNotifications(accountRef, copy, listed)
 }
 
 /**
