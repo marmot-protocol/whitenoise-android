@@ -132,7 +132,8 @@ internal fun composerToolbarFittingRows(limit: Dp): Int {
 
 /**
  * Live adapters are ephemeral. Only [settings] is a persisted preference. While [transactionActive], only
- * [draftEditsOpen] draft controls stay usable, rechecked through [canEditDraft] rather than [canActivate].
+ * [draftEditsOpen] draft controls stay usable, rechecked through [canEditDraft] rather than [canActivate]; Plus
+ * counts only when [menuOffersDraftEdits], so it never opens an empty menu.
  */
 internal data class ComposerToolbarBindings(
     val settings: ComposerToolbarSettings,
@@ -142,6 +143,7 @@ internal data class ComposerToolbarBindings(
     val scrollEnabled: Boolean = enabled,
     val transactionActive: Boolean = false,
     val draftEditsOpen: Boolean = false,
+    val menuOffersDraftEdits: Boolean = true,
     val voiceLauncherVisible: Boolean = true,
     val onCustomize: (() -> Unit)? = null,
     val canActivate: () -> Boolean = { true },
@@ -166,7 +168,11 @@ internal val composerDraftEditShortcuts =
 internal fun ComposerToolbarBindings.usableDuringTransaction(shortcut: ComposerShortcut): Boolean =
     !transactionActive ||
         shortcut == ComposerShortcut.Paste ||
-        (draftEditsOpen && shortcut in composerDraftEditShortcuts)
+        (
+            draftEditsOpen &&
+                shortcut in composerDraftEditShortcuts &&
+                (shortcut != ComposerShortcut.More || menuOffersDraftEdits)
+        )
 
 /** Translate mode's toolbar adapter; [active] tints the pinned button while the preview line is shown. */
 internal data class ComposerTranslateToggle(

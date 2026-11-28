@@ -112,6 +112,18 @@ class ComposerToolbarDictationTest {
         }
     }
 
+    /** With Emoji and Paste both pinned, Plus would offer nothing during dictation, so it stays disabled. */
+    @Test
+    fun plusIsDisabledDuringDictationWhenItsMenuHasNoDraftEdit() {
+        val controller = renderDictating(listOf(ComposerShortcut.More, ComposerShortcut.Emoji, ComposerShortcut.Paste))
+        try {
+            composeRule.onNodeWithContentDescription(context.getString(R.string.attach_options)).assertIsNotEnabled()
+            composeRule.onNodeWithContentDescription(context.getString(R.string.open_emoji_picker)).assertIsEnabled()
+        } finally {
+            controller.cancel()
+        }
+    }
+
     /** Renders the production composer with [shortcuts] pinned while a dictation of this chat is listening. */
     private fun renderDictating(shortcuts: List<ComposerShortcut>): ConversationDictationController {
         saveToolbar(ComposerToolbarSettings(shortcuts, ComposerToolbarLayout.AlwaysExpanded))

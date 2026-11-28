@@ -1574,6 +1574,7 @@ internal fun ComposerBar(
                             },
                         transactionActive = transactionActive,
                         draftEditsOpen = voicePhase == VoiceComposerPhase.Idle,
+                        menuOffersDraftEdits = hiddenMenuShortcuts.any { it in composerDraftEditShortcuts },
                         onCustomize = beginCustomization,
                         canActivate = canActivateToolbar,
                         canEditDraft = canEditToolbarDraft,

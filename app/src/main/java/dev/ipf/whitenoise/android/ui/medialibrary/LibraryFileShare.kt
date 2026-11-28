@@ -21,7 +21,9 @@ import dev.ipf.whitenoise.android.ui.conversation.media.presentMediaLaunchFailur
 import dev.ipf.whitenoise.android.ui.conversation.media.shareAttachmentExternally
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** The attachment a library row stands for, which stays the same while the row recomposes with fresh data. */
 internal fun SharedMediaRow.attachmentKey() = messageIdHex to attachmentIndex
@@ -59,20 +61,37 @@ internal class LibraryFileShares(
     }
 }
 
+/** Returns the library's current row for a shared file's slot and reference, or null once it is gone. */
+internal typealias LibraryFileResolver = suspend (SharedMediaRow) -> SharedMediaRow?
+
+/** Resolves a shared file from MDK's attachment history, not from the rows the tab shows, which a reload empties. */
+internal fun GroupAttachmentPager.libraryFileResolver(accountId: () -> String?): LibraryFileResolver =
+    { row ->
+        val slot = row.messageIdHex to row.attachmentIndex.toUInt()
+        projectSlots(setOf(slot)) { entries ->
+            val account = accountId()
+            withContext(Dispatchers.Default) { attachmentLibraryTiles(entries, account).files }
+        }.firstOrNull { it.attachmentKey() == row.attachmentKey() && it.reference == row.reference }
+    }
+
 /**
  * The Files tab's shares for [controller]'s conversation. Each streams the verified file under its original name and
- * opens the share sheet only while the conversation still owns its foreground presentation, and a failure is
- * reported only while it still does.
+ * opens the share sheet only while the conversation still owns its foreground presentation and, when [resolveFile]
+ * is given, the file is still in the attachment history. A failure is reported only while the conversation still
+ * owns its presentation.
  */
 @Composable
 internal fun rememberLibraryFileShares(
     controller: ConversationController,
     appState: WhiteNoiseAppState,
+    resolveFile: LibraryFileResolver? = null,
 ): LibraryFileShares {
     val context = LocalContext.current
     val chooserTitle by rememberUpdatedState(stringResource(R.string.shared_media_share))
+    // The route builds a fresh resolver on each composition, so it is read at launch rather than keyed on.
+    val currentResolver by rememberUpdatedState(resolveFile)
     val scope = rememberCoroutineScope()
-    return remember(scope, controller, appState) {
+    return remember(scope, context, controller, appState) {
         LibraryFileShares(scope) { row ->
             runCatchingCancellable {
                 shareLibraryFile(
@@ -80,7 +99,11 @@ internal fun rememberLibraryFileShares(
                     accountRef = checkNotNull(controller.conversationAccountRef),
                     row = row,
                     chooserTitle = chooserTitle,
-                    currentRow = { row.takeIf { controller.ownsRetainedForegroundPresentation } },
+                    currentRow = {
+                        val owned = { controller.ownsRetainedForegroundPresentation }
+                        val resolve = currentResolver
+                        if (resolve == null) row.takeIf { owned() } else resolve(row)?.takeIf { owned() }
+                    },
                 ) {
                     attachmentSource(controller, row.messageIdHex, row.attachmentIndex, row.reference, row.mine)
                 }
@@ -99,7 +122,7 @@ internal suspend fun shareLibraryFile(
     accountRef: String,
     row: SharedMediaRow,
     chooserTitle: String,
-    currentRow: () -> SharedMediaRow?,
+    currentRow: suspend () -> SharedMediaRow?,
     source: suspend () -> AttachmentPlaintext,
 ) = shareAttachmentExternally(
     context = context,

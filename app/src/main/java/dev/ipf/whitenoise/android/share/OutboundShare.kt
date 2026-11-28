@@ -7,17 +7,16 @@ import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ComponentName
 import android.content.Context
-import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleOwner
 import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
+import dev.ipf.whitenoise.android.ui.common.lifecycleOwner
 import kotlinx.coroutines.CancellationException
 
 internal data class OutboundShareStream(
@@ -121,19 +120,14 @@ internal fun launchOutboundShare(
  * staged and keeps its selection. A context with no hosting activity is not checked.
  */
 internal fun requireOutboundShareHostStarted(context: Context) {
-    if (context.hostingLifecycle()?.currentState?.isAtLeast(Lifecycle.State.STARTED) == false) {
+    if (context
+            .lifecycleOwner()
+            ?.lifecycle
+            ?.currentState
+            ?.isAtLeast(Lifecycle.State.STARTED) == false
+    ) {
         throw CancellationException("outbound share host is no longer started")
     }
-}
-
-/** The lifecycle of the activity behind [this] context, unwrapping wrappers, or null when none hosts it. */
-private fun Context.hostingLifecycle(): Lifecycle? {
-    var current: Context? = this
-    while (current != null) {
-        if (current is LifecycleOwner) return current.lifecycle
-        current = (current as? ContextWrapper)?.baseContext
-    }
-    return null
 }
 
 internal fun inviteShareIntent(message: String): Intent = outboundShareIntent(message, emptyList())

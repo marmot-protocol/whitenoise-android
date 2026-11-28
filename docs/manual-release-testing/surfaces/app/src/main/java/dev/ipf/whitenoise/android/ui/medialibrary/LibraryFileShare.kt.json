@@ -28,6 +28,14 @@
         "test_ids": [
           "MED-070"
         ]
+      },
+      {
+        "surface": "A file gone from attachment history opens no share sheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/LibraryFileShare.kt",
+        "anchor": "fun GroupAttachmentPager.libraryFileResolver(",
+        "test_ids": [
+          "MED-070"
+        ]
       }
     ],
     "settings_controls": [

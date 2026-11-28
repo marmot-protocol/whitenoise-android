@@ -24,7 +24,7 @@ internal suspend fun shareAttachmentExternally(
     attachmentIndex: Int,
     reference: MediaAttachmentReferenceFfi,
     chooserTitle: String,
-    isCurrent: () -> Boolean,
+    isCurrent: suspend () -> Boolean,
     plaintext: suspend () -> AttachmentPlaintext,
 ) = shareStagedAttachments(
     context = context,

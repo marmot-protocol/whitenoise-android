@@ -396,6 +396,7 @@ internal fun MediaLibraryRoute(
                 paging = state,
                 onLoadMore = { scope.launch { pager?.loadMore() } },
                 resolvePhotos = pager?.selectedPhotoResolver { controller.boundAccountIdHex },
+                resolveFile = pager?.libraryFileResolver { controller.boundAccountIdHex },
             )
         }
     }
@@ -414,9 +415,12 @@ private fun MediaLibraryContent(
     paging: GroupAttachmentState? = null,
     onLoadMore: () -> Unit = {},
     resolvePhotos: SelectedPhotoResolver? = null,
+    resolveFile: LibraryFileResolver? = null,
 ) {
     var filter by rememberSaveable { mutableStateOf(SharedVisualFilter.All) }
     val photoShare = rememberSharedPhotoShare(tiles, controller, appState, resolvePhotos)
+    // Owned above the loading state, so loading another page does not cancel a file share.
+    val fileShares = rememberLibraryFileShares(controller, appState, resolveFile)
     var pendingDay by rememberSaveable { mutableStateOf<LocalDate?>(null) }
     val viewerSelection = remember { SharedMediaViewerSelection() }
     val viewerChromeIcons = rememberMediaViewerChromeIconProvider()
@@ -513,6 +517,7 @@ private fun MediaLibraryContent(
                         listState = filesListState,
                         controller = controller,
                         appState = appState,
+                        shares = fileShares,
                         onJumpToMessage = onJumpToMessage,
                     )
                 SharedContentCategory.Voice ->
@@ -585,17 +590,18 @@ internal fun <T> MonthSectionedColumn(
     }
 }
 
-/** Files tab of the library. */
+/** Files tab of the library; [shares] belong to the library, so a reload of this tab does not cancel them. */
+@Suppress("FunctionNaming", "LongParameterList")
 @Composable
 private fun FileLibraryTab(
     tiles: SharedMediaTiles,
     listState: androidx.compose.foundation.lazy.LazyListState,
     controller: ConversationController,
     appState: WhiteNoiseAppState,
+    shares: LibraryFileShares,
     onJumpToMessage: (String) -> Unit,
 ) {
     val documentSaveFallback = rememberDocumentSaveFallback(appState, controller.group.groupIdHex)
-    val shares = rememberLibraryFileShares(controller, appState)
     MonthSectionedColumn(
         sections = tiles.fileSections,
         listState = listState,
@@ -718,7 +724,7 @@ internal fun FileLibraryRow(
                 .clip(MaterialTheme.shapes.large)
                 .background(MaterialTheme.colorScheme.surfaceContainer)
                 .amoledSurfaceBorder(MaterialTheme.shapes.large)
-                .clickable(enabled = !inFlight) {
+                .clickable(enabled = !inFlight && !shares.isSharing(row)) {
                     inFlight = true
                     scope.launch {
                         val downloaded =

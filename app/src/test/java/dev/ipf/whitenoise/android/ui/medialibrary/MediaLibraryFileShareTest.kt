@@ -7,6 +7,7 @@ import android.content.pm.ResolveInfo
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.test.core.app.ApplicationProvider
+import dev.ipf.marmotkit.AttachmentCategoryFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaLocatorFfi
@@ -107,6 +108,32 @@ class MediaLibraryFileShareTest {
             mounted = row("other.pdf", PDF, attachmentIndex = 1)
             release.complete(Unit)
             val failure = sharing.await()
+
+            assertTrue("$failure", failure is CancellationException)
+            assertNull(shadowOf(RuntimeEnvironment.getApplication()).nextStartedActivity)
+            assertTrue(sharedFiles().isEmpty())
+        }
+
+    /** A file removed from attachment history while it is staged opens no share sheet and leaves no copy behind. */
+    @Test
+    fun aFileRemovedFromHistoryDuringStagingSharesNothing() =
+        runTest {
+            clearSharedFiles()
+            registerShareTarget("image/png")
+            val entry = historyEntry(1, category = AttachmentCategoryFfi.FILE)
+            val history = GroupAttachmentFixture(listOf(entry))
+            val resolve = GroupAttachmentPager(history).libraryFileResolver { "account" }
+            val shared = attachmentLibraryTiles(listOf(entry), "account").files.single()
+            assertEquals(shared, resolve(shared))
+
+            val failure =
+                runCatching {
+                    shareLibraryFile(context, "account", shared, "Share", currentRow = { resolve(shared) }) {
+                        history.rows = emptyList()
+                        history.removals++
+                        AttachmentPlaintext.Bytes("secret".encodeToByteArray())
+                    }
+                }.exceptionOrNull()
 
             assertTrue("$failure", failure is CancellationException)
             assertNull(shadowOf(RuntimeEnvironment.getApplication()).nextStartedActivity)
