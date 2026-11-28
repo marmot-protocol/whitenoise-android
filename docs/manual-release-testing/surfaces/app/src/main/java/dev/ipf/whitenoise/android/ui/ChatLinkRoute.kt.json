@@ -12,6 +12,14 @@
         ]
       },
       {
+        "surface": "ChatLinkChoiceSupersededEffect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/ChatLinkRoute.kt",
+        "anchor": "fun ChatLinkChoiceSupersededEffect(",
+        "test_ids": [
+          "SYS-015"
+        ]
+      },
+      {
         "surface": "R.string.chat_link_choose_account_title",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/ChatLinkRoute.kt",
         "anchor": "R.string.chat_link_choose_account_title",

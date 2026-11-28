@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android
 
+import dev.ipf.whitenoise.android.core.ChatLink
+
 /**
  * Distinguishes a plain foreground resume from a notification-owned route.
  *
@@ -12,15 +14,28 @@ internal class ForegroundConversationDismissalCoordinator {
     private var notificationRouteObserved = false
     private var currentForegroundNotificationOwned = false
 
-    fun onStart(hasPendingNotificationRoute: Boolean) {
+    /** Starts a foreground entry that a pending notification route or a pending chat [pendingLink] already owns. */
+    fun onStart(
+        hasPendingNotificationRoute: Boolean,
+        pendingLink: String? = null,
+    ) {
+        val owned = inboundIntentOwnsForeground(hasPendingNotificationRoute, pendingLink)
         resumePending = true
-        notificationRouteObserved = hasPendingNotificationRoute
-        currentForegroundNotificationOwned = hasPendingNotificationRoute
+        notificationRouteObserved = owned
+        currentForegroundNotificationOwned = owned
     }
 
     fun onNotificationRouteObserved() {
         currentForegroundNotificationOwned = true
         if (resumePending) notificationRouteObserved = true
+    }
+
+    /** Notes an inbound intent, which owns this foreground entry when [inboundIntentOwnsForeground] says so. */
+    fun onInboundRoute(
+        hasNotificationTarget: Boolean,
+        data: String?,
+    ) {
+        if (inboundIntentOwnsForeground(hasNotificationTarget, data)) onNotificationRouteObserved()
     }
 
     /**
@@ -42,3 +57,13 @@ internal class ForegroundConversationDismissalCoordinator {
 
     fun shouldDismissAfterUnlock(): Boolean = !currentForegroundNotificationOwned
 }
+
+/**
+ * Whether an inbound intent routes this foreground entry itself, so resume must not dismiss the notifications of
+ * the conversation that was open before it: a notification tap, or a chat link that resolves to its own chat or
+ * notice (#4186). A profile link or a plain launch leaves the open conversation in front and still dismisses.
+ */
+internal fun inboundIntentOwnsForeground(
+    hasNotificationTarget: Boolean,
+    data: String?,
+): Boolean = hasNotificationTarget || ChatLink.isChatLink(data)

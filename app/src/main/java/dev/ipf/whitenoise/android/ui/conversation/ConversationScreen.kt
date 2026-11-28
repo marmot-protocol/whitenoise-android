@@ -3193,7 +3193,7 @@ internal fun ConversationScreen(
                     chat.id,
                     controller.title(groupTitleCopy),
                 )
-            navigationState.searchOpen = true
+            messageNavigator.openSearch()
         }
     val headerShortcuts = appState.headerShortcutPreferences.shortcuts
     // Mute and Read aloud write through the active account, so like chat details they stay hidden while a

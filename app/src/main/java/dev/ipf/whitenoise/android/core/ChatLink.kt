@@ -30,6 +30,9 @@ object ChatLink {
     /** The canonical link for a chat, in the form [parse] reads back; shared from chat details (#3658). */
     fun uri(groupIdHex: String): String = "${ProfileLink.MARMOT_SCHEME}://$CHAT_HOST/${groupIdHex.lowercase()}"
 
+    /** Whether [raw] is a chat link, valid or malformed, rather than a profile or other link the app reads (#4186). */
+    fun isChatLink(raw: String?): Boolean = raw != null && parse(raw) != ChatLinkParse.NotChatLink
+
     fun parse(raw: String): ChatLinkParse {
         val trimmed = raw.trim()
         val uri = runCatching { URI(trimmed) }.getOrNull()

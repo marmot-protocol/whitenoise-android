@@ -11,6 +11,9 @@ import dev.ipf.whitenoise.android.state.ProductObservation
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.recordProductObservation
 
+/** Whether this inbound payload replaces the shell with the root loading screen: any link except a chat link. */
+internal fun String?.showsRootLoading(): Boolean = this != null && !ChatLink.isChatLink(this)
+
 /** Settles the Activity's current link after startup and reports unsupported links once. */
 @Composable
 @Suppress("FunctionNaming", "LongParameterList")

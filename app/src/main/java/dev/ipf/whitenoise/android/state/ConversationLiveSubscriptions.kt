@@ -10,6 +10,10 @@ import dev.ipf.marmotkit.TimelineMessagesSubscription
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.state.TimelinePageOutcome.Advanced
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicReference
 
 /** Attempts allowed for not-ready or superseded exact-message jumps before asking the reader to retry. */
 internal const val CONVERSATION_JUMP_RETRY_ATTEMPTS = 4
@@ -134,20 +138,49 @@ internal class ConversationLiveSubscriptions(
         fun bind(appState: WhiteNoiseAppState): ConversationLiveSubscriptions =
             ConversationLiveSubscriptions(
                 openTimeline = { account, groupIdHex, limit ->
-                    // Traced on its own: this open is the largest measured segment of a notification
-                    // tap, and the route trace alone cannot separate it from the first page (#586).
-                    appState.marmotIo(MarmotTraceSection.CONVERSATION_WINDOW_OPEN) {
-                        openTimelineWithFallback(account, groupIdHex, limit)
+                    openOwnedAcrossDispatch(close = ConversationTimelineSubscriptionHandle::close) { deliver ->
+                        // Traced on its own: this open is the largest measured segment of a notification
+                        // tap, and the route trace alone cannot separate it from the first page (#586).
+                        appState.marmotIo(MarmotTraceSection.CONVERSATION_WINDOW_OPEN) {
+                            deliver(openTimelineWithFallback(account, groupIdHex, limit))
+                        }
                     }
                 },
                 openGroupState = { account, groupIdHex ->
-                    appState.marmotIo {
-                        FfiConversationGroupStateSubscriptionHandle(
-                            subscribeGroupState(account, groupIdHex),
-                        )
+                    openOwnedAcrossDispatch(close = ConversationGroupStateSubscriptionHandle::close) { deliver ->
+                        appState.marmotIo {
+                            deliver(
+                                FfiConversationGroupStateSubscriptionHandle(subscribeGroupState(account, groupIdHex)),
+                            )
+                        }
                     }
                 },
             )
+    }
+}
+
+/**
+ * Keeps a native subscription handle owned while [dispatch] carries it back from the MDK dispatcher (#4221).
+ *
+ * [dispatch] opens the handle on its dispatcher and passes it through `deliver` before returning it. When the
+ * caller was cancelled while the open ran, `withContext` throws instead of returning, and the caller never sees
+ * the handle its cleanup would close. That handle is closed here exactly once, off the caller's thread, before
+ * the cancellation propagates. A delivered handle belongs to the caller, whose own cleanup closes it.
+ */
+internal suspend fun <H : Any> openOwnedAcrossDispatch(
+    close: (H) -> Unit,
+    dispatch: suspend (deliver: (H) -> H) -> H,
+): H {
+    val opened = AtomicReference<H?>(null)
+    var delivered = false
+    try {
+        return dispatch { handle -> handle.also(opened::set) }.also { delivered = true }
+    } finally {
+        if (!delivered) {
+            opened.getAndSet(null)?.let { undelivered ->
+                withContext(NonCancellable + Dispatchers.IO) { runCatching { close(undelivered) } }
+            }
+        }
     }
 }
 

@@ -329,42 +329,43 @@ internal class ConversationMessageNavigator(
             }
     }
 
-    /** Closes in-conversation search and clears its query and pinned match. */
+    /** Opens in-conversation search and remembers the reading position its close returns to. */
+    fun openSearch() {
+        navigationState.openSearchSession(scrollCoordinator.bookmark(currentScrollAnchor()), controller.timeline)
+    }
+
+    /**
+     * Closes in-conversation search, clears its query and pinned match, and returns the reader to where search
+     * opened. A repeated close of the same session keeps that pending return.
+     */
     fun closeSearch() {
-        navigationState.searchOpen = false
-        presentationState.searchState.value = GlobalSearchTransitions.closeSearch(presentationState.searchState.value)
-        navigationState.searchPinnedMatchId = null
-        val previousSearchJob = navigationState.searchJob
-        previousSearchJob?.cancel()
-        navigationState.navigateReplyJob?.cancel()
-        navigationState.targetNavigation.cancel()
         val expectedRestoreIntent = scrollCoordinator.intentToken
-        navigationState.targetHighlight.clear()
-        // A deep search jump can evict the original viewport from the capped
-        // window. Page back to its durable local message before asking the
-        // coordinator to restore the logical anchor and exact offset.
-        navigationState.preSearchScrollAnchor?.let { anchor ->
-            navigationState.searchJob =
-                scope.launch {
-                    previousSearchJob?.join()
-                    val match = anchor.match
-                    if (match != null && controller.loadSearchResultMessageAvailable(match)) {
-                        withFrameNanos { }
-                    }
-                    scrollCoordinator.restoreBookmark(
-                        anchor.bookmark,
-                        expectedIntent = expectedRestoreIntent,
-                        resolveAnchorIndex = { saved ->
-                            resolveScrollAnchorIndex(saved)
-                                ?: saved.listIndex.coerceIn(
-                                    0,
-                                    (timelineViewport.readingLayoutInfo().totalItemsCount - 1).coerceAtLeast(0),
-                                )
-                        },
-                    )
-                }
+        navigationState.closeSearchSession(
+            scope = scope,
+            clearSearch = {
+                presentationState.searchState.value =
+                    GlobalSearchTransitions.closeSearch(presentationState.searchState.value)
+            },
+        ) { anchor ->
+            // A deep search jump can evict the original viewport from the capped
+            // window. Page back to its durable local message before asking the
+            // coordinator to restore the logical anchor and exact offset.
+            val match = anchor.match
+            if (match != null && controller.loadSearchResultMessageAvailable(match)) {
+                withFrameNanos { }
+            }
+            scrollCoordinator.restoreBookmark(
+                anchor.bookmark,
+                expectedIntent = expectedRestoreIntent,
+                resolveAnchorIndex = { saved ->
+                    resolveScrollAnchorIndex(saved)
+                        ?: saved.listIndex.coerceIn(
+                            0,
+                            (timelineViewport.readingLayoutInfo().totalItemsCount - 1).coerceAtLeast(0),
+                        )
+                },
+            )
         }
-        navigationState.preSearchScrollAnchor = null
     }
 }
 

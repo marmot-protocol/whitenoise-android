@@ -257,6 +257,8 @@ internal fun WhiteNoiseApp(
             null
         }
     val visiblePickerRequest = visibleShareRequest.takeUnless { visibleShareDirectGroupId != null }
+    // A chat link resolves over the current screen; only a profile payload swaps in the loading screen (#4186).
+    val payloadShowsRootLoading = remember(inboundProfilePayload) { inboundProfilePayload.showsRootLoading() }
     val inboundRoutePending =
         inboundNotificationTarget != null ||
             inboundProfilePayload != null ||
@@ -305,7 +307,7 @@ internal fun WhiteNoiseApp(
             appState.accountSetup.controller == null &&
             appState.profileSignUpForPresentation == null
     val protectedStartupVisible =
-        inboundProfilePayload != null ||
+        payloadShowsRootLoading ||
             !shouldComposeProtectedMainShell(protectedFirstUsefulSurface)
     val protectedShell =
         rememberProtectedShellSavedState(
@@ -424,6 +426,9 @@ internal fun WhiteNoiseApp(
         }
     }
     val currentOnChatLinkResolved by rememberUpdatedState(onChatLinkResolved)
+    val currentRouteGeneration by rememberUpdatedState(inboundNotificationRequestId)
+    val inAppChatLinks = remember(scope) { InAppChatLinkLookups(scope) { currentRouteGeneration } }
+    ChatLinkChoiceSupersededEffect(inboundNotificationRequestId) { chatLinkChoice = null }
     val inAppLinkHandler =
         remember(appState) {
             InAppLinkHandler(
@@ -434,8 +439,7 @@ internal fun WhiteNoiseApp(
                         appState.presentProfilePayload(link)
                         return@open
                     }
-                    scope.launch {
-                        val outcome = resolveChatLinkOutcome(chatLink, appState) ?: return@launch
+                    inAppChatLinks.launch(resolve = { resolveChatLinkOutcome(chatLink, appState) }) { outcome ->
                         // The app may have locked while the accounts holding the chat were read.
                         if (appState.appLock.screenVisible || appState.appLock.evaluationPending) return@launch
                         showChatLinkOutcome(outcome)
@@ -633,7 +637,7 @@ internal fun WhiteNoiseApp(
                                         }
                                     }
                                     if (
-                                        inboundProfilePayload != null ||
+                                        payloadShowsRootLoading ||
                                         !shouldComposeProtectedMainShell(firstUsefulSurface)
                                     ) {
                                         NotificationRouteStartupSwapTrace(
@@ -653,12 +657,12 @@ internal fun WhiteNoiseApp(
                                             surface =
                                                 when {
                                                     startupError != null -> WarmResumeRenderedSurface.Error
-                                                    inboundProfilePayload != null ->
+                                                    payloadShowsRootLoading ->
                                                         WarmResumeRenderedSurface.FullScreenLoading
                                                     else -> WarmResumeRenderedSurface.StartupLoading
                                                 },
                                         ) {
-                                            if (startupError == null && inboundProfilePayload != null) {
+                                            if (startupError == null && payloadShowsRootLoading) {
                                                 LoadingScreen()
                                             } else {
                                                 StartupLocalProjectionScreen(startupError) {
