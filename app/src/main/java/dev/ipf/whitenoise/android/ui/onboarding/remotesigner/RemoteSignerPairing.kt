@@ -148,6 +148,7 @@ internal class RemoteSignerPairing(
     fun submitLink() {
         if (step != RemoteSignerStep.EnterLink) return
         val value = link.text.toString().trim()
+        clipboardPaste = clipboardPaste?.takeIf { it.matchesLink(value) }
         if (isBunkerLink(value)) {
             open(RemoteSignerMethod.BunkerLink, JSONObject().put("uri", value).toString())
         } else {

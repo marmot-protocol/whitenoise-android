@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.onboarding
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.net.Uri
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.runtime.CompositionLocalProvider
@@ -29,19 +30,26 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.BunkerClipboardPaste
 import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.FakeRemoteSignerHost
 import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.FakeRemoteSignerSession
+import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.RemoteSignerEntry
 import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.RemoteSignerLinkField
+import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.RemoteSignerMethod
 import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.RemoteSignerPairing
+import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.RemoteSignerPairingHost
+import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.clearClipboardIfHolding
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.util.ReflectionHelpers
 
 /**
  * Presentation contracts use synthetic keys and local callbacks; no account, signer, camera or network operation
@@ -298,6 +306,70 @@ class WelcomeSignInPresentationTest {
         }
         assertEquals(0, imports)
         clipboard.clearPrimaryClip()
+    }
+
+    /** A provider clip pasted on Sign In can be retired by pairing without a second read. */
+    @Test fun signInForwardsTheProviderClipboardIdentityWithTheBunkerLink() {
+        val clipboard = context.getSystemService(ClipboardManager::class.java)
+        val link = "bunker://test?relay=wss://signer.example"
+        var reads = 0
+        val item =
+            object : ClipData.Item(Uri.parse("content://fixture.signer/link")) {
+                override fun coerceToText(context: Context): CharSequence {
+                    reads++
+                    return link
+                }
+            }
+        clipboard.setPrimaryClip(ClipData("Signer link", arrayOf("text/plain"), item))
+        val description = requireNotNull(clipboard.primaryClipDescription)
+        ReflectionHelpers.callInstanceMethod<Unit>(
+            description,
+            "setTimestamp",
+            ReflectionHelpers.ClassParameter.from(Long::class.javaPrimitiveType, 1L),
+        )
+        var entry: RemoteSignerEntry? = null
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                SignInContent(
+                    "",
+                    false,
+                    null,
+                    onIdentityChange = {},
+                    onErrorChange = {},
+                    onBack = {},
+                    onSignIn = { error("A bunker link should open remote signer pairing") },
+                    onUseRemoteSigner = { entry = it },
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription(context.getString(R.string.paste)).performClick()
+        composeRule.onNodeWithTag("onboarding.sign_in.action").performClick()
+        composeRule.runOnIdle {
+            val request = requireNotNull(entry)
+            assertEquals(link, request.link)
+            val session = FakeRemoteSignerSession()
+            val fakeHost = FakeRemoteSignerHost(session)
+            val host =
+                object : RemoteSignerPairingHost by fakeHost {
+                    /** Runs the real clipboard cleanup through the pairing host contract. */
+                    override fun onBunkerLinkSpent(
+                        link: String,
+                        paste: BunkerClipboardPaste?,
+                    ) = clearClipboardIfHolding(context, link, paste)
+                }
+            val pairing =
+                RemoteSignerPairing(
+                    host,
+                    CoroutineScope(Dispatchers.Unconfined),
+                    sessionDispatcher = Dispatchers.Unconfined,
+                )
+            pairing.choose(RemoteSignerMethod.BunkerLink, request.link, request.clipboardPaste)
+            pairing.approve()
+            session.connectReply.complete("a1b2c3")
+            assertFalse(clipboard.hasPrimaryClip())
+            assertEquals(1, reads)
+        }
     }
 
     /** While Amber is awaiting its second prompt both credential import and Back stay gated. */
