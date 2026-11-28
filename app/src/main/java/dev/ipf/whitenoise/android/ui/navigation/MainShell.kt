@@ -86,6 +86,7 @@ import dev.ipf.whitenoise.android.ui.conversation.hasVisibleComposer
 import dev.ipf.whitenoise.android.ui.conversation.media.attachmentInstallerHandoffEffect
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardOperationStatusHost
 import dev.ipf.whitenoise.android.ui.conversation.rememberConversationSurfaceState
+import dev.ipf.whitenoise.android.ui.devices.SignInDevicesRouteEffect
 import dev.ipf.whitenoise.android.ui.icons.filled.Settings
 import dev.ipf.whitenoise.android.ui.settings.DiagnosticsScreen
 import dev.ipf.whitenoise.android.ui.settings.SettingsHomeViewport
@@ -441,7 +442,7 @@ internal fun MainShell(
             )
         }
     val visibleShareRequest = preparedShareRequest ?: shellStateHolder.pendingShareRequest.value
-    val currentShareRequestId by rememberUpdatedState(visibleShareRequest?.requestId ?: inboundShareRequest?.requestId)
+    val ownsShare = { id: String -> shellStateHolder.visibleShareRequest?.requestId == id }
     val visiblePickerRequest = visibleShareRequest.takeUnless { inboundDirectGroupId != null }
     var pendingStagedShareOpen by shellStateHolder::pendingStagedShareOpen
     val clearSharePickerRequest: () -> Unit = {
@@ -571,6 +572,15 @@ internal fun MainShell(
         previousPendingProfileNpub = current
     }
 
+    fun closeConversationForNotificationRoute() {
+        chatListReturnHeadSnap = resetChatListReturnHeadSnap()
+        supersedePendingGroupCreateOpen()
+        selectedChat = null
+        selectedChatOpenContext = ConversationOpenContext()
+        selectedChatJustCreated = false
+        selectedChatOpenedAsDmHint = false
+    }
+
     NotificationOpenRouteEffect(
         router =
             NotificationOpenRouter(
@@ -589,19 +599,7 @@ internal fun MainShell(
                             shellNavState = armShellNotificationRequest(shellNavState, profileGroupForegroundState)
                         }
 
-                        /** Closes the selected conversation and its open-time state before an account switch. */
-                        override fun closeConversationForAccountSwitch() {
-                            chatListReturnHeadSnap = resetChatListReturnHeadSnap()
-                            supersedePendingGroupCreateOpen()
-                            selectedChat = null
-                            // Notification routing never opens a just-created conversation, so
-                            // clear any leftover open-time state from a prior New Chat / Create
-                            // Group flow, otherwise a stale justCreated flag would auto-raise
-                            // the IME on the next opened conversation (issue #321 guard).
-                            selectedChatOpenContext = ConversationOpenContext()
-                            selectedChatJustCreated = false
-                            selectedChatOpenedAsDmHint = false
-                        }
+                        override fun closeConversationForAccountSwitch() = closeConversationForNotificationRoute()
 
                         /** Revokes any selected conversation and open-time input state before returning to Chats. */
                         override fun fallBackToChatList() {
@@ -649,10 +647,7 @@ internal fun MainShell(
         supersedePendingTtsDestinationNavigation()
         sectionName = MainSection.Chats.name
         settingsDetailName = null
-        supersedePendingGroupCreateOpen()
-        selectedChat = null
-        selectedChatOpenContext = ConversationOpenContext()
-        selectedChatJustCreated = false
+        closeConversationForNotificationRoute()
         notificationRoute.routing = false
         routingAppUpdate = false
         appState.showAppUpdateBannerFromNotification()
@@ -676,8 +671,7 @@ internal fun MainShell(
         }
     }
 
-    // The first argument is the staged share's request id, which binds a deferred cross-account open.
-    val openAfterStagedShare: (String, String, List<String>) -> Unit = openStagedShare@{ share, accountRef, groupIds ->
+    val openAfterStagedShare: (String, String, List<String>) -> Unit = openStagedShare@{ id, accountRef, groupIds ->
         if (groupIds.isEmpty()) return@openStagedShare
         val otherCount = groupIds.size - 1
         if (accountRef == appState.activeAccountRef) {
@@ -694,7 +688,7 @@ internal fun MainShell(
         } else {
             val pending =
                 PendingStagedShareOpen(
-                    requestId = share,
+                    requestId = id,
                     accountRef = accountRef,
                     groupIdHex = groupIds.first(),
                     otherChatCount = otherCount,
@@ -703,10 +697,7 @@ internal fun MainShell(
             appState.launchMutation {
                 // A newer share retires this open; its delayed switch must then not change the account (#3698).
                 appState.setActiveAccount(accountRef, shouldActivate = { pendingStagedShareOpen === pending })
-                if (
-                    appState.activeAccountRef != accountRef &&
-                    pendingStagedShareOpen === pending
-                ) {
+                if (appState.activeAccountRef != accountRef && pendingStagedShareOpen === pending) {
                     pendingStagedShareOpen = null
                 }
             }
@@ -715,18 +706,18 @@ internal fun MainShell(
     val stageShareToChats:
         suspend (ShareRequest, String, List<String>) -> Boolean =
         stageShare@{ request, accountRef, groupIds ->
-            if (groupIds.isEmpty() || currentShareRequestId != request.requestId) return@stageShare false
+            if (groupIds.isEmpty() || !ownsShare(request.requestId)) return@stageShare false
             val staged =
                 runCatchingCancellable {
                     appState.stageInboundShareForFirstFrame(accountRef, groupIds, request.payload) {
-                        currentShareRequestId == request.requestId
+                        ownsShare(request.requestId)
                     }
                 }.getOrElse {
-                    appState.present(R.string.share_import_storage)
+                    if (ownsShare(request.requestId)) appState.present(R.string.share_import_storage)
                     return@stageShare false
                 }
             if (!staged) {
-                appState.present(R.string.toast_notification_account_unavailable)
+                if (ownsShare(request.requestId)) appState.present(R.string.toast_notification_account_unavailable)
                 return@stageShare false
             }
             openAfterStagedShare(request.requestId, accountRef, groupIds)
@@ -848,13 +839,13 @@ internal fun MainShell(
                         accountRef = accountRef,
                         targetGroupIds = listOf(directGroupId),
                         payload = request.payload,
-                        shouldCommit = { currentShareRequestId == request.requestId },
+                        shouldCommit = { ownsShare(request.requestId) },
                     )
                 }
             if (stagingResult.getOrDefault(false)) {
                 clearSharePickerRequest()
                 openAfterStagedShare(request.requestId, accountRef, listOf(directGroupId))
-            } else {
+            } else if (ownsShare(request.requestId)) {
                 if (shellStateHolder.promoteInboundShareRequest(request, persisted)) onShareRequestHandled(request)
                 val message =
                     if (stagingResult.isFailure) {
@@ -949,6 +940,18 @@ internal fun MainShell(
             updateSettingsViewport(SettingsHomeViewportEvent.ChangeAccount)
         }
         previousActiveAccountRef = nextNavAccountRef(previousActiveAccountRef, current)
+    }
+
+    SignInDevicesRouteEffect(appState, previousActiveAccountRef) {
+        supersedePendingTtsDestinationNavigation()
+        closeConversationForNotificationRoute()
+        pendingConversationOpen = null
+        appState.clearPresentedProfile()
+        profileGroupForegroundState.close()
+        clearSharePickerRequest()
+        pendingStagedShareOpen = null
+        sectionName = MainSection.Settings.name
+        settingsDetailName = SettingsDetail.Account.name
     }
 
     // Return the UI to the active spoken passage without touching playback.
@@ -1483,20 +1486,8 @@ internal fun MainShell(
         if (!controller.group.groupIdHex.equals(request.item.group.groupIdHex, ignoreCase = true)) {
             return@LaunchedEffect
         }
-        awaitPreparedConversationOpen(
-            awaitReady = {
-                snapshotFlow {
-                    preparedConversationCanOpen(
-                        hasPublishedAuthoritativeTimeline = controller.hasPublishedAuthoritativeTimeline,
-                        hasPreparedInitialPresentation = controller.hasPreparedInitialPresentation,
-                        hasLoadError = controller.error != null,
-                        terminalConversationUnavailable = controller.terminalConversationUnavailable,
-                    )
-                }.filter { it }
-                    .first()
-            },
-            holdingForEventCards = { controller.isHoldingInitialPageForEventCards },
-        )
+        controller.awaitPreparedConversationOpen()
+        if (pendingConversationOpen?.requestId != request.requestId) return@LaunchedEffect
         // A normal cached open reaches the ready state before this deadline and
         // keeps its spinner-free transition. A first page held for its event
         // cards may extend the wait by the card budget, never more. A stuck local
@@ -1836,7 +1827,7 @@ internal fun MainShell(
                                 chatsActive = {
                                     appState.canShareFromChats(sectionName, selectedChat, pendingConversationOpen) &&
                                         quickAccountSwitchTransition == null &&
-                                        currentShareRequestId == null
+                                        shellStateHolder.visibleShareRequest == null
                                 },
                                 onFirstRunHelp = { support ->
                                     sectionName = MainSection.Settings.name

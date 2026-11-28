@@ -150,7 +150,7 @@ internal class DeviceLinkRequestWatcher(
     private val canPresentOutcome: (String) -> Boolean = { true },
     private val nowMs: () -> Long = ::monotonicNowMs,
     private val historyNowMs: () -> Long = nowMs,
-    private val history: DeviceLinkRequestHistory? = null,
+    private val records: DeviceLinkRequestRecords? = null,
 ) {
     var snapshots by mutableStateOf<Map<String, DeviceLinkSnapshotFfi>>(emptyMap())
         private set
@@ -170,7 +170,9 @@ internal class DeviceLinkRequestWatcher(
     var blocked by mutableStateOf(false)
 
     /** Per profile, when each unanswered request was first seen, by [historyNowMs]. */
-    private var unanswered = history?.read().orEmpty()
+    private var unanswered = records?.unanswered?.read().orEmpty()
+
+    val attempts: DeviceLinkAttemptHistory? get() = records?.attempts
 
     private var watchedAccounts: Set<String>? = null
 
@@ -207,13 +209,15 @@ internal class DeviceLinkRequestWatcher(
         }
     }
 
-    /** Re-reads the one profile [event] concerns, when it is a link change for a watched profile. */
-    suspend fun onEvent(
-        event: MarmotEventFfi,
-        accounts: List<String>,
-    ) {
-        val account = (event as? MarmotEventFfi.DeviceLinkChanged)?.accountLabel?.takeIf { it in accounts } ?: return
-        reread(account)
+    /** Removes the wiped profile and retires reads started before the wipe. */
+    fun forgetAccount(accountRef: String) {
+        attempts?.forget(accountRef)
+        unanswered = unanswered - accountRef
+        records?.unanswered?.write(unanswered)
+        accepted = accepted + (accountRef to (accepted[accountRef] ?: 0L) + 1L)
+        watchedAccounts = watchedAccounts?.minus(accountRef)
+        successfulReads = successfulReads - accountRef
+        publish(snapshots - accountRef)
     }
 
     /**
@@ -251,12 +255,16 @@ internal class DeviceLinkRequestWatcher(
 
     /** Presents [request] because the user tapped its notice. Nothing opens while the shell is blocked. */
     fun open(request: DeviceLinkRequest) {
+        val presented = queue.presented
         queue = queue.open(request, blocked)
+        if (presented == null) queue.presented?.let { attempts?.reviewed(it) }
     }
 
     /** Puts the notice for [request] off until MDK drops it, without answering it. */
     fun dismiss(request: DeviceLinkRequest) {
-        queue = queue.dismiss(request)
+        val next = queue.dismiss(request)
+        if (queue.requests.any { it.id == request.id && it.open }) attempts?.reviewed(request)
+        queue = next
     }
 
     /** Closes the presented request without answering it; the chat list announces it again. */
@@ -275,7 +283,8 @@ internal class DeviceLinkRequestWatcher(
                 .mapValues { (_, prompts) ->
                     prompts.filterValues { historyTime - it in 0 until REPEATED_LINK_REQUEST_WINDOW_MS }
                 }.filterValues { it.isNotEmpty() }
-        if (unanswered != previous) history?.write(unanswered)
+        if (unanswered != previous) records?.unanswered?.write(unanswered)
+        watchedAccounts?.let { accounts -> attempts?.observe(next, accounts) }
         snapshots = next
         val repeated = repeatedLinkRequestAccounts(unanswered)
         val visible = deviceLinkRequests(next, repeated).filter { it.open || canPresentOutcome(it.accountRef) }
@@ -291,6 +300,15 @@ internal class DeviceLinkRequestWatcher(
         } catch (_: Throwable) {
             null
         }
+}
+
+/** Re-reads the one profile [event] concerns, when it is a link change for a watched profile. */
+internal suspend fun DeviceLinkRequestWatcher.onEvent(
+    event: MarmotEventFfi,
+    accounts: List<String>,
+) {
+    val account = (event as? MarmotEventFfi.DeviceLinkChanged)?.accountLabel?.takeIf { it in accounts } ?: return
+    reread(account)
 }
 
 /** These read counts with one more successful read of each of [accounts]. */
@@ -337,6 +355,6 @@ internal fun WhiteNoiseAppState.runtimeLinkRequests() =
             owns = { runtimeGeneration == epoch },
             canPresentOutcome = { account -> activeAccountRef == account },
             historyNowMs = System::currentTimeMillis,
-            history = DeviceLinkRequestHistory(appContext),
+            records = DeviceLinkRequestRecords(appContext),
         )
     }

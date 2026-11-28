@@ -2,12 +2,7 @@
 
 package dev.ipf.whitenoise.android.ui.devices
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -17,13 +12,11 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import dev.ipf.marmotkit.CompromiseWarningItemFfi
 import dev.ipf.marmotkit.CompromiseWarningReasonFfi
-import dev.ipf.marmotkit.SignInResponseFfi
 import dev.ipf.marmotkit.UnrecognizedSignInFfi
 import dev.ipf.marmotkit.UnrecognizedSignInStateFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.state.SignInListState
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.settings.SettingsAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsCallout
 import dev.ipf.whitenoise.android.ui.settings.SettingsExplainer
@@ -31,7 +24,6 @@ import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.settings.SettingsLink
 import dev.ipf.whitenoise.android.ui.settings.SettingsSection
-import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import java.time.format.FormatStyle
 
 internal const val SIGN_INS_CHECK_TAG = "sign_ins.check"
@@ -40,15 +32,21 @@ internal const val SIGN_INS_START_FRESH_TAG = "sign_ins.start_fresh"
 internal const val SIGN_IN_REJECT_TAG = "sign_in.reject"
 internal const val SIGN_IN_NOT_NOW_TAG = "sign_in.not_now"
 internal const val SIGN_IN_DISMISS_TAG = "sign_in.dismiss"
+internal const val SIGN_IN_MINE_TAG = "sign_in.mine"
+internal const val SIGN_IN_CLOSE_TAG = "sign_in.close"
 internal const val COMPROMISE_WARNING_TAG = "devices.compromise_warning"
 internal const val COMPROMISE_WARNING_DISMISS_TAG = "devices.compromise_warning.dismiss"
 
-/** What the review section needs: the sign-ins, the open warning, whether this device started fresh, and busyness. */
+/**
+ * What the review section needs: the sign-ins, the open warning, whether this device started fresh, busyness, and
+ * the sign-ins answered Mine, don't link on this device.
+ */
 internal data class SignInReviewState(
     val list: SignInListState = SignInListState(),
     val warning: List<CompromiseWarningItemFfi> = emptyList(),
     val startedFresh: Boolean = false,
     val busy: Boolean = false,
+    val mine: Set<String> = emptySet(),
 )
 
 /** What the review section can ask its owner to do. */
@@ -70,19 +68,18 @@ internal fun compromiseWarningText(reason: CompromiseWarningReasonFfi): Int =
     }
 
 /**
- * The open compromise warning, one sentence per distinct reason, with the action that marks it seen. The wording
- * never claims the account's devices stopped anything, and marking it seen is described as hiding it here only.
+ * The open compromise warning: one sentence per distinct reason, what the key can still do, and what to do about it,
+ * with the action that hides it here. The wording never claims the account's devices stopped anything, and hiding is
+ * described as affecting this device only.
  */
 internal fun LazyListScope.compromiseWarning(
     state: SignInReviewState,
     onDismiss: () -> Unit,
 ) {
     if (state.warning.isEmpty()) return
-    val reasons = state.warning.map { it.reason }.distinct()
     item(key = "warning") {
-        val text = reasons.map { stringResource(compromiseWarningText(it)) }.joinToString("\n\n")
         SettingsCallout(
-            text = text,
+            text = compromiseWarningBody(state.warning, steps = true),
             title = stringResource(R.string.compromise_warning_title),
             isError = true,
             modifier = Modifier.testTag(COMPROMISE_WARNING_TAG).semantics { liveRegion = LiveRegionMode.Polite },
@@ -143,12 +140,14 @@ internal fun LazyListScope.signInReview(
             }
             state.list.signIns.forEach { signIn ->
                 row(signIn.slotIdHex) { context ->
+                    val mine = signIn.slotIdHex in state.mine
+                    val lines = listOfNotNull(signInWhen(signIn)) + signInSummary(signIn, mine)
                     SettingsLink(
                         context = context,
-                        title = signIn.client.ifBlank { stringResource(R.string.sign_in_unknown_client) },
+                        title = lines.first(),
                         onClick = { actions.onOpen(signIn) },
                         modifier = Modifier.testTag("sign_ins.row.${signIn.slotIdHex}"),
-                        subtitle = signInSummary(signIn).joinToString("\n"),
+                        subtitle = lines.drop(1).joinToString("\n"),
                         enabled = !state.busy,
                         leading = { SettingsLeadingIcon(R.drawable.ic_device) },
                     )
@@ -181,24 +180,43 @@ internal fun offersStartFresh(state: SignInReviewState): Boolean =
     !state.startedFresh &&
         state.list.signIns.any { it.beforeThisDevice && it.state == UnrecognizedSignInStateFfi.PROMPT }
 
-/** The lines under a sign-in: when it appeared or was last seen, whether it is still signed in, and its state. */
+/** When a sign-in appeared, or was last seen for one from before this device; null when MDK gave no usable stamp. */
 @Composable
-internal fun signInSummary(signIn: UnrecognizedSignInFfi): List<String> =
-    buildList {
-        if (signIn.beforeThisDevice) {
-            signInDate(signIn.lastSeenAt)?.let { add(stringResource(R.string.sign_in_last_seen, it)) }
-        } else {
-            signInDate(signIn.appearedAt)?.let { add(stringResource(R.string.sign_in_appeared, it)) }
-        }
-        if (!signIn.signedIn) add(stringResource(R.string.sign_in_signed_out))
-        signInStateLabel(signIn.state)?.let { add(stringResource(it)) }
+internal fun signInWhen(signIn: UnrecognizedSignInFfi): String? =
+    if (signIn.beforeThisDevice) {
+        signInDate(signIn.lastSeenAt)?.let { stringResource(R.string.sign_in_last_seen, it) }
+    } else {
+        signInDate(signIn.appearedAt)?.let { stringResource(R.string.sign_in_appeared, it) }
     }
 
-/** The state line for a sign-in, or null while it simply waits for an answer. */
-internal fun signInStateLabel(state: UnrecognizedSignInStateFfi): Int? =
+/**
+ * The lines after a sign-in's time: the app it says it is, as a claim, whether it is still signed in, and its state.
+ * The app name is written by whoever published the sign-in, so it is never shown as a fact or a title.
+ */
+@Composable
+internal fun signInSummary(
+    signIn: UnrecognizedSignInFfi,
+    mine: Boolean = false,
+): List<String> =
+    buildList {
+        val claim = signInClientClaim(signIn.client)
+        if (claim != null) {
+            add(stringResource(R.string.sign_in_claim, claim))
+        } else {
+            add(stringResource(R.string.sign_in_unknown_client))
+        }
+        if (!signIn.signedIn) add(stringResource(R.string.sign_in_signed_out))
+        signInStateLabel(signIn.state, mine)?.let { add(stringResource(it)) }
+    }
+
+/** The state line for a sign-in, or null while it simply waits for an answer. [mine] marks Mine, don't link. */
+internal fun signInStateLabel(
+    state: UnrecognizedSignInStateFfi,
+    mine: Boolean = false,
+): Int? =
     when (state) {
-        UnrecognizedSignInStateFfi.PROMPT -> null
-        UnrecognizedSignInStateFfi.NOT_NOW -> R.string.sign_in_not_now_state
+        UnrecognizedSignInStateFfi.PROMPT -> if (mine) R.string.sign_in_mine_state else null
+        UnrecognizedSignInStateFfi.NOT_NOW -> if (mine) R.string.sign_in_mine_state else R.string.sign_in_not_now_state
         UnrecognizedSignInStateFfi.LINKED_ELSEWHERE -> R.string.sign_in_linked_elsewhere
         UnrecognizedSignInStateFfi.REJECTED_ELSEWHERE -> R.string.sign_in_rejected_elsewhere
     }
@@ -214,10 +232,10 @@ internal enum class SignInAnswerChoice {
     /** Another device answered: only ending the prompt here is offered. */
     DismissOnly,
 
-    /** It was signed in before this device: the user can only put it off (or link from it, or start fresh). */
-    NotNowOnly,
+    /** It was signed in before this device: the user can put it off or say they don't recognize it. */
+    NotNowOrDontRecognize,
 
-    /** A new sign-in: the user can put it off or say it was not them. */
+    /** A new sign-in: the user can put it off, call it theirs without linking it, or say it was not them. */
     NotNowOrReject,
 }
 
@@ -226,73 +244,6 @@ internal fun signInAnswerChoice(signIn: UnrecognizedSignInFfi): SignInAnswerChoi
     when {
         signIn.state == UnrecognizedSignInStateFfi.LINKED_ELSEWHERE ||
             signIn.state == UnrecognizedSignInStateFfi.REJECTED_ELSEWHERE -> SignInAnswerChoice.DismissOnly
-        signIn.beforeThisDevice -> SignInAnswerChoice.NotNowOnly
+        signIn.beforeThisDevice -> SignInAnswerChoice.NotNowOrDontRecognize
         else -> SignInAnswerChoice.NotNowOrReject
     }
-
-/**
- * Reviews one sign-in. Not now, This wasn't me and Dismiss are separate buttons that send separate answers, and
- * closing the dialog with Back or a tap outside sends none. This wasn't me says what it records and what it does
- * not do before it is pressed.
- */
-@Composable
-internal fun SignInReviewDialog(
-    signIn: UnrecognizedSignInFfi,
-    onAnswer: (SignInResponseFfi) -> Unit,
-    onClose: () -> Unit,
-) {
-    val choice = signInAnswerChoice(signIn)
-    val question = if (signIn.beforeThisDevice) R.string.sign_in_question_before else R.string.sign_in_question_new
-    WhiteNoiseAlertDialog(
-        onDismissRequest = onClose,
-        title = { Text(stringResource(question)) },
-        text = { SignInReviewText(signIn, choice) },
-        confirmButton = {
-            when (choice) {
-                SignInAnswerChoice.DismissOnly ->
-                    TextButton(
-                        onClick = { onAnswer(SignInResponseFfi.DISMISS) },
-                        modifier = Modifier.testTag(SIGN_IN_DISMISS_TAG),
-                    ) { Text(stringResource(R.string.sign_in_dismiss)) }
-                SignInAnswerChoice.NotNowOnly ->
-                    TextButton(
-                        onClick = { onAnswer(SignInResponseFfi.NOT_NOW) },
-                        modifier = Modifier.testTag(SIGN_IN_NOT_NOW_TAG),
-                    ) { Text(stringResource(R.string.link_request_not_now)) }
-                SignInAnswerChoice.NotNowOrReject ->
-                    TextButton(
-                        onClick = { onAnswer(SignInResponseFfi.REJECT) },
-                        modifier = Modifier.testTag(SIGN_IN_REJECT_TAG),
-                    ) { Text(stringResource(R.string.sign_in_reject), color = MaterialTheme.colorScheme.error) }
-            }
-        },
-        dismissButton = {
-            if (choice == SignInAnswerChoice.NotNowOrReject) {
-                TextButton(
-                    onClick = { onAnswer(SignInResponseFfi.NOT_NOW) },
-                    modifier = Modifier.testTag(SIGN_IN_NOT_NOW_TAG),
-                ) { Text(stringResource(R.string.link_request_not_now)) }
-            } else {
-                TextButton(onClick = onClose) { Text(stringResource(R.string.close)) }
-            }
-        },
-    )
-}
-
-/** The dialog's body: the sign-in's facts, what the question means, and what This wasn't me records. */
-@Composable
-private fun SignInReviewText(
-    signIn: UnrecognizedSignInFfi,
-    choice: SignInAnswerChoice,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related)) {
-        Text(signIn.client.ifBlank { stringResource(R.string.sign_in_unknown_client) })
-        signInSummary(signIn).forEach { Text(it) }
-        if (choice != SignInAnswerChoice.DismissOnly) {
-            val detail = if (signIn.beforeThisDevice) R.string.sign_in_detail_before else R.string.sign_in_detail_new
-            Text(stringResource(detail))
-        }
-        if (signIn.previouslyLinkedHere) Text(stringResource(R.string.sign_in_previously_linked))
-        if (choice == SignInAnswerChoice.NotNowOrReject) Text(stringResource(R.string.sign_in_reject_confirm))
-    }
-}

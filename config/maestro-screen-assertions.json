@@ -2207,6 +2207,13 @@
       "second_device": ["SET-075"]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/CompromiseAlert.kt",
+      "symbol": "CompromiseAlert",
+      "bindings": [],
+      "remaining": "Showing the compromise alert requires a native warning. SET-078 covers the alert, follow-up actions and dismissal.",
+      "second_device": ["SET-078"]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestHost.kt",
       "symbol": "ActiveProfileLinkRequest",
       "bindings": [],
@@ -7155,7 +7162,7 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewDialog.kt",
       "symbol": "SignInReviewDialog",
       "bindings": [],
       "remaining": "This surface opens only for an account with a second installation or linked device, which the single-emulator runner cannot provide. Its states and actions are covered by JVM tests and the linked-devices manual scenarios; add a direct assertion when the runner can seed a second device.",

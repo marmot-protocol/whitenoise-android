@@ -133,8 +133,8 @@
     <string name="sign_in_signed_out">Artık oturum açık değil</string>
     <string name="sign_in_question_new">Bu siz miydiniz?</string>
     <string name="sign_in_question_before">Bu cihaz hâlâ sizde mi?</string>
-    <string name="sign_in_detail_new">Birisi başka bir cihazda oturum açtı. Sizseniz o cihazı bağlayabilirsiniz. Siz değilseniz “Bu ben değildim” seçeneğine dokunun.</string>
-    <string name="sign_in_detail_before">Bu cihaz, hesapta bundan önce oturum açmıştı. Hâlâ sizdeyse bu cihazı oradan bağlayın. Değilse sıfırdan başlayabilirsiniz.</string>
+    <string name="sign_in_detail_new">Birisi başka bir cihazda oturum açtı. Sizseniz o cihazı bağlayabilirsiniz. Bağlamak istemediğiniz kendi uygulamanızsa “Benim, bağlama” seçeneğine dokunun. Siz değilseniz “Bu ben değildim” seçeneğine dokunun.</string>
+    <string name="sign_in_detail_before">Bu cihaz, hesapta bundan önce oturum açmıştı. Hâlâ sizdeyse bu cihazı oradan bağlayın ya da sıfırdan başlayın. Tanımıyorsanız “Bunu tanımıyorum” seçeneğine dokunun.</string>
     <string name="sign_in_previously_linked">Daha önce burada bağlanan bir cihaz, bu cihazın geçerli listesinde yok. Bağlantıyı denetlemek için iki cihazı da açın.</string>
     <string name="sign_in_reject">Bu ben değildim</string>
     <string name="sign_in_reject_confirm">Bu oturum açma işlemi tüm cihazlarınızda size ait değil olarak işaretlenir ve bir güvenlik uyarısı gösterilir. Cihazın oturumu açık kalır ve anahtarınız değişmez.</string>
@@ -146,10 +146,10 @@
     <string name="start_fresh_title">Hayır, sıfırdan başla</string>
     <string name="start_fresh_detail">Şimdilik bu cihazı tek başına kullanın. Daha önce oturum açtığınız cihazlardan biriyle bu cihazı daha sonra bağlayabilirsiniz.</string>
     <string name="started_fresh_note">Bu cihaz sıfırdan başladı. Burada yalnızca bundan sonra davet edildiğiniz sohbetler görünür.</string>
-    <string name="compromise_warning_title">Güvenlik uyarısı</string>
-    <string name="compromise_warning_rejected">Bu hesaba yapılan bir oturum açma size ait değil olarak işaretlendi. Başka biri bu hesabın anahtarına veya imzalayıcısıyla bir oturuma sahip olabilir.</string>
-    <string name="compromise_warning_foreign_key">Bu cihaz kendi yuvasında oluşturmadığı davet anahtarları buldu ve onları değiştirdi. Başka biri bu hesabın anahtarına veya imzalayıcısıyla bir oturuma sahip olabilir.</string>
-    <string name="compromise_warning_dismiss">Görüldü olarak işaretle</string>
+    <string name="compromise_warning_title">Gizli anahtarınız başka birinde olabilir</string>
+    <string name="compromise_warning_rejected">Bu hesaptaki bir oturum açma sizin değil olarak işaretlendi.</string>
+    <string name="compromise_warning_foreign_key">Bu cihaz kendi yuvasında oluşturmadığı davet anahtarları buldu.</string>
+    <string name="compromise_warning_dismiss">Bu cihazda gizle</string>
     <string name="compromise_warning_dismiss_detail">Bu uyarıyı yalnızca bu cihazda gizler. Bir cihazı kaldırmaz, bir oturum açmayı reddetmez ve anahtarınızı güvenceye almaz.</string>
     <string name="device_move_section">Bu cihaz taşınıyor</string>
     <string name="device_move_waiting">Diğer cihazların eklemesi bekleniyor</string>
@@ -187,4 +187,29 @@
     <string name="unlinked_remove_sign_in_detail">Bu cihazın bağlantısı kesildi. Bu profilin sohbetleri ve verileri bu cihazdan silinsin ve girdiğiniz anahtarla oturum açılsın mı? Diğer cihazlarınızdaki veriler korunur.</string>
     <string name="invite_decline_wait_for_sync">Sohbet eşitlendikten sonra Reddet seçeneğine yeniden dokunun.</string>
     <string name="invite_decline_check_delivery">Son grup değişikliği tüm aktarıcılara ulaşmadı. Yeniden denemeden önce bu sohbette teslimat uyarısı olup olmadığını kontrol edin.</string>
+    <string name="sign_in_claim">Kendini şöyle tanıtıyor: %1$s</string>
+    <string name="sign_in_mine">Benim, bağlama</string>
+    <string name="sign_in_mine_state">Sizin, bağlı değil</string>
+    <string name="sign_in_dont_recognize">Bunu tanımıyorum</string>
+    <string name="compromise_warning_explainer">Anahtarınız her yerde oturum açabilir ve değiştirilemez ya da iptal edilemez. White Noise bilinmeyen cihazları bağlı cihazlarınızın dışında tutar ama onları dışarıda bırakamaz.</string>
+    <string name="compromise_warning_steps_title">Ne yapmalı</string>
+    <string name="compromise_warning_step_remove">1. Tanımadığınız tüm cihazları kaldırın.</string>
+    <string name="compromise_warning_step_signer">2. İmzalama uygulaması kullanıyorsanız orada tanımadığınız uygulamaları kaldırın.</string>
+    <string name="compromise_warning_step_move">3. Yeni bir hesaba geçin. Kişilerinizin onu eklemesi gerekecek.</string>
+    <string name="compromise_alert_review">Cihazları incele</string>
+    <string name="compromise_warning_hide_failed">Uyarı gizlenemedi. Tekrar deneyin.</string>
+    <string name="sign_in_alert_review_banner">Bağlamadığınız bir cihaz hesabınızda oturum açtı. Sizin olup olmadığını kontrol edin.</string>
+    <string name="sign_in_alert_review_action">İncele</string>
+    <string name="sign_in_alert_badge_review">İncelenecek oturum açma</string>
+    <string name="sign_in_alert_badge_compromise">Güvenlik uyarısı</string>
+    <string name="sign_in_alert_review_body">Bağlamadığınız bir cihaz hesabınızda oturum açtı. Sizin olup olmadığını kontrol etmek için White Noise’u açın.</string>
+    <string name="sign_in_alert_review_public">İncelenecek oturum açma</string>
+    <string name="sign_in_alert_compromise_body">Ne olduğunu ve ne yapmanız gerektiğini görmek için White Noise’u açın.</string>
+    <string name="sign_in_alert_compromise_public">Güvenlik kontrolü gerekiyor</string>
+    <string name="device_detail_remove_stolen">Bu cihaz kaybolduysa veya çalındıysa, onu elinde tutan kişide anahtarınız hâlâ olabilir.</string>
+    <plurals name="sign_in_alert_review_title">
+        <item quantity="one">İncelenecek yeni oturum açma</item>
+        <item quantity="other">İncelenecek %d yeni oturum açma</item>
+    </plurals>
+    <string name="link_request_expired_attempt">Bir cihaz %1$s tarihinde bağlanmayı denedi.</string>
 </resources>

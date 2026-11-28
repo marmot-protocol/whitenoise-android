@@ -1652,6 +1652,9 @@
     <string name="notification_channel_app_updates">應用程式更新</string>
     <string name="notification_channel_app_updates_global">應用程式更新 · 整個應用程式</string>
     <string name="notification_channel_app_updates_global_description">White Noise 應用程式更新的 Android 提醒方式</string>
+    <string name="notification_channel_account_security">帳號安全</string>
+    <string name="notification_channel_account_security_global">帳號安全 · 整個應用程式</string>
+    <string name="notification_channel_account_security_global_description">未知登入和安全警告的 Android 提醒方式</string>
 
     <string name="chat_bubble_colors">聊天氣泡顏色</string>
     <string name="custom_emoji">自訂表情</string>

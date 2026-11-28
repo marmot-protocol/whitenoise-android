@@ -1683,6 +1683,9 @@
     <string name="notification_channel_app_updates">App-Updates</string>
     <string name="notification_channel_app_updates_global">App-Updates · App-weit</string>
     <string name="notification_channel_app_updates_global_description">Android-Benachrichtigungsverhalten für White-Noise-App-Updates</string>
+    <string name="notification_channel_account_security">Kontosicherheit</string>
+    <string name="notification_channel_account_security_global">Kontosicherheit · App-weit</string>
+    <string name="notification_channel_account_security_global_description">Android-Benachrichtigungsverhalten für unbekannte Anmeldungen und Sicherheitswarnungen</string>
 
     <string name="chat_bubble_colors">Farben der Chatblasen</string>
     <string name="custom_emoji">Eigene Emoji</string>
