@@ -71,6 +71,7 @@ class SignInAlertNotifierTest {
         assertEquals(1, notification.number)
         assertTrue(notification.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
         assertFalse(notification.wasBuiltSilent())
+        assertNull(notification.sortKey)
 
         manager.cancelAll()
 

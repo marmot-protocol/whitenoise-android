@@ -36,8 +36,7 @@ internal class SignInAlertNotifier(
         count: Int,
         alert: Boolean,
     ): Boolean {
-        val live = if (alert) null else liveReview(accountRef)
-        if (!notificationPermissionGranted(context) || (!alert && live == null)) return false
+        if (!notificationPermissionGranted(context) || (!alert && liveReview(accountRef) == null)) return false
         val title = context.resources.getQuantityString(R.plurals.sign_in_alert_review_title, count, count)
         val body = context.getString(R.string.sign_in_alert_review_body)
         val channel = NotificationChannelSpec.SIGN_IN_REVIEW
@@ -48,8 +47,8 @@ internal class SignInAlertNotifier(
                 .setNumber(count)
                 .setStyle(NotificationCompat.BigTextStyle().bigText(body))
                 .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setOnlyAlertOnce(!alert)
                 .setPublicVersion(publicVersion(R.string.sign_in_alert_review_public, channel))
-        if (live != null) review.quietWrite(replaceCurrentMessage = false, notificationId = REVIEW_ID, liveCard = live)
         return post(REVIEW_TAG, accountRef, review.build())
     }
 
