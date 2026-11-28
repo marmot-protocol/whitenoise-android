@@ -111,19 +111,30 @@ An HTTP success response or “Ready to share” status is not evidence of persi
    emulator. Create a synthetic account, finish setup, and grant sharing in the
    Help Improve White Noise sheet on Chats. Create a group, add a synthetic
    member, and send one message. Background the app and resume it so MDK flushes
-   its aggregate window. Note the UTC time window and the synthetic group size.
-   Send the operator the build details and time window; do not send the account key.
-   The operator confirms that `mdk_session_started` and at least one of
+   its aggregate window. Note the UTC start and end of the test and the synthetic
+   group size. MDK stamps summaries with the start of their 15-minute window, so
+   a 17:08 action persists as 17:00. Give the operator the build details and the
+   test interval widened to the start of every 15-minute window it overlaps; do
+   not send the account key. The operator confirms that `mdk_session_started` and at least one of
    `mdk_onboarding_step`, `mdk_account_summary` or `mdk_group_summary` persisted
    in the staging application with Android platform, the expected app version,
    and only catalogue properties.
-4. **Consent.** On the same install, revoke sharing, repeat one group action,
-   relaunch, then regrant and repeat it again. Separately, decline on a fresh
-   synthetic install. The operator confirms that no events from the revoked or
-   declined periods appear in a later batch. Run `HostTimingConsentDeviceTest`
-   on a disposable emulator for the registry-expansion and renewed-consent cases.
+4. **Consent.** Run each phase in its own 15-minute window, during a period
+   with no other staging testing, and record each window in UTC:
+   - On the same install, revoke sharing, repeat one group action and relaunch.
+     In the next window, regrant, repeat the action, and background the app.
+   - On a fresh synthetic install, decline the sheet and perform one group
+     action. In the next window, turn on **Share usage and telemetry** in
+     Diagnostics & Improvements,
+     repeat the action, and background the app.
+
+   The operator confirms that events exist for both regrant windows and that
+   none carry the start of a revoked or declined window. Run
+   `HostTimingConsentDeviceTest` on a disposable emulator for the
+   registry-expansion and renewed-consent cases.
 5. **Production smoke.** Agree a short window with the operator first. Repeat
-   step 3 once with a synthetic account on the production build. The operator
+   step 3 once with a synthetic account on the production build, and widen the
+   query interval to the window starts as in step 3. The operator
    confirms the events persisted in the production application and that no
    staging events reached it.
 6. **Operator receipt.** The operator confirms the deployed Aptabase version,
