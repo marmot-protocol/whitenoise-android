@@ -253,7 +253,30 @@ class DisappearingMessagesPickerScreenshotTest {
         renderDefault(currentSecs = 0L, onPick = { events += "pick:$it" }, onDismiss = { events += "dismiss" })
         composeRule.onNodeWithTag(disappearingPresetTag(604_800L)).performClick()
         composeRule.mainClock.advanceTimeBy(DIALOG_EXIT_MS)
-        composeRule.runOnIdle { assertEquals(listOf("pick:604800"), events) }
+        composeRule.runOnIdle { assertEquals(listOf("pick:604800", "dismiss"), events) }
+    }
+
+    /** Tapping the current value only closes, and still releases the owner so the dialog can open again. */
+    @Test
+    fun defaultDialogUnchangedPickOnlyCloses() {
+        val events = mutableListOf<String>()
+        renderDefault(currentSecs = 0L, onPick = { events += "pick:$it" }, onDismiss = { events += "dismiss" })
+        composeRule.onNodeWithTag(disappearingPresetTag(0L)).performClick()
+        composeRule.mainClock.advanceTimeBy(DIALOG_EXIT_MS)
+        composeRule.runOnIdle { assertEquals(listOf("dismiss"), events) }
+    }
+
+    /** System Back on the Custom editor returns to the rows and keeps the dialog open. */
+    @Test
+    fun defaultDialogSystemBackLeavesCustomForTheRows() {
+        var dismissed = false
+        renderDefault(currentSecs = 0L, onDismiss = { dismissed = true })
+        composeRule.onNodeWithTag(DISAPPEARING_CUSTOM_ACTION_TAG).performClick()
+        composeRule.onNodeWithTag(DISAPPEARING_CUSTOM_PAGE_TAG).assertIsDisplayed()
+        Espresso.pressBack()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(DISAPPEARING_CUSTOM_ACTION_TAG).assertIsDisplayed()
+        composeRule.runOnIdle { assertTrue(!dismissed) }
     }
 
     /** Custom swaps the rows for the shared controls in the same dialog, Back returns, and Set applies the value. */

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -120,7 +121,22 @@ internal fun RelaysScreen(
             // Lists still loading show the page's frame; loaded lists without the relay return to the list.
             LaunchedEffect(lists, busy) { if (lists != null && !busy) currentOnBack() }
             SettingsScaffold(title = stringResource(R.string.relay), onBack = onBack) {
-                CircularProgressIndicator(Modifier.padding(WhiteNoiseSpacing.Section).testTag("relay.details.loading"))
+                val failed = publication.failed
+                if (lists == null && failed != null && !busy) {
+                    // A failed first load would otherwise spin forever, so the page offers the list's Retry.
+                    TextButton(
+                        onClick = {
+                            runPublication(RelayPublicationOperation.Refresh) {
+                                account?.let { appState.loadAccountRelayLists(it) }
+                            }
+                        },
+                        modifier = Modifier.padding(WhiteNoiseSpacing.Section).testTag("relay.details.retry"),
+                    ) { Text(stringResource(R.string.retry)) }
+                } else {
+                    CircularProgressIndicator(
+                        Modifier.padding(WhiteNoiseSpacing.Section).testTag("relay.details.loading"),
+                    )
+                }
             }
             return
         } else {

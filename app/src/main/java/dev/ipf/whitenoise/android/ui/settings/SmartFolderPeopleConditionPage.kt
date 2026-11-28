@@ -83,6 +83,8 @@ internal fun SmartFolderPeopleConditionPage(
         origin = null,
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+        // Playback-source navigation would leave the page without the discard prompt, so it waits for no changes.
+        onSourceDismiss = onDismiss.takeIf { !changed },
         dismissEnabled = { !changed },
     ) {
         val surface = this

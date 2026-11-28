@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.group
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -26,8 +27,9 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
  * The account's default disappearing timer in Settings. It is a short, familiar Settings list, so it is the radio
  * choice dialog from docs/ui-patterns.md, not the chat's sheet: Off and every preset are radio rows, a tap applies
  * the duration and closes, and Cancel or Back keeps the current default. Custom swaps the rows for the shared
- * custom-duration controls in the same dialog, where Set applies and Back returns to the list, so no second dialog
- * opens. New chats take the default, so nothing already sent changes and no consequence warning is needed.
+ * custom-duration controls in the same dialog, where Set applies and Back (the button or system Back) returns to the
+ * list, so no second dialog opens. [onDismiss] follows every close, picked or not, so the owner can open it again.
+ * New chats take the default, so nothing already sent changes and no consequence warning is needed.
  */
 @Suppress("FunctionNaming", "LongMethod")
 @Composable
@@ -40,8 +42,16 @@ internal fun DefaultDisappearingTimerDialog(
     var custom by rememberSaveable(currentSecs) { mutableStateOf(false) }
     val customState = rememberDisappearingCustomState(currentSecs.takeIf { it > 0L } ?: DEFAULT_CUSTOM_START_SECS)
     val isCustom = currentSecs !in disappearingPresetSecs
+
+    /** Applies a changed duration, then always releases the dialog's owner, even when nothing changed. */
+    fun pickAndClose(secs: Long) {
+        if (secs != currentSecs) onPick(secs)
+        onDismiss()
+    }
     WhiteNoiseAlertDialog(
-        onDismissRequest = { if (custom) custom = false else onDismiss() },
+        onDismissRequest = onDismiss,
+        // While Custom is open, Back returns to the rows instead of closing the dialog.
+        dismissEnabled = { !custom },
         modifier = Modifier.testTag(DEFAULT_DISAPPEARING_DIALOG_TAG),
         title = {
             Text(stringResource(if (custom) R.string.disappearing_custom else R.string.disappearing_messages))
@@ -52,6 +62,7 @@ internal fun DefaultDisappearingTimerDialog(
                 verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
             ) {
                 if (custom) {
+                    BackHandler { custom = false }
                     Column(Modifier.testTag(DISAPPEARING_CUSTOM_PAGE_TAG)) { DisappearingCustomControls(customState) }
                 } else {
                     Text(
@@ -69,7 +80,7 @@ internal fun DefaultDisappearingTimerDialog(
                                         disappearingMessagesLabel(secs)
                                     },
                                 selected = currentSecs == secs,
-                                onClick = { close { if (secs != currentSecs) onPick(secs) } },
+                                onClick = { close { pickAndClose(secs) } },
                                 enabled = acceptsInput,
                                 modifier = Modifier.testTag(disappearingPresetTag(secs)),
                             )
@@ -94,7 +105,7 @@ internal fun DefaultDisappearingTimerDialog(
         confirmButton = {
             if (custom) {
                 TextButton(
-                    onClick = { close { if (customState.secs != currentSecs) onPick(customState.secs) } },
+                    onClick = { close { pickAndClose(customState.secs) } },
                     enabled = acceptsInput,
                     modifier = Modifier.testTag(DISAPPEARING_CUSTOM_SET_TAG),
                 ) { Text(stringResource(R.string.disappearing_set)) }

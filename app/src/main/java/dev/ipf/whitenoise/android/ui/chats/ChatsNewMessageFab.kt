@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.chats
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -19,6 +20,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
@@ -174,9 +176,16 @@ internal fun ChatsNewMessageFab(
                 onDismissRequest = close,
                 properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
             ) {
-                RelaysScreen(appState, onBack = dismiss, onFeedback = { result ->
-                    if (relayOpening === relayToken && current()) feedback = result
-                })
+                // The dialog keeps its own relay page: a row opens it in place and Back returns to the list.
+                var openRelay by rememberSaveable { mutableStateOf<String?>(null) }
+                BackHandler(enabled = openRelay != null) { openRelay = null }
+                RelaysScreen(
+                    appState,
+                    onBack = { if (openRelay != null) openRelay = null else dismiss() },
+                    onFeedback = { result -> if (relayOpening === relayToken && current()) feedback = result },
+                    selectedUrl = openRelay,
+                    onOpenRelay = { openRelay = it },
+                )
                 feedback?.let { result ->
                     ChatRelayFeedbackDialog(result, onDismiss = { feedback = null })
                 }

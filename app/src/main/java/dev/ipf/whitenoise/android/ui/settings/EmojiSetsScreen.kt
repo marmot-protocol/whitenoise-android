@@ -16,6 +16,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -136,6 +137,10 @@ internal fun EmojiSetsScreen(
             },
             onShow = { set -> if (onOpenPreview != null) onOpenPreview(set.coordinate) else controller.show(set) },
             previewPage = previewCoordinate != null,
+            onRetryPreview =
+                previewCoordinate?.let { coordinate ->
+                    { scope.launch { controller.preview(coordinate) } }
+                },
             images = images,
             onInstall = { appState.launchMutation { controller.install() } },
             onCancel = controller::cancelInstall,
@@ -159,7 +164,10 @@ private fun rememberEmojiSetImages(
         }
     }
 
-/** Pure presentation for the browser and preview, with only the editable query held in Compose. */
+/**
+ * Pure presentation for the browser and preview, with only the editable query held in Compose. On a set's own page
+ * ([previewPage]) the set's status shows until it loads, with [onRetryPreview] offered once a lookup is not running.
+ */
 @Suppress("LongParameterList")
 @Composable
 internal fun EmojiSetsContent(
@@ -174,6 +182,7 @@ internal fun EmojiSetsContent(
     profileName: String? = null,
     builtinSets: BuiltinEmojiSetChoices? = null,
     previewPage: Boolean = false,
+    onRetryPreview: (() -> Unit)? = null,
 ) {
     val title = stringResource(R.string.emoji_sets_title)
     val query = rememberTextFieldState()
@@ -203,7 +212,17 @@ internal fun EmojiSetsContent(
         val set = state.preview
         if (set == null && previewPage) {
             // A set's own page shows its loading and any failure until the set arrives, never the browser.
-            SettingsList(listTag = "emoji_sets.preview.pending") { item { EmojiSetStatus(state) } }
+            SettingsList(listTag = "emoji_sets.preview.pending") {
+                item { EmojiSetStatus(state) }
+                // A failed lookup keeps a way to try the same set again, since Refresh belongs to the browser.
+                if (onRetryPreview != null && !state.busy && !state.discovering) {
+                    item {
+                        TextButton(onClick = onRetryPreview, modifier = Modifier.testTag("emoji_sets.preview.retry")) {
+                            Text(stringResource(R.string.retry))
+                        }
+                    }
+                }
+            }
         } else if (set == null) {
             EmojiSetBrowser(state, query, onSearch, onShow, builtinSets)
         } else {

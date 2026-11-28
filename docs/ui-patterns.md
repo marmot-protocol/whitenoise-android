@@ -74,9 +74,11 @@ exception here.
 
 ### Single-choice pickers (#4094)
 
-Choose the container by what the person does with the options, then use
-Material radio rows (`RadioButton` in a selectable row) for mutually exclusive
-values, never check marks.
+Choose the container by what the person does with the options. In a list,
+dialog or page, mutually exclusive values are Material radio rows
+(`RadioButton` in a selectable row), never check marks. A value menu, such as
+the read-aloud speed or a smart-folder rule value, is the exception: its rows
+are dropdown items and the current value carries a trailing check.
 
 | Task | Material API | App component | Apply and dismiss |
 | --- | --- | --- | --- |
@@ -102,8 +104,11 @@ sheet's rows belong to #4064.
 
 | Task | Material API | App component | Apply and dismiss |
 | --- | --- | --- | --- |
-| Open a place to read or browse: Message info, a viewer, a Settings sub-page | Page with a top app bar and Back, predictive back | `SettingsScaffold` or `WhiteNoiseScaffold` with `WhiteNoiseTopBar` | The toolbar arrow and system Back return to the place that opened it. About → Developer returns to About, Help & support → Developer returns there, and a Settings search result returns to the results. |
+| Open a place to read or browse: Message info, edit history, a Settings sub-page | Page with a top app bar and Back, predictive back | `SettingsScaffold` or `WhiteNoiseScaffold` with `WhiteNoiseTopBar` | The toolbar arrow and system Back return to the place that opened it. About → Developer returns to About, Help & support → Developer returns there, and a Settings search result returns to the results. |
 | Start a task to finish or abandon: Forward, Share to, create and edit flows with staged changes | Full-screen dialog | `WhiteNoiseTopBar` with `WhiteNoiseTopBarNavigation.Close` | Selecting recipients only prepares the task. The named action (Forward) completes it. Close abandons it and returns to the conversation. |
+
+Attachment viewers are not in this row: they lead with Close, as the viewer
+chrome rule above says, because they return to the message they opened from.
 
 Settings sub-pages are destinations in the Settings navigation
 (`SettingsDetail` in `ui/navigation/AppDestinations.kt`), never content swapped
