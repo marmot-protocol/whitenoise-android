@@ -31,20 +31,11 @@ pulls_for_branch() {
   gh api --method GET "$repo_api/pulls" -f state=open -f head="${repo%%/*}:$branch"
 }
 
-refresh_draft() {
-  # A Git ref lease protects commits only. Recheck PR state and metadata independently.
-  local expected_head=$1
-  open_prs=$(pulls_for_branch) || fail 'Could not recheck the active RC pull request.'
-  if [[ -z "$pr" ]]; then
-    local current_ref
-    current_ref=$(remote_git ls-remote --heads origin "$branch_ref") ||
-      fail 'Could not verify the automation branch head.'
-    [[ "$(jq 'length' <<< "$open_prs")" == 0 && "${current_ref%%$'\t'*}" == "$expected_head" ]]
-  else
-    jq -e --argjson number "$pr" --arg base "$base" --arg head "$expected_head" \
-      'length == 1 and (.[0] | .number == $number and .draft and .base.ref == $base and .head.sha == $head)' \
-      <<< "$open_prs" > /dev/null
-  fi
+no_open_pin() {
+  # Recheck PR state independently of the Git ref lease before publishing.
+  local current_pulls
+  current_pulls=$(pulls_for_branch) || fail 'Could not recheck the active RC pull request.'
+  [[ "$(jq 'length' <<< "$current_pulls")" == 0 ]]
 }
 
 [[ -n "${GH_TOKEN:-}" ]] || fail 'Set MARMOTKIT_BUMP_TOKEN to a dedicated bot-user token (Contents and Pull requests write).'
@@ -75,8 +66,8 @@ pr=$(jq -r '.[0].number // empty' <<< "$open_prs")
 if [[ "$(jq 'length' <<< "$open_prs")" -gt 1 || -n "$pr" && "$(jq -r '.[0].base.ref' <<< "$open_prs")" != "$base" ]]; then
   fail "Resolve the existing PR from $branch before publishing."
 fi
-if [[ -n "$pr" && "$(jq -r '.[0].draft' <<< "$open_prs")" != true ]]; then
-  echo "PR #$pr is ready for review. Leaving its reviewed candidate in place."
+if [[ -n "$pr" ]]; then
+  echo "PR #$pr is open. Leaving its pin and metadata in place."
   exit 0
 fi
 
@@ -97,17 +88,10 @@ if [[ -n "$inspected" ]]; then
   fi
   if git show "$inspected:$lock_path" | cmp -s - "$proposal_lock"; then
     proposal_matches=true
-    if [[ -n "$pr" ]] && jq -er '.[0].body // ""' <<< "$open_prs" |
-      grep -Fx "Proposes MarmotKit $version on develop. The published RC metadata classifies this update as **$impact**." > /dev/null; then
-      echo "PR #$pr already proposes $version."
+    closed_prs=$(gh api --method GET "$repo_api/pulls" -f state=closed -f base="$base" -f head="${repo%%/*}:$branch")
+    if jq -e --arg commit "$inspected" 'any(.[]; .head.sha == $commit)' <<< "$closed_prs" > /dev/null; then
+      echo "A closed PR already proposed this pin. Keeping it closed."
       exit 0
-    fi
-    if [[ -z "$pr" ]]; then
-      closed_prs=$(gh api --method GET "$repo_api/pulls" -f state=closed -f base="$base" -f head="${repo%%/*}:$branch")
-      if jq -e --arg commit "$inspected" 'any(.[]; .head.sha == $commit)' <<< "$closed_prs" > /dev/null; then
-        echo "A closed PR already proposed this pin. Keeping it closed."
-        exit 0
-      fi
     fi
   fi
 fi
@@ -144,34 +128,6 @@ EOF
 fi
 printf '\n<!-- marmotkit-rc-bump:end -->\n' >> "$scratch/generated.md"
 
-prepare_pr_metadata() {
-  title="Pin MarmotKit $version on $base"
-  if [[ -z "$pr" ]]; then
-    cp "$scratch/generated.md" "$scratch/body.md"
-    return
-  fi
-  jq -j '.[0].body // ""' <<< "$open_prs" > "$scratch/old-body.md"
-  python3 - "$scratch/old-body.md" "$scratch/generated.md" "$scratch/body.md" <<'PY'
-from pathlib import Path
-import sys
-
-old, generated, output = (Path(path) for path in sys.argv[1:])
-start = "<!-- marmotkit-rc-bump:start -->"
-end = "<!-- marmotkit-rc-bump:end -->"
-old_body = old.read_text()
-before, opened, rest = old_body.partition(start)
-_, closed, after = rest.partition(end)
-if not opened or not closed or old_body.count(start) != 1 or old_body.count(end) != 1:
-    sys.exit("The PR body no longer has one generated section. Preserving it.")
-output.write_text(before + generated.read_text().rstrip("\n") + after)
-PY
-  local old_title
-  old_title=$(jq -r '.[0].title' <<< "$open_prs")
-  if [[ ! "$old_title" =~ ^Pin\ MarmotKit\ [0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+\ on\ develop$ ]]; then
-    title=$old_title
-  fi
-}
-
 commit=$inspected
 if [[ "$proposal_matches" == false ]]; then
   gh api --method POST "$repo_api/git/refs" -f ref="refs/heads/$trial" -f sha="$base_sha" > /dev/null
@@ -192,22 +148,19 @@ if [[ "$proposal_matches" == false ]]; then
     fail 'GitHub did not verify the signed pin commit under the bot user.'
 
   remote_git fetch --quiet origin "$commit"
-  if ! refresh_draft "$inspected"; then
-    echo 'The pull request changed during verification. Leaving it in place.'
+  if ! no_open_pin; then
+    echo 'An RC pull request opened during verification. Leaving it in place.'
     exit 0
   fi
-  prepare_pr_metadata
   remote_git push --force-with-lease="$branch_ref:$inspected" origin "$commit:$branch_ref"
 fi
 
-if ! refresh_draft "$commit"; then
-  echo 'The pull request changed after verification. Leaving its metadata in place.'
+if ! no_open_pin; then
+  echo 'An RC pull request is already open. Leaving it in place.'
   exit 0
 fi
-prepare_pr_metadata
-if [[ -n "$pr" ]]; then
-  gh api --method PATCH "$repo_api/pulls/$pr" -f title="$title" -F body=@"$scratch/body.md" --jq .html_url
-else
-  gh api --method POST "$repo_api/pulls" -f head="$branch" -f base="$base" -f title="$title" \
-    -F body=@"$scratch/body.md" -F draft=true --jq .html_url
-fi
+current_ref=$(remote_git ls-remote --heads origin "$branch_ref") ||
+  fail 'Could not verify the automation branch head.'
+[[ "${current_ref%%$'\t'*}" == "$commit" ]] || fail 'The automation branch changed before opening the draft.'
+gh api --method POST "$repo_api/pulls" -f head="$branch" -f base="$base" -f title="Pin MarmotKit $version on $base" \
+  -F body=@"$scratch/generated.md" -F draft=true --jq .html_url

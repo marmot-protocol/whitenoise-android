@@ -89,9 +89,10 @@ A Stable pin uses a final `X.Y.Z` release and its matching Android
 archive. Published RC pins are eligible for validation on `develop`.
 
 The scheduled MarmotKit RC bump runs from `develop`, the default branch, and
-prepares the next Android pin from its current checkout. It opens or refreshes one draft
-PR from `automation/marmotkit-rc` to `develop`. It preserves human commits
-and ready-for-review candidates. Reruns with the same pin leave the PR alone.
+prepares the next Android pin from its current checkout. It opens one draft PR
+from `automation/marmotkit-rc` to `develop`. While that PR is open, its pin,
+title, and description stay fixed. After it closes, the workflow can propose a
+newer RC. It preserves human commits on the automation branch.
 
 Configure the repository secret `MARMOTKIT_BUMP_TOKEN` with a dedicated bot user's
 fine-grained token that can write Contents and Pull requests in this repository. This lets the

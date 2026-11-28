@@ -32,14 +32,17 @@ case "$1 $2" in
         if [[ "$5 $6" == '-f state=open' && -f "$MOCK_DIR/open.json" ]]; then
           tip=$(bare rev-parse "$managed")
           jq --arg head "$tip" '.[0].head.sha = $head' "$MOCK_DIR/open.json"
+        elif [[ "$5 $6" == '-f state=closed' && -f "$MOCK_DIR/closed.json" ]]; then
+          cat "$MOCK_DIR/closed.json"
+        else
+          echo '[]'
           if [[ -f "$MOCK_DIR/race-after-read" ]]; then
+            tip=$(bare rev-parse "$managed")
             human=$(bare commit-tree "$tip^{tree}" -p "$tip" -m 'Adapt Android call sites')
             bare update-ref "$managed" "$human" "$tip"
             printf '%s\n' "$human" > "$MOCK_DIR/human-oid"
             rm -f "$MOCK_DIR/race-after-read"
           fi
-        else
-          echo '[]'
         fi
         ;;
       "POST $repo/git/refs")
@@ -51,12 +54,6 @@ case "$1 $2" in
         jq -n --arg title "${10#title=}" --rawfile body "${12#body=@}" \
           '[{number:42,base:{ref:"develop"},draft:true,title:$title,body:$body}]' > "$MOCK_DIR/open.json"
         cp "${12#body=@}" "$MOCK_DIR/pr-body"
-        ;;
-      "PATCH $repo/pulls/42")
-        jq --arg title "${6#title=}" --rawfile body "${8#body=@}" '.[0] |= (.title = $title | .body = $body)' \
-          "$MOCK_DIR/open.json" > "$MOCK_DIR/edit.json"
-        mv "$MOCK_DIR/edit.json" "$MOCK_DIR/open.json"
-        cp "${8#body=@}" "$MOCK_DIR/pr-body"
         ;;
       "DELETE $repo/git/refs/heads/"*)
         bare update-ref -d "refs/heads/${4#"$repo/git/refs/heads/"}"
@@ -84,10 +81,8 @@ case "$1 $2" in
     if [[ -f "$MOCK_DIR/concurrent-push" && "$commit" != "$(bare rev-parse "$managed")" ]]; then
       mv "$MOCK_DIR/concurrent-push" "$MOCK_DIR/race-after-read"
     fi
-    if [[ -f "$MOCK_DIR/ready-during-signing" && "$commit" != "$(bare rev-parse "$managed")" ]]; then
-      jq '.[0].draft = false' "$MOCK_DIR/open.json" > "$MOCK_DIR/edit.json"
-      mv "$MOCK_DIR/edit.json" "$MOCK_DIR/open.json"
-      rm -f "$MOCK_DIR/ready-during-signing"
+    if [[ -f "$MOCK_DIR/reopen-during-signing" && "$commit" != "$(bare rev-parse "$managed")" ]]; then
+      mv "$MOCK_DIR/reopen-during-signing" "$MOCK_DIR/open.json"
     fi
     if [[ ! -f "$MOCK_DIR/human-oid" || "$commit" != "$(cat "$MOCK_DIR/human-oid")" ]]; then
       echo fixture-publisher
@@ -108,6 +103,7 @@ git -C work -c commit.gpgsign=false commit --quiet -m Stable
 git -C work push --quiet origin develop
 git -C work rev-parse HEAD > proposal/base.txt
 
+# Writes a verified proposal fixture for one published RC.
 write_proposal() {
   jq -n --arg version "$1" '{
     version:$version, impact:"minor",
@@ -118,7 +114,9 @@ write_proposal() {
   echo "artifact-id=$1" > proposal/MARMOT_VERSION
 }
 
+# Runs the publisher against the isolated bare remote and mock GitHub API.
 publish() { (cd work && bash "$script" "$scratch/proposal"); }
+# Reads the exact revision that an open test PR would reference.
 remote_tip() { git --git-dir="$MOCK_REMOTE" rev-parse "$branch"; }
 
 write_proposal 0.20.0-rc.2
@@ -128,33 +126,52 @@ git --git-dir="$MOCK_REMOTE" show "$first:$lock" | cmp -s - proposal/MARMOT_VERS
 grep -q 'Proposes MarmotKit 0.20.0-rc.2 on develop' pr-body
 grep -q 'manifest omits its feature list' pr-body
 [[ -z "$(git --git-dir="$MOCK_REMOTE" for-each-ref 'refs/heads/automation/marmotkit-rc-run-*')" ]]
-publish | grep -q 'already proposes 0.20.0-rc.2'
+publish | grep -q 'PR #42 is open'
 [[ "$(remote_tip)" == "$first" ]]
 
 jq '.[0] |= (.body += "\nReviewed the builder flags.\n" | .title = "Android RC test")' open.json > changed.json
 mv changed.json open.json
+cp open.json expected.json
+# A newer RC leaves the head and review metadata intact even while the PR is a draft.
 write_proposal 0.20.0-rc.3
+publish | grep -q 'PR #42 is open'
+[[ "$(remote_tip)" == "$first" ]]
+cmp open.json expected.json
+
+jq '.[0].draft = false' open.json > ready.json
+cp ready.json open.json
+publish | grep -q 'PR #42 is open'
+[[ "$(remote_tip)" == "$first" ]]
+cmp open.json ready.json
+
+# A closed pin stays closed for the same RC, but a newer version can be proposed.
+jq --arg head "$first" '.[0].head.sha = $head' open.json > closed.json
+rm open.json
+write_proposal 0.20.0-rc.2
+publish | grep -q 'A closed PR already proposed this pin'
+[[ "$(remote_tip)" == "$first" && ! -f open.json ]]
+
+write_proposal 0.20.0-rc.3
+cp ready.json reopen-during-signing
+publish | grep -q 'An RC pull request opened during verification'
+[[ "$(remote_tip)" == "$first" ]]
+cmp open.json ready.json
+rm open.json
 publish
 updated=$(remote_tip)
 [[ "$updated" != "$first" ]]
 git --git-dir="$MOCK_REMOTE" show "$updated:$lock" | cmp -s - proposal/MARMOT_VERSION
-[[ "$(jq -r '.[0].title' open.json)" == 'Android RC test' ]]
-grep -q 'Reviewed the builder flags' pr-body
-
-write_proposal 0.20.0-rc.4
-touch ready-during-signing
-publish | grep -q 'pull request changed during verification'
-[[ "$(remote_tip)" == "$updated" ]]
-publish | grep -q 'ready for review'
-[[ "$(remote_tip)" == "$updated" ]]
+grep -q 'Proposes MarmotKit 0.20.0-rc.3 on develop' pr-body
 
 # A normal merge may leave the automation ref at a commit now on develop.
 git -C work push --quiet origin "$updated:refs/heads/develop"
 printf '%s\n' "$updated" > proposal/base.txt
 rm open.json
+write_proposal 0.20.0-rc.4
 publish
 integrated=$(remote_tip)
 git --git-dir="$MOCK_REMOTE" show "$integrated:$lock" | cmp -s - proposal/MARMOT_VERSION
+rm open.json
 
 write_proposal 0.20.0-rc.5
 touch concurrent-push
