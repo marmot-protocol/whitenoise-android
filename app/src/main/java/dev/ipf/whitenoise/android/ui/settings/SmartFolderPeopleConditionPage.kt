@@ -184,7 +184,10 @@ internal fun SmartFolderPeopleConditionPage(
                                             withContext(Dispatchers.IO) { resolveKey(input) }
                                                 ?.lowercase(java.util.Locale.ROOT)
                                         invalidKey = !isPubkeyHex(hex)
-                                        if (!invalidKey && hex != null && publicKey.text.toString() == input) {
+                                        // People picked while the key resolved may have reached the limit meanwhile.
+                                        val fits = hex in keys || keys.size < SmartFolderCodec.MAX_VALUES
+                                        val accepted = !invalidKey && hex != null && fits
+                                        if (accepted && publicKey.text.toString() == input) {
                                             keys = (keys + hex).distinct()
                                         }
                                         resolving = false
