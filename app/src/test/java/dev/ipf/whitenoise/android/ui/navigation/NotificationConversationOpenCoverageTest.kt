@@ -62,9 +62,10 @@ class NotificationConversationOpenCoverageTest {
         assertTrue("cancellation must precede every route-state publication", dismiss >= 0 && navigation > dismiss)
         assertTrue("pin authority is rechecked after the suspension", recheck in dismiss until navigation)
         val shellOpen = mainShellSource().between("override fun openRoutedConversation(", "override fun targetHandled")
-        val section = shellOpen.indexOf("sectionName = MainSection.Chats.name")
-        val selected = shellOpen.indexOf("selectedChat = item")
-        assertTrue("selected chat must commit last, after the section", section >= 0 && selected > section)
+        // The route owner commits the section and the selected chat together, in one event, re-lands included.
+        val commitEvent = "shellNav(ShellNavEvent.CommitNotificationRoute(routeOf(item, openContext)))"
+        assertTrue("the routed conversation must commit with the route's open context", commitEvent in shellOpen)
+        assertEquals("the open sends exactly one route event", 1, Regex("""\bshellNav\(""").findAll(shellOpen).count())
     }
 
     @Test

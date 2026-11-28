@@ -28,7 +28,7 @@ class ChatListFolderFilterNavigationCoverageTest {
         val chatsScreenWiring =
             mainShell.requiredSection(
                 start = "ChatsScreen(",
-                end = "MainSection.Settings ->",
+                end = "is ShellRoute.Settings ->",
             )
         assertTrue(
             "ChatsScreen must receive the shell-owned folder filter",

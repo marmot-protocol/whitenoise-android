@@ -33,9 +33,10 @@ import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.isUsageDiagnosticsGranted
 import dev.ipf.whitenoise.android.ui.WhiteNoiseApp
-import dev.ipf.whitenoise.android.ui.navigation.MainSection
 import dev.ipf.whitenoise.android.ui.navigation.MainShellStateHolder
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
+import dev.ipf.whitenoise.android.ui.navigation.ShellNavEvent
+import dev.ipf.whitenoise.android.ui.navigation.dispatchShellNav
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -71,8 +72,7 @@ class DevicePrivacyScreenScreenshotTest {
                 .apply { isAccessible = true }
         try {
             composeRule.runOnIdle {
-                shell.sectionState.sectionName = MainSection.Settings.name
-                shell.sectionState.settingsDetailName = SettingsDetail.DevicePrivacy.name
+                shell.dispatchShellNav(ShellNavEvent.OpenSettings(SettingsDetail.DevicePrivacy))
             }
             composeRule.onNodeWithTag("privacy.device_protection.group").assertIsDisplayed()
             repeat(3) {

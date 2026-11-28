@@ -12,6 +12,9 @@ import dev.ipf.whitenoise.android.state.WarmResumeTrace
 import dev.ipf.whitenoise.android.ui.common.FULL_SCREEN_LOADING_TEST_TAG
 import dev.ipf.whitenoise.android.ui.common.STARTUP_LOADING_TEST_TAG
 import dev.ipf.whitenoise.android.ui.common.WARM_RESUME_USEFUL_SURFACE_TEST_TAG
+import dev.ipf.whitenoise.android.ui.navigation.ConversationOpenContext
+import dev.ipf.whitenoise.android.ui.navigation.ShellNavEvent
+import dev.ipf.whitenoise.android.ui.navigation.ShellRoute
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -120,7 +123,17 @@ class FreshActivitySameProcessFirstUsefulFrameTest {
             val chats = processState.chatsController(appState.activeAccountRef, appState.runtimeGeneration)
             assumeTrue("Requires at least one local chat on the device fixture", chats.items.isNotEmpty())
             composeRule.runOnIdle {
-                processState.selectedChat.value = chats.items.first()
+                val chat = chats.items.first()
+                processState.shellNavigator.dispatch(
+                    ShellNavEvent.OpenConversation(
+                        ShellRoute.Conversation(
+                            accountRef = appState.activeAccountRef.orEmpty(),
+                            groupIdHex = chat.group.groupIdHex,
+                            open = ConversationOpenContext(),
+                            item = chat,
+                        ),
+                    ),
+                )
             }
             assertTrue(processState.selectedChat.value != null)
 

@@ -1,0 +1,21 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreenHost.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "SettingsScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreenHost.kt",
+        "anchor": "fun SettingsScreen(",
+        "test_ids": [
+          "SET-001",
+          "SET-039",
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

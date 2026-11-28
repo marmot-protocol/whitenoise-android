@@ -142,14 +142,33 @@ class MainShellShareRoutingCoverageTest {
         assertTrue("shouldCommit = { ownsShare(request.requestId) }" in source)
         assertTrue("                        ownsShare(request.requestId)" in source)
         val routeStart = "SignInDevicesRouteEffect(appState, previousActiveAccountRef) {"
+        val openAccount = "shellNav(ShellNavEvent.OpenSettings(SettingsDetail.Account))"
         val route =
             source
                 .substringAfter(routeStart, missingDelimiterValue = "")
-                .substringBefore("settingsDetailName = SettingsDetail.Account.name", missingDelimiterValue = "")
+                .substringBefore(openAccount, missingDelimiterValue = "")
 
-        val settingsIndex = route.indexOf("sectionName = MainSection.Settings.name")
+        val settingsIndex = route.length
         assertTrue(route.indexOf("clearSharePickerRequest()") in 0 until settingsIndex)
         assertTrue(route.indexOf("pendingStagedShareOpen = null") in 0 until settingsIndex)
+    }
+
+    /** The invite chooser reads the live route, so a Settings open just before staging ends wins. */
+    @Test
+    fun invitePromptChecksTheLiveSectionBeforeLaunchingTheChooser() {
+        val chatsActive =
+            mainShellSource()
+                .readText()
+                .substringAfter("val chatsActive = {", missingDelimiterValue = "")
+                .substringBefore("\n    }", missingDelimiterValue = "")
+        assertTrue(
+            "chatsActive must read the navigator's section, not a value captured by the last composition",
+            "appState.canShareFromChats(shellStateHolder.sectionState.sectionName," in chatsActive,
+        )
+        assertTrue(
+            "ChatsScreen must receive the live guard",
+            "chatsActive = chatsActive," in mainShellSource().readText(),
+        )
     }
 
     private fun mainShellSource(): File =
