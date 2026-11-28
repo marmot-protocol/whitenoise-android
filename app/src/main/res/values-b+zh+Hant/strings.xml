@@ -1670,9 +1670,18 @@
     <string name="emoji_sets_builtin_shown">預先安裝 · %1$s</string>
     <string name="emoji_sets_builtin_hidden">已從選擇器中隱藏。訊息中仍會顯示。</string>
     <string name="emoji_sets_update_available">有可用更新</string>
-    <string name="emoji_sets_load_image">載入預覽圖片</string>
-    <string name="emoji_sets_image_privacy">載入預覽或安裝表情包會向其圖片伺服器透露你的 IP 位址。</string>
-    <string name="emoji_sets_preview_host">預覽圖片伺服器：%1$s</string>
+    <string name="emoji_sets_load_emoji">載入表情符號</string>
+    <plurals name="emoji_sets_image_hosts">
+        <item quantity="other">圖片來自 %1$s。載入或安裝時，這些主機會收到你的 IP 位址。</item>
+    </plurals>
+    <plurals name="emoji_sets_more_hosts">
+        <item quantity="other">另外 %1$d 個</item>
+    </plurals>
+    <string name="emoji_sets_image_hosts_unknown">載入或安裝這些圖片時，圖片主機會收到你的 IP 位址。</string>
+    <string name="emoji_sets_untitled">未命名的表情符號組</string>
+    <string name="emoji_sets_emoji_loading">正在載入 %1$s</string>
+    <string name="emoji_sets_emoji_failed">無法載入 %1$s。</string>
+    <string name="emoji_sets_emoji_unavailable">這部裝置上沒有 %1$s。</string>
     <string name="emoji_sets_install">安裝表情包</string>
     <string name="emoji_sets_update">更新表情包</string>
     <string name="emoji_sets_check_update">檢查更新</string>

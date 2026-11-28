@@ -1695,9 +1695,20 @@
     <string name="emoji_sets_builtin_shown">Pré-instalado · %1$s</string>
     <string name="emoji_sets_builtin_hidden">Oculto no seletor. Continua aparecendo nas mensagens.</string>
     <string name="emoji_sets_update_available">Atualização disponível</string>
-    <string name="emoji_sets_load_image">Carregar imagem de prévia</string>
-    <string name="emoji_sets_image_privacy">Carregar uma prévia ou instalar um conjunto compartilha seu endereço IP com os servidores de imagens dele.</string>
-    <string name="emoji_sets_preview_host">Servidor da imagem de prévia: %1$s</string>
+    <string name="emoji_sets_load_emoji">Carregar emojis</string>
+    <plurals name="emoji_sets_image_hosts">
+        <item quantity="one">As imagens vêm de %1$s. Ao carregá-las ou instalá-las, os servidores que as hospedam recebem seu endereço IP.</item>
+        <item quantity="other">As imagens vêm de %1$s. Ao carregá-las ou instalá-las, os servidores que as hospedam recebem seu endereço IP.</item>
+    </plurals>
+    <plurals name="emoji_sets_more_hosts">
+        <item quantity="one">mais %1$d</item>
+        <item quantity="other">mais %1$d</item>
+    </plurals>
+    <string name="emoji_sets_image_hosts_unknown">Ao carregar ou instalar estas imagens, os servidores que as hospedam recebem seu endereço IP.</string>
+    <string name="emoji_sets_untitled">Conjunto sem nome</string>
+    <string name="emoji_sets_emoji_loading">Carregando %1$s</string>
+    <string name="emoji_sets_emoji_failed">Não foi possível carregar %1$s.</string>
+    <string name="emoji_sets_emoji_unavailable">%1$s não está disponível neste dispositivo.</string>
     <string name="emoji_sets_install">Instalar conjunto</string>
     <string name="emoji_sets_update">Atualizar conjunto</string>
     <string name="emoji_sets_check_update">Verificar atualização</string>
