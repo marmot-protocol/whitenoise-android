@@ -795,7 +795,6 @@
     <string name="conversation_jump_to_mention">Bahsetmeye git</string>
     <string name="notification_channel_reactions">Tepkiler</string>
     <string name="notification_channel_invites">Davetler</string>
-    <string name="notification_channel_agent_activity">Ajan etkinliği</string>
     <string name="notification_channel_direct_messages_default">Doğrudan mesajlar · Tüm sohbetler için varsayılan</string>
     <string name="notification_channel_group_global_defaults">Genel varsayılanlar</string>
     <string name="notification_channel_direct_messages_default_description">Doğrudan mesajlar için varsayılan Android uyarı davranışı</string>
@@ -810,8 +809,6 @@
     <string name="notification_channel_group_membership">Grup üyeliği değişiklikleri</string>
     <string name="notification_channel_group_membership_default">Grup üyeliği değişiklikleri · Tüm sohbetler için varsayılan</string>
     <string name="notification_channel_group_membership_default_description">Gruplardan çıkarıldığınızda varsayılan Android uyarı davranışı</string>
-    <string name="notification_channel_agent_activity_default">Ajan etkinliği · Tüm sohbetler için varsayılan</string>
-    <string name="notification_channel_agent_activity_default_description">Sohbetlerdeki ajan etkinliği için varsayılan Android uyarı davranışı</string>
     <string name="notification_channel_custom_name">%1$s · %2$s (özel)</string>
     <string name="notification_channel_custom_description">%2$s içindeki %1$s için özel uyarı davranışı</string>
     <string name="notification_group_invite">Güvenli bir sohbete davet edildiniz</string>
@@ -2181,6 +2178,7 @@
     <string name="setup_finding_too_many_relays">Listede çok fazla röle var.</string>
     <string name="setup_finding_multi_device_unsupported">Sohbetler cihazlar arasında eşitlenmez.</string>
     <string name="setup_finding_discovery_incomplete">Keşif tamamlanamadı. Bu sonuçtan bir değiştirme önerisi çıkarılmayacak.</string>
+    <string name="setup_finding_rate_limited">Çok fazla istek gönderildi. Biraz sonra tekrar dene.</string>
     <string name="setup_profile_help">İnsanların sizi tanıması için bir ad ekleyin. Bunu daha sonra yapabilirsiniz.</string>
     <string name="setup_details">Ayrıntılar</string>
     <string name="setup_hide_details">Ayrıntıları gizle</string>

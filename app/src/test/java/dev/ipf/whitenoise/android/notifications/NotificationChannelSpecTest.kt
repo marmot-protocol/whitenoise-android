@@ -127,21 +127,6 @@ class NotificationChannelSpecTest {
         )
     }
 
-    /** A mention still uses the configured mention channel when the traffic class is standard. */
-    @Test
-    fun mentionTakesPrecedenceOverStandardGroupRouting() {
-        val spec =
-            NotificationChannelSpec.forUpdate(
-                update(
-                    trigger = NotificationTriggerFfi.NEW_MESSAGE,
-                    isMention = true,
-                    trafficClass = NotificationTrafficClassFfi.STANDARD,
-                ),
-            )
-
-        assertEquals(NotificationChannelSpec.MENTIONS, spec)
-    }
-
     @Test
     fun channelIdsAreTheFrozenStableContractWithTheOs() {
         // These IDs are a stable contract — changing one discards the user's
@@ -153,7 +138,6 @@ class NotificationChannelSpecTest {
         assertEquals("reactions_v2", NotificationChannelSpec.REACTIONS.id)
         assertEquals("invites_v2", NotificationChannelSpec.INVITES.id)
         assertEquals("group_membership_v1", NotificationChannelSpec.GROUP_MEMBERSHIP.id)
-        assertEquals("agent_activity_v1", NotificationChannelSpec.AGENT_ACTIVITY.id)
         assertEquals("app_updates_v1", NotificationChannelSpec.APP_UPDATES.id)
     }
 

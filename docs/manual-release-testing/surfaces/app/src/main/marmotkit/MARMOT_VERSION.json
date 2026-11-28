@@ -4,7 +4,7 @@
   "categories": {
     "source_coverage": [
       {
-        "surface": "Isolated MarmotKit 0.20.0-rc.4 pilot over a populated 0.19.0 install. Verify account migrations, retained chats and attachments, cold restart, the original pending upload, and recovery in both relay modes.",
+        "surface": "MarmotKit 0.20.0-rc.4 over populated 0.19.0. Verify account migrations 0219\u20130228, retained chats and attachments, cold restart, the original pending upload, both recovery relay modes with audit enabled and declined, and actionable agent alerts following standard message controls.",
         "source": "app/src/main/marmotkit/MARMOT_VERSION",
         "anchor": "artifact-id=0.20.0-rc.4",
         "test_ids": [
@@ -47,7 +47,8 @@
           "SET-065",
           "SET-066",
           "SET-067",
-          "CON-004"
+          "CON-004",
+          "NTF-031"
         ]
       }
     ]

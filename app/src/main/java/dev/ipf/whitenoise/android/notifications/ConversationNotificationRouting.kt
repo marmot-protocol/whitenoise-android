@@ -14,7 +14,6 @@ internal enum class OverridableConversationNotificationCategory(
     MENTIONS(NotificationChannelSpec.MENTIONS),
     REACTIONS(NotificationChannelSpec.REACTIONS),
     INVITES(NotificationChannelSpec.INVITES),
-    AGENT_ACTIVITY(NotificationChannelSpec.AGENT_ACTIVITY),
     ;
 
     companion object {

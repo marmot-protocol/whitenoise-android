@@ -71,11 +71,11 @@ class ConversationSoundAppearanceSheetScreenshotTest {
         var opened: NotificationChannelSpec? = null
         render(isDm = false, fontScale = 2f, onOpen = { opened = it.channel })
         composeRule
-            .onNodeWithTag("open-conversation-notification-${NotificationChannelSpec.AGENT_ACTIVITY.id}")
+            .onNodeWithTag("open-conversation-notification-${NotificationChannelSpec.INVITES.id}")
             .performScrollTo()
             .assertIsDisplayed()
             .performClick()
-        composeRule.runOnIdle { assertEquals(NotificationChannelSpec.AGENT_ACTIVITY, opened) }
+        composeRule.runOnIdle { assertEquals(NotificationChannelSpec.INVITES, opened) }
         val context = ApplicationProvider.getApplicationContext<Context>()
         composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
         composeRule.onNodeWithTag("conversation-notifications-content").assertDoesNotExist()
@@ -133,7 +133,6 @@ class ConversationSoundAppearanceSheetScreenshotTest {
             NotificationChannelSpec.MENTIONS,
             NotificationChannelSpec.REACTIONS,
             NotificationChannelSpec.INVITES,
-            NotificationChannelSpec.AGENT_ACTIVITY,
         ).map { channel ->
             val custom = channel == NotificationChannelSpec.GROUP_MESSAGES
             ConversationNotificationCategorySetting(

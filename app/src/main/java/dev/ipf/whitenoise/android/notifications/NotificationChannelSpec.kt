@@ -3,6 +3,9 @@ package dev.ipf.whitenoise.android.notifications
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 
+/** Parent ID retained only to recognize channels created by older installs. */
+internal const val LEGACY_AGENT_ACTIVITY_CHANNEL_ID = "agent_activity_v1"
+
 /**
  * Stable Android notification channel identities and the routing that maps a
  * [NotificationUpdateFfi] to the channel it belongs on.
@@ -78,14 +81,6 @@ enum class NotificationChannelSpec(
         "group_membership_v1",
         ChannelImportance.HIGH,
         ConversationChannelPolicy.GLOBAL_ONLY,
-        launcherBadgeByDefault = false,
-    ),
-
-    /** Agent tool progress and status updates. Visible but silent by default. */
-    AGENT_ACTIVITY(
-        "agent_activity_v1",
-        ChannelImportance.LOW,
-        ConversationChannelPolicy.GLOBAL_UNTIL_OVERRIDE,
         launcherBadgeByDefault = false,
     ),
 

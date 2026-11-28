@@ -56,11 +56,13 @@ internal fun conversationChannelShortcutId(channel: NotificationChannel): String
     val parent =
         NotificationChannelSpec.entries.firstOrNull { spec ->
             channelId.startsWith("${spec.id}$CONVERSATION_CHANNEL_INFIX$CONVERSATION_SHORTCUT_PREFIX")
+        }?.id ?: LEGACY_AGENT_ACTIVITY_CHANNEL_ID.takeIf { legacy ->
+            channelId.startsWith("$legacy$CONVERSATION_CHANNEL_INFIX$CONVERSATION_SHORTCUT_PREFIX")
         }
     val fromId =
-        parent?.let { spec ->
+        parent?.let { parentId ->
             channelId
-                .removePrefix("${spec.id}$CONVERSATION_CHANNEL_INFIX")
+                .removePrefix("$parentId$CONVERSATION_CHANNEL_INFIX")
                 .substringBefore(VIBRATION_SUFFIX_MARKER)
                 .takeIf(::isConversationShortcutId)
         }

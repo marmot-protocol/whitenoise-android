@@ -110,6 +110,7 @@ object LocalNotificationFormatter {
             id = MENTION_NOTIFICATION_ID,
         )
 
+    /** Clears agent cards posted by older installs before alerts moved to standard message channels. */
     fun agentActivityDismissalKey(
         accountRef: String,
         groupIdHex: String,
