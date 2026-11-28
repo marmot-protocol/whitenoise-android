@@ -1680,7 +1680,7 @@ internal fun ChatsScreen(
         return
     }
 
-    // Keep consent in the app root and present it when account setup and other sheets are closed.
+    // Consent belongs to the unobstructed Chats list, after all account setup.
     fun otherSheetOpen(): Boolean =
         actionSheetChatId != null ||
             folderHandoff.pickerChatIds != null ||
