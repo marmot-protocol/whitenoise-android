@@ -84,9 +84,10 @@ class StagingTagTest(unittest.TestCase):
     def test_rejects_a_source_outside_develop_history(self):
         """A successful run cannot tag a commit outside the trusted branch history."""
         ancestry_check = ("git", "merge-base", "--is-ancestor", SOURCE, "HEAD")
-        with patch.object(staging, "command", side_effect=subprocess.CalledProcessError(1, ancestry_check)):
+        with patch.object(staging, "command", side_effect=subprocess.CalledProcessError(1, ancestry_check)) as command:
             with self.assertRaises(subprocess.CalledProcessError) as failure:
                 staging.publish_staging_tag("123")
+        command.assert_called_once_with(*ancestry_check)
         self.assertEqual(failure.exception.cmd, ancestry_check)
         self.assertEqual(self.writes, [])
 
