@@ -173,10 +173,12 @@ internal fun rememberConversationUnreadMentionJump(
     mentionJumpLayout: (String, Int) -> ConversationMentionJumpLayout,
     inputs: ConversationUnreadMentionJump.Inputs,
 ): ConversationUnreadMentionJump {
-    val keys = arrayOf(appState, controller, scope, navigationState, scrollCoordinator, timelineViewport, mentionSeed)
-    val latest = remember(*keys) { mutableStateOf(inputs) }
+    val latest =
+        remember(appState, controller, scope, navigationState, scrollCoordinator, timelineViewport, mentionSeed) {
+            mutableStateOf(inputs)
+        }
     latest.value = inputs
-    return remember(*keys) {
+    return remember(appState, controller, scope, navigationState, scrollCoordinator, timelineViewport, mentionSeed) {
         ConversationUnreadMentionJump(
             appState = appState,
             controller = controller,
