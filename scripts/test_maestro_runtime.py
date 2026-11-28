@@ -2172,7 +2172,7 @@ class RuntimeEvidenceTest(unittest.TestCase):
         helper = runtime.ROOT / '.maestro/fixtures/open-settings.yaml'
         _, commands = list(yaml.safe_load_all(helper.read_text()))
         self.assertEqual(commands[0], {'tapOn': {'id': 'chats.switchProfile'}})
-        self.assertIn({'runFlow': {'when': {'visible': 'Switch Profile'},
+        self.assertIn({'runFlow': {'when': {'visible': {'id': 'account-selector-content'}},
                                   'commands': [{'tapOn': 'Settings'}]}}, commands)
         self.assertEqual(commands[-1], {'assertVisible': {'id': 'settings-home-content'}})
         for path in (runtime.ROOT / '.maestro/runtime').glob('*.yaml'):

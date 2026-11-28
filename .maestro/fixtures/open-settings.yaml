@@ -5,11 +5,12 @@ appId: dev.ipf.whitenoise.android.maestrolab
     id: "chats.switchProfile"
 - extendedWaitUntil:
     visible:
-      text: "^(Switch Profile|Settings)$"
+      id: "^(account-selector-content|settings-home-content)$"
     timeout: 5000
 - runFlow:
     when:
-      visible: "Switch Profile"
+      visible:
+        id: "account-selector-content"
     commands:
       - tapOn: "Settings"
 - assertVisible: "Settings"
