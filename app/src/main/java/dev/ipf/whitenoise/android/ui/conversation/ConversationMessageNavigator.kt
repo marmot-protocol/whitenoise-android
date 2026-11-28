@@ -19,6 +19,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.hiddenMessageIdsInGroup
 import dev.ipf.whitenoise.android.state.isLoadingPage
 import dev.ipf.whitenoise.android.state.loadMessageAvailability
+import dev.ipf.whitenoise.android.state.loadSearchResultMessageAvailable
 import dev.ipf.whitenoise.android.state.loadUntilMessageAvailable
 import dev.ipf.whitenoise.android.state.returnToLatestWindow
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTransitions
@@ -354,7 +355,7 @@ internal class ConversationMessageNavigator(
             val match = anchor.match
             if (match != null &&
                 pageBackForSearchReturn({ controller.isLoadingPage }, isCurrent) {
-                    controller.loadSearchResultMessageAvailable(match)
+                    controller.loadSearchResultMessageAvailable(match, isCurrent)
                 }
             ) {
                 withFrameNanos { }
