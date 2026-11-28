@@ -4,7 +4,6 @@ import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.GroupSystemEventFfi
 import dev.ipf.marmotkit.GroupSystemEventProvenanceFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
-import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.whitenoise.android.state.timelineRecord as fixtureTimelineRecord
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
