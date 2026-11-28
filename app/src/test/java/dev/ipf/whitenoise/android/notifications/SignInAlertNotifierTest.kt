@@ -78,7 +78,8 @@ class SignInAlertNotifierTest {
         assertFalse(notifier.postReview(ACCOUNT, count = 1, alert = false))
         assertTrue(manager.activeNotifications.isEmpty())
         assertTrue(notifier.postReview(ACCOUNT, count = 2, alert = true))
-        assertEquals(0, manager.activeNotifications.single().notification.flags and Notification.FLAG_ONLY_ALERT_ONCE)
+        val newNotification = manager.activeNotifications.single().notification
+        assertEquals(0, newNotification.flags and Notification.FLAG_ONLY_ALERT_ONCE)
     }
 
     /** The compromise notification carries the neutral public text and names nothing either. */
