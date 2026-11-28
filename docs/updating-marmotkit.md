@@ -135,6 +135,19 @@ assertions now prove retained-data reopening, not a fresh rekey. No new storage
 migration is introduced relative to the October 23 nightly. Physical app-performance
 evidence remains separate from hosted qualification; phone testing is paused.
 
+### Android 0.20.0-rc.4 staging decision
+
+On November 28, 2026, the maintainer waived
+`healthyAccountReceivesAfterLocalDeletionAndRestart` only when the relay
+silently ignores history comparison, for MarmotKit `0.20.0-rc.4`
+(`07567caf0814fa0f5688c5da83a7209f94c71e03`) on Android `develop` and internal
+staging. The [qualification run](https://github.com/marmot-protocol/whitenoise-android/actions/runs/46127170756)
+on Android commit `a7f6835f55` missed the first incoming message with audit on
+and off. The retained-data upgrade, cold restart and all seven cases with an
+explicit comparison refusal passed in both modes. Track the missed message in
+[MDK #3643](https://github.com/marmot-protocol/mdk/issues/3643). Required review
+and CI still apply. Production and later pins require their own qualification.
+
 ## 1. Select and inspect the release
 
 ### Manual RC sync for develop

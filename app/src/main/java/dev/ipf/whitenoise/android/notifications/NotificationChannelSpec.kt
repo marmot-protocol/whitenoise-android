@@ -3,7 +3,10 @@ package dev.ipf.whitenoise.android.notifications
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 
-/** Parent ID retained only to recognize channels created by older installs. */
+/**
+ * Recognizes channels from older installs for ownership and privacy cleanup.
+ * Existing parent channels stay dormant on upgrade so Android does not count them as deleted categories.
+ */
 internal const val LEGACY_AGENT_ACTIVITY_CHANNEL_ID = "agent_activity_v1"
 
 /**
