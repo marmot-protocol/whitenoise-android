@@ -12,14 +12,6 @@
         ]
       },
       {
-        "surface": "Device linking consent: R.string.link_consent_report_failed",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkConsent.kt",
-        "anchor": "R.string.link_consent_report_failed",
-        "test_ids": [
-          "SET-079"
-        ]
-      },
-      {
         "surface": "Device linking consent: R.string.link_device_action_failed",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkConsent.kt",
         "anchor": "R.string.link_device_action_failed",
