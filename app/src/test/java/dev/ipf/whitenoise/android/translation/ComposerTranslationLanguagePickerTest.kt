@@ -177,7 +177,7 @@ class ComposerTranslationLanguagePickerTest {
         composeRule.onNodeWithText("Target language", substring = true).performClick()
         composeRule.onNodeWithTag(WHITE_NOISE_CHOICE_PAGE_TAG).assertExists()
         composeRule.onNodeWithTag("translation.language.en").assertIsSelected()
-        composeRule.onNodeWithTag("translation.language.search").performTextReplacement("deu")
+        composeRule.onNodeWithTag("translation.language.search").performTextReplacement("germ")
         composeRule.onNodeWithTag("translation.language.de").performClick()
         composeRule.mainClock.advanceTimeBy(1_000)
         composeRule.runOnIdle { assertEquals("de", saved) }

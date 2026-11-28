@@ -127,6 +127,7 @@ class SmartFolderEditorTest {
         composeRule.onNodeWithTag("folder.presets").performClick()
         composeRule.onNodeWithText(context.getString(R.string.smart_folder_preset_read)).performClick()
         composeRule.onNodeWithTag("folder.confirmPreset").performClick()
+        composeRule.waitForIdle()
         assertTrue(root.value.all)
         val conditions =
             root.value.children
@@ -177,6 +178,7 @@ class SmartFolderEditorTest {
         composeRule.onNodeWithTag("folder.presets").performClick()
         composeRule.onNodeWithText(context.getString(R.string.smart_folder_preset_mentions)).performClick()
         composeRule.onNodeWithTag("folder.confirmPreset").performClick()
+        composeRule.waitForIdle()
         assertEquals(FolderField.MENTIONS, (root.value!!.children.last() as SmartFolderFilter.Condition).field)
     }
 
@@ -209,6 +211,7 @@ class SmartFolderEditorTest {
         composeRule.onNodeWithTag("folder.addField.MENTIONS").performClick()
         composeRule.onNodeWithTag("folder.conditionDone").performClick()
         composeRule.onNodeWithTag("folder.confirmPreset").performClick()
+        composeRule.waitForIdle()
         assertEquals(FolderField.MENTIONS, (root.value!!.children.last() as SmartFolderFilter.Condition).field)
     }
 
@@ -366,6 +369,7 @@ class SmartFolderEditorTest {
         assertEquals(null, root.value)
         composeRule.onNodeWithTag("folder.quick.start").performClick()
         composeRule.onNodeWithTag("folder.confirmPreset").performClick()
+        composeRule.waitForIdle()
         assertEquals(defaultSmartFolder(), root.value)
     }
 

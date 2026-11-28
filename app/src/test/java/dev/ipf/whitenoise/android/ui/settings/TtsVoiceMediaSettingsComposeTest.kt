@@ -1,6 +1,9 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import android.app.Application
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -84,11 +87,10 @@ class TtsVoiceMediaSettingsComposeTest {
         composeRule.onNodeWithText(app.getString(R.string.tts_media_mix_title)).assertIsOn()
     }
 
-    /** Tapping an available voice on the catalog page applies it once and the page returns to its opener. */
+    /** Tapping an available voice on the catalog page applies it once, after the page has closed back to its opener. */
     @Test
     fun availableVoiceAppliesAndClosesThePage() {
         var applied = 0
-        var dismissed = 0
         val voice =
             TtsVoiceOption(
                 key = TtsVoiceKey("engine.a", "Local voice", "en-US"),
@@ -96,21 +98,31 @@ class TtsVoiceMediaSettingsComposeTest {
                 localeTag = "en-US",
                 unavailableReason = null,
             )
+        var open by mutableStateOf(true)
         composeRule.setContent {
             WhiteNoiseTheme {
-                SpeechChoicePage(
-                    title = app.getString(R.string.tts_voice_title),
-                    choices = listOf(speechVoiceChoice(voice, Locale.US, selected = false) { applied++ }),
-                    onDismiss = { dismissed++ },
-                )
+                if (open) {
+                    SpeechChoicePage(
+                        title = app.getString(R.string.tts_voice_title),
+                        choices =
+                            listOf(
+                                speechVoiceChoice(voice, Locale.US, selected = false) {
+                                    applied++
+                                    open = false
+                                },
+                            ),
+                        onDismiss = { open = false },
+                    )
+                }
             }
         }
+        composeRule.mainClock.advanceTimeBy(PAGE_MOTION_MS)
+        composeRule.waitForIdle()
         composeRule.onNodeWithText("Local voice").assertIsSelectable().performClick()
-        composeRule.mainClock.advanceTimeBy(1_000)
-        composeRule.runOnIdle {
-            assertEquals(1, applied)
-            assertEquals(1, dismissed)
-        }
+        composeRule.mainClock.advanceTimeBy(PAGE_MOTION_MS)
+        composeRule.waitForIdle()
+        composeRule.runOnIdle { assertEquals(1, applied) }
+        composeRule.onNodeWithText("Local voice").assertDoesNotExist()
     }
 
     /** A network-only voice announces its locale and reason and stays unselectable. */
@@ -149,3 +161,6 @@ class TtsVoiceMediaSettingsComposeTest {
         composeRule.runOnIdle { assertFalse(clicked) }
     }
 }
+
+/** Longer than the page entrance or exit motion. */
+private const val PAGE_MOTION_MS = 1_000L
