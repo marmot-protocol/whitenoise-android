@@ -2,6 +2,7 @@
 
 package dev.ipf.whitenoise.android.media.sandbox
 
+import android.content.Context
 import android.os.IBinder
 import android.os.Parcel
 import java.io.IOException
@@ -281,6 +282,15 @@ internal class AvStreamLifetime {
 internal enum class AvStreamLane {
     Playback,
     Analysis,
+    ;
+
+    /** Video playback feeds the foreground player, so its worker shares the client's scheduling group. */
+    fun bindFlags(wantVideo: Boolean): Int =
+        if (this == Playback && wantVideo) {
+            Context.BIND_AUTO_CREATE or Context.BIND_IMPORTANT
+        } else {
+            Context.BIND_AUTO_CREATE
+        }
 }
 
 /** A lane cannot be replaced by a different owner or a newer account epoch before cleanup. */
