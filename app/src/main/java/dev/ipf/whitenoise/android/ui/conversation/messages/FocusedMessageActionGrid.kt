@@ -2,6 +2,7 @@
 
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -36,6 +37,7 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 
@@ -61,6 +63,9 @@ private val FocusedActionCellVerticalPadding = 8.dp
  * states, so opening the full set keeps every first-level action in place: the panel grows, the hidden
  * actions fade into the slots after the first level and the disclosure glides to the end of the grid as
  * Fewer actions. The disclosure keeps one identity throughout, so a screen reader keeps its focus on it.
+ *
+ * With a [scrollState] the rows scroll inside the rounded surface, so a short frame still shows the
+ * menu's whole outline and shadow instead of cutting the surface off at the frame's edge (#4100).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -68,6 +73,7 @@ internal fun FocusedActionMenu(
     actions: List<FocusedMessageAction>,
     showingAll: Boolean = true,
     onShowingAllChange: (Boolean) -> Unit = {},
+    scrollState: ScrollState? = null,
 ) {
     val hasMore = hasMoreMessageActions(actions, FocusedMessageAction::firstLevel)
     val laidOut = if (hasMore) actions.sortedBy { !it.firstLevel } else actions
@@ -81,7 +87,7 @@ internal fun FocusedActionMenu(
         border = amoledOutlineBorder(),
         shadowElevation = MenuDefaults.ShadowElevation,
     ) {
-        BoxWithConstraints {
+        BoxWithConstraints(if (scrollState != null) Modifier.fadingVerticalScroll(scrollState) else Modifier) {
             val actionWidths = cellWidths.take(laidOut.size)
             val disclosureWidth = cellWidths.drop(laidOut.size).maxOrNull()
             val grid = focusedActionGridColumns(actionWidths, disclosureWidth, firstLevelCount, maxWidth)

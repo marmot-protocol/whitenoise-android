@@ -83,7 +83,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.PopupPositionProvider
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiGlyph
 import dev.ipf.whitenoise.android.ui.conversation.reactions.reactionSourceBounds
 import dev.ipf.whitenoise.android.ui.design.KeyboardSafePopup
@@ -412,9 +411,9 @@ internal fun FocusedMessageActions(
                                 ),
                     ) { preview() }
                 }
-                // When the IME shortens the safe frame, only the actions overflow. Scrolling the
-                // whole stack would move the lifted message and reactions out of sight, even though
-                // the user is still choosing an action for that message.
+                // When the frame is short, only the action rows overflow, inside the menu's own surface, so its
+                // outline and shadow stay whole (#4100). Scrolling the whole stack would move the lifted message
+                // and reactions out of sight, even though the user is still choosing an action for that message.
                 Box(
                     modifier =
                         Modifier
@@ -422,10 +421,14 @@ internal fun FocusedMessageActions(
                             // Labels that need more than the column may use the whole padded window, so a
                             // wide window never wraps an action the 560dp column could not hold (#3587).
                             .focusedColumnSlot(railWidth, actionPanelMaximumWidth, mine, actionTouchX)
-                            .fadingVerticalScroll(rememberScrollState())
                             .testTag(FOCUSED_ACTION_MENU_SCROLL_TEST_TAG),
                 ) {
-                    FocusedActionMenu(terminalActions, showingAllActions.value) { showingAllActions.value = it }
+                    FocusedActionMenu(
+                        actions = terminalActions,
+                        showingAll = showingAllActions.value,
+                        onShowingAllChange = { showingAllActions.value = it },
+                        scrollState = rememberScrollState(),
+                    )
                 }
             }
         }

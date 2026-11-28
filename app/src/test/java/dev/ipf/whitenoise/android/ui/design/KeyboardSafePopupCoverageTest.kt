@@ -195,9 +195,10 @@ class KeyboardSafePopupCoverageTest {
                 "previewCenterInStackPx = previewCenterInStackPx" in focusedBody,
         )
         assertTrue(
-            "Tall action content must scroll within the keyboard-safe frame",
+            "Tall action content must scroll inside the menu surface within the keyboard-safe frame",
             ".heightIn(max = maxHeight)" in focusedBody &&
-                ".fadingVerticalScroll(rememberScrollState())" in focusedBody &&
+                "scrollState = rememberScrollState()" in focusedBody &&
+                "Modifier.fadingVerticalScroll(scrollState)" in focusedActionMenuBody() &&
                 scrollBinding in scrollSource,
         )
         assertTrue(
@@ -258,6 +259,9 @@ class KeyboardSafePopupCoverageTest {
 
     /** Focused message actions source. */
     private fun focusedMessageActionsSource(): File = sourceFile("ui/conversation/messages/FocusedMessageActions.kt")
+
+    private fun focusedActionMenuBody(): String =
+        sourceFile("ui/conversation/messages/FocusedMessageActionGrid.kt").readText().functionBody("FocusedActionMenu")
 
     private fun reactionsSource(): File = sourceFile("ui/conversation/reactions/Reactions.kt")
 

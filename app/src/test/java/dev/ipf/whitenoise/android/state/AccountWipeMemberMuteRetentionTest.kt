@@ -1,8 +1,14 @@
 package dev.ipf.whitenoise.android.state
 
 import android.app.Application
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.Context
+import android.content.Intent
+import android.os.Bundle
 import android.os.Looper
+import androidx.core.app.NotificationCompat
+import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AttachmentDownloadPolicyFfi
@@ -18,6 +24,11 @@ import dev.ipf.whitenoise.android.functionBody
 import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.media.sharedPlaintextPrefix
+import dev.ipf.whitenoise.android.notifications.CONVERSATION_SHORTCUT_PREFIX
+import dev.ipf.whitenoise.android.notifications.LocalNotificationFormatter
+import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
+import dev.ipf.whitenoise.android.notifications.conversationShortcutAccountExtras
+import dev.ipf.whitenoise.android.notifications.conversationShortcutId
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -459,6 +470,92 @@ class AccountWipeMemberMuteRetentionTest {
                 assertEquals(other, state.toast)
             }
         }
+
+    /** An unlinked device takes the account's conversation shortcuts down at once and keeps the other account's. */
+    @Test
+    fun unlinkClearsOnlyTheUnlinkedAccountsShortcuts() =
+        runBlocking {
+            savedUnlinked = true
+            val removed = publishConversationShortcut(WIPED_ACCOUNT)
+            val kept = publishConversationShortcut(SURVIVING_ACCOUNT)
+
+            appState(active = SURVIVING_ACCOUNT).presentDeviceUnlinked(WIPED_ACCOUNT)
+
+            val left = ShortcutManagerCompat.getDynamicShortcuts(context).map { it.id }
+            assertFalse("the unlinked account's shortcut must go", removed in left)
+            assertTrue("the other account's shortcut must stay", kept in left)
+        }
+
+    /** An account listed as linked again when the handler reads it was signed in again; its shortcuts stay. */
+    @Test
+    fun unlinkKeepsTheShortcutsOfAnAccountSignedInAgain() =
+        runBlocking {
+            savedUnlinked = false
+            val kept = publishConversationShortcut(WIPED_ACCOUNT)
+
+            appState(active = SURVIVING_ACCOUNT).presentDeviceUnlinked(WIPED_ACCOUNT)
+
+            assertTrue(kept in ShortcutManagerCompat.getDynamicShortcuts(context).map { it.id })
+        }
+
+    /**
+     * MDK has signed the account out before reporting the unlink, so its group inventory is incomplete, and an
+     * ownerless legacy channel used to discard even the groups it had read. Cards that name the unlinked account
+     * still come down, and the other account's card stays.
+     */
+    @Test
+    fun unlinkTakesDownTheUnlinkedAccountsCardsDespiteAnOwnerlessLegacyChannel() =
+        runBlocking {
+            savedUnlinked = true
+            val manager = checkNotNull(context.getSystemService(NotificationManager::class.java))
+            val parent = NotificationChannelSpec.entries.first().id
+            val legacy = "$parent:conv:${CONVERSATION_SHORTCUT_PREFIX}ffee0011"
+            val importance = NotificationManager.IMPORTANCE_DEFAULT
+            manager.createNotificationChannel(NotificationChannel(legacy, "Chat", importance))
+            postInviteCard(manager, legacy, id = 41, account = WIPED_ACCOUNT)
+            postInviteCard(manager, legacy, id = 42, account = SURVIVING_ACCOUNT)
+
+            appState(active = SURVIVING_ACCOUNT).presentDeviceUnlinked(WIPED_ACCOUNT)
+
+            assertEquals(listOf(42), manager.activeNotifications.map { it.id })
+        }
+
+    /** Posts an invite card for [GROUP] that names [account] in its dismissal metadata. */
+    private fun postInviteCard(
+        manager: NotificationManager,
+        channel: String,
+        id: Int,
+        account: String,
+    ) {
+        val extras =
+            Bundle().apply {
+                putString(LocalNotificationFormatter.EXTRA_DISMISS_ACCOUNT_REF, account)
+                putString(LocalNotificationFormatter.EXTRA_DISMISS_GROUP_ID, GROUP)
+            }
+        val card =
+            NotificationCompat
+                .Builder(context, channel)
+                .setSmallIcon(android.R.drawable.stat_notify_chat)
+                .setContentTitle("Invite")
+                .addExtras(extras)
+                .build()
+        manager.notify("invite-$id", id, card)
+    }
+
+    /** Publishes [account]'s conversation shortcut for [GROUP] the way notifications scope it, and returns its id. */
+    private fun publishConversationShortcut(account: String): String {
+        val id = checkNotNull(conversationShortcutId(account, GROUP))
+        val shortcut =
+            ShortcutInfoCompat
+                .Builder(context, id)
+                .setShortLabel("Chat")
+                .setIntent(Intent(Intent.ACTION_VIEW))
+                .setLongLived(true)
+                .setExtras(checkNotNull(conversationShortcutAccountExtras(account)))
+                .build()
+        ShortcutManagerCompat.pushDynamicShortcut(context, shortcut)
+        return id
+    }
 
     /**
      * The unlink handler re-reads the accounts before it speaks. A removal that finishes while that read is paused
