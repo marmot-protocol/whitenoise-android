@@ -17,7 +17,7 @@ WORKFLOW_NAME = "Android Staging APK"
 WORKFLOW_ID = "android-staging-apk"
 DATA_MODE = "obfuscated_sensitive_data"
 EXPECTED_REPOSITORY = "marmot-protocol/whitenoise-android"
-MASTER_REF = "refs/heads/master"
+STAGING_REF = "refs/heads/develop"
 ALLOWED_EVENTS = {"push", "workflow_dispatch"}
 ATTESTATION_KEYS = {
     "schema_version",
@@ -51,8 +51,8 @@ def build_attestation() -> dict[str, object]:
     ref = require("GITHUB_REF")
     if event not in ALLOWED_EVENTS:
         raise ValueError("attestation event is not trusted")
-    if event == "push" and ref != MASTER_REF:
-        raise ValueError("push attestation must be generated from master")
+    if event == "push" and ref != STAGING_REF:
+        raise ValueError("push attestation must be generated from develop")
     if event == "workflow_dispatch" and (
         require("GITHUB_ACTOR") != "Datawav" or not ref.startswith("refs/heads/datawav/")
     ):
