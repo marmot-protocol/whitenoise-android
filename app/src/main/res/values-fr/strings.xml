@@ -246,9 +246,12 @@
     <string name="error_missing_key_package_for">Aucune clé de discussion utilisable n’a été trouvée pour %1$s. Demandez-lui d’installer ou de mettre à jour White Noise et de l’ouvrir, puis réessayez.</string>
     <string name="invite_to_white_noise">Inviter sur White Noise</string>
     <string name="invite_friends">Inviter des amis</string>
-    <string name="invite_to_white_noise_description">%1$s n\'est pas encore sur White Noise. Partagez l\'application pour démarrer une discussion sécurisée.</string>
-    <string name="unknown_invite_to_white_noise_description">Cet utilisateur n\'est pas encore sur White Noise. Partagez l\'application pour démarrer une discussion sécurisée.</string>
     <string name="invite_message">Rejoignez-moi sur White Noise. Pas de numéro de téléphone. Pas de surveillance. Juste une vraie confidentialité. Téléchargez ici : https://www.whitenoise.chat/download</string>
+    <string name="start_chat_not_on_white_noise_for">%1$s n’est pas encore sur White Noise</string>
+    <string name="start_chat_not_on_white_noise">Cette personne n’est pas encore sur White Noise</string>
+    <string name="start_chat_not_on_white_noise_detail">Envoyez-lui une invitation. Quand elle aura installé et ouvert White Noise, réessayez.</string>
+    <string name="send_invite">Envoyer une invitation</string>
+    <string name="invite_message_personal">Je suis %1$s sur White Noise, une messagerie privée qui ne demande pas de numéro de téléphone. Installe-la, touche Nouveau chat et colle ma clé pour m’écrire : %2$s\nTéléchargement : https://www.whitenoise.chat/download</string>
     <string name="error_invalid_identity_reference">Ce destinataire n’est pas une clé publique Nostr valide. Utilisez un npub, un lien de profil ou une clé publique hex.</string>
     <string name="error_group_create_failed_retry">Un problème est survenu lors de la configuration de la discussion chiffrée. Vérifiez votre connexion et réessayez.</string>
     <string name="error_no_group_members_selected">Aucune des personnes sélectionnées n’a pu être ajoutée. Demandez-leur de vérifier la configuration de leur discussion ou modifiez votre sélection.</string>
@@ -1703,9 +1706,20 @@
     <string name="emoji_sets_builtin_shown">Préinstallé · %1$s</string>
     <string name="emoji_sets_builtin_hidden">Masqué dans le sélecteur. Toujours visible dans les messages.</string>
     <string name="emoji_sets_update_available">Mise à jour disponible</string>
-    <string name="emoji_sets_load_image">Charger l’image d’aperçu</string>
-    <string name="emoji_sets_image_privacy">Charger un aperçu ou installer un ensemble partage votre adresse IP avec ses hébergeurs d’images.</string>
-    <string name="emoji_sets_preview_host">Hébergeur de l’image d’aperçu : %1$s</string>
+    <string name="emoji_sets_load_emoji">Charger les émojis</string>
+    <plurals name="emoji_sets_image_hosts">
+        <item quantity="one">Les images proviennent de %1$s. Leurs hébergeurs reçoivent votre adresse IP lors du chargement ou de l’installation.</item>
+        <item quantity="other">Les images proviennent de %1$s. Leurs hébergeurs reçoivent votre adresse IP lors du chargement ou de l’installation.</item>
+    </plurals>
+    <plurals name="emoji_sets_more_hosts">
+        <item quantity="one">%1$d de plus</item>
+        <item quantity="other">%1$d de plus</item>
+    </plurals>
+    <string name="emoji_sets_image_hosts_unknown">Les hébergeurs de ces images reçoivent votre adresse IP lorsque vous les chargez ou les installez.</string>
+    <string name="emoji_sets_untitled">Jeu sans nom</string>
+    <string name="emoji_sets_emoji_loading">Chargement de %1$s</string>
+    <string name="emoji_sets_emoji_failed">Impossible de charger %1$s.</string>
+    <string name="emoji_sets_emoji_unavailable">%1$s n’est pas disponible sur cet appareil.</string>
     <string name="emoji_sets_install">Installer l’ensemble</string>
     <string name="emoji_sets_update">Mettre à jour l’ensemble</string>
     <string name="emoji_sets_check_update">Rechercher une mise à jour</string>

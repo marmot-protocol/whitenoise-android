@@ -306,9 +306,13 @@
     <string name="error_missing_key_package_for">We couldn’t find a usable chat key for %1$s. Ask them to install or update White Noise and open it, then retry.</string>
     <string name="invite_to_white_noise">Invite to White Noise</string>
     <string name="invite_friends">Invite friends</string>
-    <string name="invite_to_white_noise_description">%1$s isn\'t on White Noise yet. Share the app to start a secure chat.</string>
-    <string name="unknown_invite_to_white_noise_description">This user isn\'t on White Noise yet. Share the app to start a secure chat.</string>
     <string name="invite_message">Join me on White Noise. No phone number. No surveillance. Just real privacy. Download it here: https://www.whitenoise.chat/download</string>
+    <string name="start_chat_not_on_white_noise_for">%1$s isn’t on White Noise yet</string>
+    <string name="start_chat_not_on_white_noise">This person isn’t on White Noise yet</string>
+    <string name="start_chat_not_on_white_noise_detail">Send them an invite. When they’ve installed White Noise and opened it, try again.</string>
+    <string name="send_invite">Send invite</string>
+    <!-- %1$s is the sender’s profile name; %2$s is their full npub public key. Keep the download URL unchanged. -->
+    <string name="invite_message_personal">I’m %1$s on White Noise, a private messenger that doesn’t need a phone number. Install it, tap New chat and paste my key to message me: %2$s\nDownload: https://www.whitenoise.chat/download</string>
     <string name="error_invalid_identity_reference">That recipient is not a valid Nostr public key. Use an npub, profile link, or hex public key.</string>
     <string name="error_group_create_failed_retry">Something went wrong while setting up encrypted chat. Check your connection and try again.</string>
     <string name="error_no_group_members_selected">None of the selected people could be added. Ask them to check their chat setup, or edit your selection.</string>
@@ -1993,9 +1997,27 @@
     <string name="emoji_sets_builtin_shown">Pre-installed · %1$s</string>
     <string name="emoji_sets_builtin_hidden">Hidden from picker. Still shows in messages.</string>
     <string name="emoji_sets_update_available">Update available</string>
-    <string name="emoji_sets_load_image">Load preview image</string>
-    <string name="emoji_sets_image_privacy">Loading a preview or installing a set shares your IP address with its image hosts.</string>
-    <string name="emoji_sets_preview_host">Preview image host: %1$s</string>
+    <string name="emoji_sets_load_emoji">Load emoji</string>
+    <!-- %1$s lists web hosts such as "nostr.build and void.cat" or "a.com, b.com, c.com and 2 more". The quantity is the total host count. -->
+    <plurals name="emoji_sets_image_hosts">
+        <item quantity="one">Images come from %1$s. Loading or installing them shares your IP address with that host.</item>
+        <item quantity="other">Images come from %1$s. Loading or installing them shares your IP address with those hosts.</item>
+    </plurals>
+    <!-- The last item of a host list, as in "a.com, b.com, c.com and 2 more". -->
+    <plurals name="emoji_sets_more_hosts">
+        <item quantity="one">%1$d more</item>
+        <item quantity="other">%1$d more</item>
+    </plurals>
+    <string name="emoji_sets_image_hosts_unknown">Loading or installing these images shares your IP address with their hosts.</string>
+    <!-- %1$s is an emoji count such as "12 emoji"; %2$s is Installed or Update available. -->
+    <string name="emoji_sets_summary" translatable="false">%1$s · %2$s</string>
+    <string name="emoji_sets_untitled">Untitled set</string>
+    <!-- %1$s is an emoji shortcode such as :fox:. -->
+    <string name="emoji_sets_emoji_loading">%1$s, loading</string>
+    <!-- %1$s is an emoji shortcode such as :fox:. -->
+    <string name="emoji_sets_emoji_failed">%1$s couldn’t load.</string>
+    <!-- %1$s is an emoji shortcode such as :fox:. -->
+    <string name="emoji_sets_emoji_unavailable">%1$s isn’t available on this device.</string>
     <string name="emoji_sets_install">Install set</string>
     <string name="emoji_sets_update">Update set</string>
     <string name="emoji_sets_check_update">Check for update</string>

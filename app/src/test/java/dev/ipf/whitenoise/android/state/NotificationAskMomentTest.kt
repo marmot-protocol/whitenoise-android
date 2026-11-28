@@ -129,16 +129,17 @@ class NotificationAskMomentTest {
     @Test
     fun replyExpectedMomentsReportThemselves() {
         val sites =
-            mapOf(
-                "ui/conversation/ConversationScope.kt" to 1,
-                "ui/chats/newchat/NewChatFlow.kt" to 1,
-                "ui/profile/ProfileSheet.kt" to 1,
-                "ui/settings/ShareConnectScreen.kt" to 3,
+            listOf(
+                Triple("ui/conversation/ConversationScope.kt", "appState.noteNotificationMoment()", 1),
+                Triple("ui/settings/ShareConnectScreen.kt", "appState.noteNotificationMoment()", 3),
+                Triple("ui/chats/newchat/NewChatFlow.kt", "appState.shareAppInvite(", 1),
+                Triple("ui/profile/ProfileSheet.kt", "appState.shareAppInviteText(", 1),
+                Triple("share/WhiteNoiseInviteShare.kt", "noteNotificationMoment()", 2),
             )
-        sites.forEach { (path, expected) ->
+        sites.forEach { (path, call, expected) ->
             val source = appModuleFile("src/main/java/dev/ipf/whitenoise/android/$path").readText()
-            val calls = Regex("""appState\.noteNotificationMoment\(\)""").findAll(source).count()
-            assertTrue("$path must report $expected reply-expected moment(s), found $calls", calls == expected)
+            val calls = Regex.fromLiteral(call).findAll(source).count()
+            assertTrue("$path must call $call $expected time(s), found $calls", calls == expected)
         }
     }
 

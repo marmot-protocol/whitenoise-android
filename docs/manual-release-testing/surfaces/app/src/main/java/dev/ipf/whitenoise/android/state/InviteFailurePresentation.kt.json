@@ -157,6 +157,41 @@
           "NCH-002",
           "GRP-005"
         ]
+      },
+      {
+        "surface": "setting:start_chat_not_on_white_noise",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
+        "anchor": "R.string.start_chat_not_on_white_noise",
+        "test_ids": [
+          "NCH-001",
+          "NCH-006"
+        ]
+      },
+      {
+        "surface": "setting:start_chat_not_on_white_noise_for",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
+        "anchor": "R.string.start_chat_not_on_white_noise_for",
+        "test_ids": [
+          "NCH-001",
+          "NCH-006"
+        ]
+      },
+      {
+        "surface": "setting:start_chat_not_on_white_noise_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
+        "anchor": "R.string.start_chat_not_on_white_noise_detail",
+        "test_ids": [
+          "NCH-001",
+          "NCH-006"
+        ]
+      },
+      {
+        "surface": "setting:toast_couldnt_start_chat",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
+        "anchor": "R.string.toast_couldnt_start_chat",
+        "test_ids": [
+          "NCH-006"
+        ]
       }
     ],
     "source_coverage": [
