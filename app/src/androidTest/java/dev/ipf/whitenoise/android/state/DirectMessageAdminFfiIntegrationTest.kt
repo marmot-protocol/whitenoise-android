@@ -12,6 +12,8 @@ import dev.ipf.marmotkit.RelayPolicyFfi
 import dev.ipf.marmotkit.marmotDeploymentWhiteNoise
 import dev.ipf.whitenoise.android.MdkAdoptionDeviceAcceptance
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -76,6 +78,36 @@ class DirectMessageAdminFfiIntegrationTest {
                 assertEquals(group, bob.startDirectChat(alice, 300L))
                 alice.assertChat(group, admins, 3_600uL)
                 bob.assertChat(group, admins, 3_600uL)
+            }
+        }
+
+    /** Simultaneous starts may found two DMs, but each has both admins and later starts keep returning one. */
+    @Test
+    fun simultaneousStartsFoundSymmetricDmsAndReuseStaysStable() =
+        runBlocking {
+            withParticipants { alice, bob ->
+                val founded =
+                    coroutineScope {
+                        val fromAlice = async { alice.startDirectChat(bob, 0L) }
+                        val fromBob = async { bob.startDirectChat(alice, 0L) }
+                        setOf(fromAlice.await(), fromBob.await())
+                    }
+                val admins = setOf(alice.account.accountIdHex, bob.account.accountIdHex)
+                founded.forEach { group ->
+                    alice.joinIfInvited(group)
+                    bob.joinIfInvited(group)
+                    alice.assertChat(group, admins, 0uL)
+                    bob.assertChat(group, admins, 0uL)
+                }
+
+                val aliceReuse = alice.startDirectChat(bob, 0L)
+                val bobReuse = bob.startDirectChat(alice, 0L)
+                assertTrue(aliceReuse in founded)
+                assertTrue(bobReuse in founded)
+                repeat(2) {
+                    assertEquals(aliceReuse, alice.startDirectChat(bob, 604_800L))
+                    assertEquals(bobReuse, bob.startDirectChat(alice, 300L))
+                }
             }
         }
 
@@ -164,6 +196,20 @@ class DirectMessageAdminFfiIntegrationTest {
                 while (native.chatListRow(account.label, group) == null) delay(100L)
             }
             native.acceptGroupInvite(account.label, group)
+        }
+
+        /** Accepts [group] only when this participant was invited to it rather than founding it. */
+        suspend fun joinIfInvited(group: String) {
+            val row =
+                withTimeout(30_000L) {
+                    var current = native.chatListRow(account.label, group)
+                    while (current == null) {
+                        delay(100L)
+                        current = native.chatListRow(account.label, group)
+                    }
+                    current
+                }
+            if (row.pendingConfirmation) native.acceptGroupInvite(account.label, group)
         }
 
         /** Checks the full admin set, self permission and timer that Android reads for chat details. */
