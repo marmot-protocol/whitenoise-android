@@ -30,9 +30,7 @@ internal fun OptimisticEdit.withNativeEditStatus(status: LocalSendStatusFfi?): O
                 nativeEditMessageId = status.summary.messageIds.firstOrNull() ?: nativeEditMessageId,
             )
         }
-        is LocalSendStatusFfi.Queued -> copy(status = MessageStatus.Pending, nativeEditMessageId = status.messageIdHex)
-        is LocalSendStatusFfi.EngineOwned ->
-            copy(status = MessageStatus.Pending, nativeEditMessageId = status.messageIdHex)
+        is LocalSendStatusFfi.Queued, is LocalSendStatusFfi.EngineOwned -> copy(status = MessageStatus.Pending)
         LocalSendStatusFfi.Rejected, LocalSendStatusFfi.RefusedNewMembers ->
             copy(
                 status = MessageStatus.Failed,

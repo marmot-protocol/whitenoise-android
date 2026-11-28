@@ -341,9 +341,11 @@ class ReplyNavigationTest {
         historyImportProvenance = null,
     )
 
-    /** Creates the optional native preview of the message being replied to. */
+    /** Creates the loaded parent shown by the reply fixture. */
     private fun timelineReplyPreview(messageId: String) =
         TimelineReplyPreviewFfi(
+            retentionSeconds = null,
+            retentionExpiresAt = null,
             messageIdHex = messageId,
             sender = "bob",
             plaintext = "parent",
@@ -358,8 +360,6 @@ class ReplyNavigationTest {
             media = emptyList(),
             replyToMessageIdHex = null,
             thread = null,
-            retentionSeconds = null,
-            retentionExpiresAt = null,
             deleted = false,
             deletionSource = DeletionSourceFfi.UNKNOWN,
             invalidationStatus = null,

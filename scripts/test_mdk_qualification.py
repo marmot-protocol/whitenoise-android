@@ -779,7 +779,7 @@ class BaselineStagingTest(unittest.TestCase):
         """The former baseline, candidate itself and a partial SHA all fail before any source overlay."""
         from scripts import stage_mdk_baseline_fixture as staging
         for source in ('34646a577807f2b112ee031f3c164ec58aa18b64',
-                       'ca52a04718628f08ed76b777df9c444594074182', '3fce9546'):
+                       '07567caf0814fa0f5688c5da83a7209f94c71e03', '3fce9546'):
             with self.subTest(source=source), tempfile.TemporaryDirectory() as directory:
                 destination = Path(directory)
                 pin = destination / 'app/src/main/marmotkit/MARMOT_VERSION'

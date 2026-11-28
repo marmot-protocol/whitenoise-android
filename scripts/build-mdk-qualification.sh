@@ -7,8 +7,8 @@ export WHITENOISE_MARMOTKIT_CACHE_DIR="$RUNNER_TEMP/mdk-qualification-cache"
 reports="$root/build/mdk-qualification"
 mkdir -p "$reports" "$root/build/mdk-pair/baseline" "$root/build/mdk-pair/candidate"
 git fetch origin master --no-tags
-# Android master revision that adopted the official 0.19.0 bundle.
-baseline=016c4916c3f831233ee3963dfdddfae85cde1242
+# Android master revision with the reviewed 0.19.0 runtime used for the RC2 and RC4 qualification runs.
+baseline=c0f475b9c6183c1b6b4d44ba4b469598752436fc
 printf '%s\n' "$baseline" > "$reports/baseline-source.txt"
 git show "$baseline:app/src/main/marmotkit/MARMOT_VERSION" > "$reports/baseline-MARMOT_VERSION"
 cp app/src/main/marmotkit/MARMOT_VERSION "$reports/candidate-MARMOT_VERSION"

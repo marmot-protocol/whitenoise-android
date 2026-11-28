@@ -5,15 +5,11 @@ Normal builds never regenerate bindings from a local MDK checkout. Maintainers
 update the reviewed pin in `app/src/main/marmotkit/MARMOT_VERSION` only after
 MDK has published the corresponding release.
 
-The [0.20.0-rc.2 adoption record](marmotkit-0.20.0-rc.2.md) covers the Android
-develop pin. The [26 November 2026 nightly](marmotkit-nightly-20261126.md)
-and [25 November nightly](marmotkit-nightly-20261125.md) records cover the
-first adoption of agent items and the upgrade findings. The
-[official 0.19.0 adoption](marmotkit-0.19.0.md) records the populated upgrade
-baseline.
+The [official 0.19.0 adoption](marmotkit-0.19.0.md) records Android's pin and
+consumer changes. The [official 0.18.0 adoption](marmotkit-0.18.0.md) records the
+populated upgrade baseline.
 
-The [official 0.18.0 adoption](marmotkit-0.18.0.md), the
-[official 0.17.0 adoption](marmotkit-0.17.0.md), the
+The [official 0.17.0 adoption](marmotkit-0.17.0.md), the
 [official 0.16.0 adoption](marmotkit-0.16.0.md), the
 [official 0.15.0 release](marmotkit-0.15.0.md), the
 [November 9 nightly](https://github.com/marmot-protocol/mdk/releases/tag/marmotkit-v0.15.0-nightly.20261109),
@@ -75,11 +71,11 @@ ignores history comparison. The October 22 nightly includes MDK #2513's fixes fo
 [#2381](https://github.com/marmot-protocol/mdk/issues/2381). All seven cases must
 execute: no ignored recovery case can satisfy adoption.
 
-The populated campaign builds the master revision that adopted 0.19.0
-(`016c4916c`, set in `scripts/build-mdk-qualification.sh`) and the candidate with one
+The populated campaign builds the reviewed Android master revision
+(`c0f475b9`, set in `scripts/build-mdk-qualification.sh`) and the candidate with one
 disposable signer and isolated `.mdkqualification` package, once with audit sharing
-enabled and once declined. It fails closed unless that revision pins the reviewed
-0.19.0 source `3fce9546`. Qualification
+enabled and once declined. It fails closed unless the baseline pins MarmotKit
+0.19.0 from MDK source `3fce9546`. Qualification
 sources must compile against both runtimes: when a MarmotKit type differs, keep the
 candidate's form in the qualification package and the baseline's form under
 `scripts/mdk-baseline-overlay/` as `<File>.kt.txt`, which the staging script copies
@@ -138,6 +134,19 @@ The official 0.14.0 pair starts after that schema/key transition; the same
 assertions now prove retained-data reopening, not a fresh rekey. No new storage
 migration is introduced relative to the October 23 nightly. Physical app-performance
 evidence remains separate from hosted qualification; phone testing is paused.
+
+### Android 0.20.0-rc.4 staging decision
+
+On November 28, 2026, the maintainer waived
+`healthyAccountReceivesAfterLocalDeletionAndRestart` only when the relay
+silently ignores history comparison, for MarmotKit `0.20.0-rc.4`
+(`07567caf0814fa0f5688c5da83a7209f94c71e03`) on Android `develop` and internal
+staging. The [qualification run](https://github.com/marmot-protocol/whitenoise-android/actions/runs/46127170756)
+on Android commit `a7f6835f55` missed the first incoming message with audit on
+and off. The retained-data upgrade, cold restart and all seven cases with an
+explicit comparison refusal passed in both modes. Track the missed message in
+[MDK #3643](https://github.com/marmot-protocol/mdk/issues/3643). Required review
+and CI still apply. Production and later pins require their own qualification.
 
 ## 1. Select and inspect the release
 

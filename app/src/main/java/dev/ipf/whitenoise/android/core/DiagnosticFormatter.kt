@@ -86,6 +86,8 @@ object DiagnosticFormatter {
                 "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] welcome pending for ${identity.publicIdentity(
                     event.recipientHex,
                 )} in group ${IdentityFormatter.short(event.groupIdHex)}"
+            is MarmotEventFfi.InviteDeliveryChanged ->
+                "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] invite delivery changed"
             is MarmotEventFfi.HistoryNoticesChanged ->
                 // Notices carry no relay, message or key identities; the list
                 // itself is re-read from the runtime, never copied here.
@@ -108,9 +110,6 @@ object DiagnosticFormatter {
                 "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] chat history imports changed"
             is MarmotEventFfi.RecoveryStatusChanged ->
                 "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] recovery status changed"
-            is MarmotEventFfi.InviteDeliveryChanged ->
-                // The delivery state is re-read from the runtime, never copied here.
-                "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] invite delivery changed"
             is MarmotEventFfi.RelayHealthChanged ->
                 "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] relay health changed"
             is MarmotEventFfi.DeviceUnlinked ->

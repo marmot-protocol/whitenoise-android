@@ -70,7 +70,7 @@ internal suspend fun admitForwardPublish(
         val existing = probeOrNull(probe)
         when {
             existing.handedOff -> return@withTimeoutOrNull
-            existing.isTerminalRejection -> throw ForwardPublishRejectedException(messageIndex)
+            existing.isTerminalLocalSendFailure -> throw ForwardPublishRejectedException(messageIndex)
         }
         if (existing == null) {
             beforeAdmit()
@@ -124,7 +124,7 @@ private suspend fun awaitEngineHandoff(
     while (true) {
         val status = probeOrNull(probe)
         if (status.handedOff) return
-        if (status.isTerminalRejection) throw ForwardPublishRejectedException(messageIndex)
+        if (status.isTerminalLocalSendFailure) throw ForwardPublishRejectedException(messageIndex)
         delay(pollMillis)
     }
 }
