@@ -105,9 +105,15 @@ sheet's rows belong to #4064.
 | Open a place to read or browse: Message info, a viewer, a Settings sub-page | Page with a top app bar and Back, predictive back | `SettingsScaffold` or `WhiteNoiseScaffold` with `WhiteNoiseTopBar` | The toolbar arrow and system Back return to the place that opened it. About → Developer returns to About, Help & support → Developer returns there, and a Settings search result returns to the results. |
 | Start a task to finish or abandon: Forward, Share to, create and edit flows with staged changes | Full-screen dialog | `WhiteNoiseTopBar` with `WhiteNoiseTopBarNavigation.Close` | Selecting recipients only prepares the task. The named action (Forward) completes it. Close abandons it and returns to the conversation. |
 
-Settings sub-pages are destinations in the Settings navigation, never content
-swapped in place. Licenses is the reference: About, the licenses list and one
-notice are three places to go back through.
+Settings sub-pages are destinations in the Settings navigation
+(`SettingsDetail` in `ui/navigation/AppDestinations.kt`), never content swapped
+in place: Linked devices, Notification profiles, a relay's details, a stored
+attachments list, an emoji set's preview and the licenses. Licenses is the
+reference: About → Open source licenses → one notice are three pages, each
+with Back. Opening a page pushes it above the page that opened it, an item page
+carries its item in the route (`ShellRoute.Settings.arg`, such as the notice
+or the relay URL), and the opened chain survives process death. A deep link or
+notification that opens a page directly gets the page's fixed parents instead.
 
 | Screenshot | What to look for |
 | --- | --- |
@@ -124,8 +130,8 @@ position, and Back or a swipe dismisses it where the flow allows.
 | Task | Material API | App component | Apply and dismiss |
 | --- | --- | --- | --- |
 | Secondary task tied to the screen underneath | `ModalBottomSheet` | `WhiteNoiseModalBottomSheet`, never Material's sheet directly | Back or swipe dismisses. A choice applies as the picker rules above say. |
-| Camera scanner | Full-screen dialog | The QR scanner, with Close | Close returns to the flow that opened it. A scan result hands back to that flow. |
-| A form that grows past one task | Page with Back | — | If finishing needs sheet → dialog → another picker, the flow is a page instead. |
+| Camera scanner | Full-screen dialog | `QrScannerDialog`, with Close | Close and system Back turn the camera off and return to the flow that opened it. A scan result hands back to that flow. |
+| A form that grows past one task | Page with Back | `SmartFolderPeopleConditionPage` | If finishing needs sheet → dialog → another picker, the flow is a page instead. The smart-folder People filter is one page with its people list inline; Back after a change asks before discarding. |
 | Ongoing progress the person can leave | Inline status | — | Show it inline where the person can safely continue elsewhere. |
 
 Recorded exception: Sign out and Sign out & wipe stay sheets
@@ -138,6 +144,7 @@ are. A simple destructive decision anywhere else is a confirmation dialog.
 | <img src="../app/src/test/snapshots/reaction_details_complete_amoled.png" width="195" alt="Reaction details sheet"> | A sheet whose content only makes sense over its message. |
 | <img src="../app/src/test/snapshots/disappearing_messages_sheet_confirm_dark_green.png" width="195" alt="Confirmation before applying a shorter timer"> | The chat timer: a shorter timer confirms inside the sheet. |
 | <img src="../app/src/test/snapshots/profile_keys_wipe_sheet_light.png" width="195" alt="Sign out and wipe sheet"> | The recorded exception: the wipe sheet explains exactly what is destroyed. |
+| <img src="../app/src/test/snapshots/qr_scanner_idle_dark.png" width="195" alt="QR scanner as a full-screen task with Close"> | The camera scanner is a full-screen task with Close, not a sheet with a handle. |
 
 ### Confirmation, Undo and the error colour (#4097)
 
