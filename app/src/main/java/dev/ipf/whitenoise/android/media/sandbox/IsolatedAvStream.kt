@@ -355,7 +355,7 @@ internal class IsolatedAvStream private constructor(
             try {
                 context.bindIsolatedService(
                     Intent(context, MediaAvPlaybackService::class.java),
-                    Context.BIND_AUTO_CREATE,
+                    lane.bindFlags(wantVideo),
                     workerInstanceName(if (lane == AvStreamLane.Playback) "av_playback" else "av_analysis", instance),
                     { command -> callbackHandler.post(command) },
                     connection,
