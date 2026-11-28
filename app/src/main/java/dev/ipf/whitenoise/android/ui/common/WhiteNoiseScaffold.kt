@@ -128,10 +128,8 @@ fun ScaffoldTopBarWithNoticeSlot(
             Column {
                 if (topNoticeSlot) TopNoticeSlot()
                 LocalDialogInputSnackbar.current?.let { snackbar ->
-                    WhiteNoiseSnackbarHost(
-                        snackbar,
-                        modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
-                    )
+                    val safeHorizontal = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)
+                    WhiteNoiseSnackbarHost(snackbar, modifier = Modifier.windowInsetsPadding(safeHorizontal))
                 }
             }
         },
