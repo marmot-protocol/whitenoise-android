@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
+import android.Manifest
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
@@ -37,6 +38,8 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.util.TimeZone
@@ -99,6 +102,7 @@ class DeviceManagementScreenshotTest {
     /** The removal confirmation. */
     @Test
     fun removeDialogDark() {
+        shadowOf(RuntimeEnvironment.getApplication()).grantPermissions(Manifest.permission.HIDE_OVERLAY_WINDOWS)
         val tablet = fixtureDevice("tablet", label = "Tablet")
         show(Look(dark = true)) { LinkedDeviceDetailContent(tablet, busy = false, onBack = {}) }
         compose.onNodeWithTag(DEVICE_DETAIL_REMOVE_TAG).performScrollTo().performClick()

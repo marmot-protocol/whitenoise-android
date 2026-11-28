@@ -43,6 +43,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import dev.ipf.marmotkit.DeviceLinkPromptFfi
 import dev.ipf.marmotkit.DeviceLinkPromptStateFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.state.DeviceLinkRequest
 import dev.ipf.whitenoise.android.state.DeviceLinkRequestWatcher
@@ -292,7 +293,13 @@ internal fun DeviceLinkConsentPage(
             verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Avatar(title = profile.name, seed = profile.seed, size = 40.dp, pictureUrl = profile.avatarUrl)
+                Avatar(
+                    title = profile.name,
+                    seed = profile.seed,
+                    size = 40.dp,
+                    pictureUrl = profile.avatarUrl,
+                    pictureDomain = AvatarImageLoader.publicProfiles(),
+                )
                 Column {
                     Text(profile.name, style = MaterialTheme.typography.titleMedium)
                     Text(
