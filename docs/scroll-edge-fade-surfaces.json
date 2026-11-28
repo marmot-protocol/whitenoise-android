@@ -132,21 +132,6 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListEmptyStates.kt",
-      "calls": {
-        "fadingVerticalScroll": 1
-      },
-      "family": "chats",
-      "policy": "ordinary",
-      "test_ids": [
-        "SCR-001",
-        "SCR-002",
-        "SCR-003",
-        "SCR-004",
-        "SET-061"
-      ]
-    },
-    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
       "calls": {
         "LazyColumn": 1
@@ -298,7 +283,8 @@
         "SCR-001",
         "SCR-002",
         "SCR-003",
-        "SCR-004"
+        "SCR-004",
+        "SET-061"
       ]
     },
     {

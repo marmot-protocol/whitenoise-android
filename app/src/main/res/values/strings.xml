@@ -185,7 +185,7 @@
     <string name="folder_autosave_failed">Couldn’t save your latest changes. Edit again or go back to retry.</string>
     <string name="folder_name_required">Enter a folder name. The last saved name is kept.</string>
     <string name="folder_search">Search</string>
-    <string name="no_results">No Results</string>
+    <string name="no_results">No results</string>
     <string name="done">Done</string>
     <string name="clear_search">Clear search</string>
     <string name="chat_list_action_add_to_folder">Add to folder</string>
@@ -2513,14 +2513,14 @@
     <string name="qr_turn_flashlight_on">Turn flashlight on</string>
     <string name="qr_turn_flashlight_off">Turn flashlight off</string>
     <string name="startup_loading_message">Starting White Noise…</string>
-    <string name="chat_rows_no_chats_title">No Chats</string>
+    <string name="chat_rows_no_chats_title">No chats</string>
     <string name="chat_rows_no_chats_detail">Start a new chat to send a message.</string>
     <string name="conversation_pane_placeholder">Select a chat</string>
-    <string name="chat_rows_no_unread_title">No Unread Chats</string>
+    <string name="chat_rows_no_unread_title">No unread chats</string>
     <string name="chat_rows_no_unread_detail">You’re all caught up.</string>
     <string name="chat_rows_no_results_detail">Check the spelling or try a different search.</string>
     <string name="chat_rows_empty_folder_detail">No chats match this folder.</string>
-    <string name="chat_rows_no_archived_title">No Archived Chats</string>
+    <string name="chat_rows_no_archived_title">No archived chats</string>
     <string name="chat_rows_no_archived_detail">Chats you archive will appear here.</string>
     <string name="quick_account_switching">Quick account switching</string>
     <string name="quick_account_switching_detail">Shows other accounts beside your avatar. Tap one to switch.</string>

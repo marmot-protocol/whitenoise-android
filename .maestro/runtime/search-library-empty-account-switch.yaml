@@ -12,7 +12,7 @@ name: search-library-empty-account-switch
 - assertVisible: Switch Profile
 - tapOn: Maestro Carol
 - assertVisible: Switch Profile, Maestro Carol
-- assertVisible: No Chats
+- assertVisible: No chats
 - assertNotVisible: Maestro group
 - runFlow:
     file: ../fixtures/open-empty-library.yaml
@@ -21,7 +21,7 @@ name: search-library-empty-account-switch
 - back
 - assertNotVisible:
     id: global.library
-- assertVisible: No Chats
+- assertVisible: No chats
 - tapOn: Switch Profile, Maestro Carol
 - assertVisible: Switch Profile
 - tapOn: Maestro Alice

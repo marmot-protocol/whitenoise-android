@@ -2038,7 +2038,7 @@ class RuntimeEvidenceTest(unittest.TestCase):
         self.assertEqual(returned[-1], {'assertVisible': 'Maestro group'})
         switch = (root / 'runtime/search-library-empty-account-switch.yaml').read_text()
         self.assertLess(switch.index('- tapOn: Maestro Carol'), switch.index('- tapOn: Maestro Alice'))
-        self.assertIn('- assertVisible: No Chats', switch)
+        self.assertIn('- assertVisible: No chats', switch)
         self.assertIn('- assertNotVisible: Maestro group', switch)
         query = (root / 'runtime/search-library-empty-query-clear.yaml').read_text()
         self.assertIn('- inputText: Maestro absent attachment 934867', query)
