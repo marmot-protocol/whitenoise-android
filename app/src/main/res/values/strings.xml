@@ -3,6 +3,7 @@
     <string name="voice_recording_stopped_announcement">Recording stopped</string>
     <string name="voice_message_seek">Playback position</string>
     <string name="video_failed">Video couldn\'t load</string>
+    <string name="video_seek_failed">Couldn’t seek to this point</string>
     <string name="conversation_new_message_from">New message from %1$s</string>
     <plurals name="conversation_new_messages">
         <item quantity="one">%1$d new message</item>
@@ -184,7 +185,7 @@
     <string name="folder_autosave_failed">Couldn’t save your latest changes. Edit again or go back to retry.</string>
     <string name="folder_name_required">Enter a folder name. The last saved name is kept.</string>
     <string name="folder_search">Search</string>
-    <string name="no_results">No Results</string>
+    <string name="no_results">No results</string>
     <string name="done">Done</string>
     <string name="clear_search">Clear search</string>
     <string name="chat_list_action_add_to_folder">Add to folder</string>
@@ -305,9 +306,13 @@
     <string name="error_missing_key_package_for">We couldn’t find a usable chat key for %1$s. Ask them to install or update White Noise and open it, then retry.</string>
     <string name="invite_to_white_noise">Invite to White Noise</string>
     <string name="invite_friends">Invite friends</string>
-    <string name="invite_to_white_noise_description">%1$s isn\'t on White Noise yet. Share the app to start a secure chat.</string>
-    <string name="unknown_invite_to_white_noise_description">This user isn\'t on White Noise yet. Share the app to start a secure chat.</string>
     <string name="invite_message">Join me on White Noise. No phone number. No surveillance. Just real privacy. Download it here: https://www.whitenoise.chat/download</string>
+    <string name="start_chat_not_on_white_noise_for">%1$s isn’t on White Noise yet</string>
+    <string name="start_chat_not_on_white_noise">This person isn’t on White Noise yet</string>
+    <string name="start_chat_not_on_white_noise_detail">Send them an invite. When they’ve installed White Noise and opened it, try again.</string>
+    <string name="send_invite">Send invite</string>
+    <!-- %1$s is the sender’s profile name; %2$s is their full npub public key. Keep the download URL unchanged. -->
+    <string name="invite_message_personal">I’m %1$s on White Noise, a private messenger that doesn’t need a phone number. Install it, tap New chat and paste my key to message me: %2$s\nDownload: https://www.whitenoise.chat/download</string>
     <string name="error_invalid_identity_reference">That recipient is not a valid Nostr public key. Use an npub, profile link, or hex public key.</string>
     <string name="error_group_create_failed_retry">Something went wrong while setting up encrypted chat. Check your connection and try again.</string>
     <string name="error_no_group_members_selected">None of the selected people could be added. Ask them to check their chat setup, or edit your selection.</string>
@@ -1327,6 +1332,10 @@
     <string name="group_history_may_be_incomplete">Some earlier messages in this chat may be missing.</string>
     <string name="group_history_before_rejoin">You rejoined this chat. Messages from before you rejoined may be missing.</string>
     <string name="account_history_may_be_incomplete">Some messages may be missing from this account. White Noise couldn’t confirm that every message arrived.</string>
+    <string name="private_key_reminder_title">Save your private key</string>
+    <string name="private_key_reminder_body">If you lose this phone, your key is the only way to keep this identity and your contacts.</string>
+    <string name="private_key_reminder_save">Save key</string>
+    <string name="private_key_reminder_not_now">Not now</string>
     <string name="history_notice_dismiss_failed">Couldn\'t dismiss the history notice. Try again.</string>
     <string name="group_rejoin_title">Rejoin group?</string>
     <string name="group_rejoin_invited_by">Invited by %1$s\n%2$s</string>
@@ -1988,9 +1997,27 @@
     <string name="emoji_sets_builtin_shown">Pre-installed · %1$s</string>
     <string name="emoji_sets_builtin_hidden">Hidden from picker. Still shows in messages.</string>
     <string name="emoji_sets_update_available">Update available</string>
-    <string name="emoji_sets_load_image">Load preview image</string>
-    <string name="emoji_sets_image_privacy">Loading a preview or installing a set shares your IP address with its image hosts.</string>
-    <string name="emoji_sets_preview_host">Preview image host: %1$s</string>
+    <string name="emoji_sets_load_emoji">Load emoji</string>
+    <!-- %1$s lists web hosts such as "nostr.build and void.cat" or "a.com, b.com, c.com and 2 more". The quantity is the total host count. -->
+    <plurals name="emoji_sets_image_hosts">
+        <item quantity="one">Images come from %1$s. Loading or installing them shares your IP address with that host.</item>
+        <item quantity="other">Images come from %1$s. Loading or installing them shares your IP address with those hosts.</item>
+    </plurals>
+    <!-- The last item of a host list, as in "a.com, b.com, c.com and 2 more". -->
+    <plurals name="emoji_sets_more_hosts">
+        <item quantity="one">%1$d more</item>
+        <item quantity="other">%1$d more</item>
+    </plurals>
+    <string name="emoji_sets_image_hosts_unknown">Loading or installing these images shares your IP address with their hosts.</string>
+    <!-- %1$s is an emoji count such as "12 emoji"; %2$s is Installed or Update available. -->
+    <string name="emoji_sets_summary" translatable="false">%1$s · %2$s</string>
+    <string name="emoji_sets_untitled">Untitled set</string>
+    <!-- %1$s is an emoji shortcode such as :fox:. -->
+    <string name="emoji_sets_emoji_loading">%1$s, loading</string>
+    <!-- %1$s is an emoji shortcode such as :fox:. -->
+    <string name="emoji_sets_emoji_failed">%1$s couldn’t load.</string>
+    <!-- %1$s is an emoji shortcode such as :fox:. -->
+    <string name="emoji_sets_emoji_unavailable">%1$s isn’t available on this device.</string>
     <string name="emoji_sets_install">Install set</string>
     <string name="emoji_sets_update">Update set</string>
     <string name="emoji_sets_check_update">Check for update</string>
@@ -2486,14 +2513,14 @@
     <string name="qr_turn_flashlight_on">Turn flashlight on</string>
     <string name="qr_turn_flashlight_off">Turn flashlight off</string>
     <string name="startup_loading_message">Starting White Noise…</string>
-    <string name="chat_rows_no_chats_title">No Chats</string>
+    <string name="chat_rows_no_chats_title">No chats</string>
     <string name="chat_rows_no_chats_detail">Start a new chat to send a message.</string>
     <string name="conversation_pane_placeholder">Select a chat</string>
-    <string name="chat_rows_no_unread_title">No Unread Chats</string>
+    <string name="chat_rows_no_unread_title">No unread chats</string>
     <string name="chat_rows_no_unread_detail">You’re all caught up.</string>
     <string name="chat_rows_no_results_detail">Check the spelling or try a different search.</string>
     <string name="chat_rows_empty_folder_detail">No chats match this folder.</string>
-    <string name="chat_rows_no_archived_title">No Archived Chats</string>
+    <string name="chat_rows_no_archived_title">No archived chats</string>
     <string name="chat_rows_no_archived_detail">Chats you archive will appear here.</string>
     <string name="quick_account_switching">Quick account switching</string>
     <string name="quick_account_switching_detail">Shows other accounts beside your avatar. Tap one to switch.</string>
@@ -3064,4 +3091,7 @@
     <string name="remote_signer_disconnect_body">This account stays on this device. Sending and other signed actions stop until you pair again.</string>
     <string name="remote_signer_disconnect_confirm">Disconnect</string>
     <string name="remote_signer_switcher_attention">Remote signer needs attention</string>
+    <string name="first_run_chats_title">Start your first conversation</string>
+    <string name="first_run_chats_detail">Invite someone you talk to. While you wait, ask the White Noise team anything.</string>
+    <string name="first_run_new_chat">New chat</string>
 </resources>

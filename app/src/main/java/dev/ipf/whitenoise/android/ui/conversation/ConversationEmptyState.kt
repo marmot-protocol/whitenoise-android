@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import dev.ipf.whitenoise.android.ui.group.clampedDisappearingSecs
+
 /**
  * What an empty conversation should say about itself.
  *
@@ -27,5 +29,5 @@ internal sealed interface ConversationEmptyState {
 internal fun conversationEmptyState(retentionSeconds: ULong?): ConversationEmptyState =
     retentionSeconds
         ?.takeIf { it > 0uL }
-        ?.let { ConversationEmptyState.DisappearingMessages(it.toLong()) }
+        ?.let { ConversationEmptyState.DisappearingMessages(it.clampedDisappearingSecs()) }
         ?: ConversationEmptyState.NoMessages

@@ -7,11 +7,13 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
+import java.io.FileNotFoundException
 
 /** A paused seek acknowledges its bounded attempt; a refused attempt never invents a new frame. */
 internal class RawAvPausedSeekRequest(
     val target: RawAvPosterTarget,
     val completion: SettableFuture<Void?>,
+    val explicit: Boolean = true,
 ) {
     /**
      * Completes the exact seek future on acceptance or cancels it on refusal without interruption.
@@ -36,6 +38,7 @@ internal interface RawAvPausedPosterOwner {
     fun posterResult(
         request: RawAvPausedSeekRequest,
         probe: MediaProbe?,
+        missing: FileNotFoundException? = null,
     ): Boolean
 }
 
@@ -79,6 +82,8 @@ internal class RawAvPausedPoster(
         } catch (_: CancellationException) {
             // Stop may cancel the preparation future; that request is refused without killing this producer.
             accepted = owner.posterResult(request, null)
+        } catch (missing: FileNotFoundException) {
+            accepted = owner.posterResult(request, null, missing)
         } catch (_: Exception) {
             accepted = owner.posterResult(request, null)
         } finally {

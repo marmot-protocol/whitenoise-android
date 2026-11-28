@@ -93,6 +93,14 @@
     <string name="link_request_linked">Das neue Gerät ist verknüpft.</string>
     <string name="link_request_added_elsewhere">%1$s wurde von %2$s hinzugefügt.</string>
     <string name="link_request_added_elsewhere_unnamed">Das Gerät wurde von einem anderen deiner Geräte hinzugefügt.</string>
+    <string name="link_request_notice">Ein neues Gerät möchte mit deinem Konto verknüpft werden.</string>
+    <string name="link_request_notice_other_profile">Ein neues Gerät möchte mit %1$s verknüpft werden.</string>
+    <string name="link_request_repeated_notice">Wiederholte Verknüpfungsanfragen: Jemand hat möglicherweise deinen Schlüssel.</string>
+    <string name="link_request_repeated_notice_other_profile">Wiederholte Verknüpfungsanfragen für %1$s: Jemand hat möglicherweise deinen Schlüssel.</string>
+    <string name="link_request_repeated_title">Wiederholte Verknüpfungsanfragen</string>
+    <string name="link_request_repeated_detail">Innerhalb einer Stunde wollten mehrmals Geräte mit diesem Konto verknüpft werden. Jemand hat möglicherweise deinen privaten Schlüssel, daher wird Verknüpfen nicht angeboten. Wenn du diese Anfragen selbst gestellt hast, versuche es später von einem Gerät aus erneut.</string>
+    <string name="link_request_dont_link">Nicht verknüpfen</string>
+    <string name="link_request_review_devices">Geräte prüfen</string>
     <string name="device_detail_rename">Umbenennen</string>
     <string name="device_detail_rename_detail">Der Name, der für dieses Gerät auf all deinen Geräten angezeigt wird.</string>
     <string name="device_detail_keep">Bei Inaktivität behalten</string>

@@ -74,7 +74,7 @@ batch related edits into one candidate push, reuse matching results, retry diagn
 transient failures selectively, and request preview APKs only when testing needs them.
 Core code validation and final readiness/merge requirements remain mandatory.
 
-Every pull request to `master` and every push to `master` starts
+Every pull request to `master` or `develop` and every push to `master` starts
 `.github/workflows/android-ci.yml`. The workflow uses read-only credentials and public build inputs. Existing detekt findings remain frozen in
 `config/detekt/detekt-baseline.xml`.
 
@@ -197,9 +197,12 @@ in every merge group and full-matrix pull request, `build-contracts` builds
 both shipping R8 variants and fails on an over-budget method (see
 [DEX method-size budgets](docs/performance.md#dex-method-size-budgets)).
 
-Pushes to `master` also run `.github/workflows/android-staging-apk.yml`, which
+Pushes to `develop` run `.github/workflows/android-staging-apk.yml`, which
 builds and uploads a signed `arm64-v8a` staging release APK for internal
-installation. That workflow is also manually runnable from GitHub Actions. Its
+installation. Download the `whitenoise-staging-v8a-release-*` artifact from the
+[latest successful `develop` run](https://github.com/marmot-protocol/whitenoise-android/actions/workflows/android-staging-apk.yml?query=branch%3Adevelop+is%3Asuccess)
+to update an existing Staging install. Maintainers can also dispatch this
+workflow on a reviewed branch for diagnostics. Its
 summary shows the APK's size by component (each native library and dex file,
 `resources.arsc`, `res/`, `assets/`, `META-INF/` and ZIP overhead), and the same
 report is kept as an `apk-size-staging-*` artifact. The production build workflow

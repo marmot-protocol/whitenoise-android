@@ -19,6 +19,7 @@ import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.LoopbackNostrRelay
+import dev.ipf.whitenoise.android.state.NotificationAskMoment
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.chatListItemFromProjection
 import dev.ipf.whitenoise.android.state.requireCreatedGroupId
@@ -211,6 +212,12 @@ class MaestroRuntimeHostTest {
                         )
                     peerLabel = accounts[1].label
                     groupId = group
+                    // A returning install: the notification explanation opens at readiness, ahead of Android's prompt.
+                    context
+                        .getSharedPreferences(directory.name, Context.MODE_PRIVATE)
+                        .edit()
+                        .putBoolean(NotificationAskMoment.FIRST_READY_SEEN_KEY, true)
+                        .commit()
                     val app =
                         withContext(Dispatchers.Main.immediate) {
                             WhiteNoiseAppState(

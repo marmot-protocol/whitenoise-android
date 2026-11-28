@@ -22,7 +22,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
@@ -204,12 +204,15 @@ internal fun ChatsScreen(
     onGroupCreateFlowSuperseded: () -> Unit = {},
     diagnosticsPrompt: @Composable () -> Unit = {},
     onFirstRunHelp: ((Boolean) -> Unit)? = null,
+    onSavePrivateKey: (() -> Unit)? = null,
+    chatsActive: () -> Boolean = { true },
 ) {
     androidx.compose.runtime.LaunchedEffect(Unit) {
         appState.recordProductObservation(dev.ipf.whitenoise.android.state.ProductObservation.INBOX)
     }
     val groupTitleCopy = rememberGroupTitleCopy()
     var showNewChatFlow by rememberSaveable { mutableStateOf(false) }
+    val accountSheets = remember(appState.runtimeGeneration) { ChatListAccountSheets() }
     // The list head when New Message opened, the row its keyed scroll anchor holds while the
     // flow replaces it. Not saved: after process death the open falls back to the current head.
     var newChatFlowOriginHead by
@@ -935,7 +938,8 @@ internal fun ChatsScreen(
             runtimeGeneration = appState.runtimeGeneration,
             showArchived = showArchived,
         )
-    val chatListState = searchViewport?.listState(showArchived) ?: key(viewportOwner) { rememberLazyListState() }
+    val chatListState = searchViewport?.listState(showArchived) ?: key(viewportOwner) { rememberChatAvatarListState() }
+    val avatarVisibleKeys = rememberChatAvatarVisibleKeys(chatListState)
     // Active/archived viewports keep separate scrolling; only decorative fades share the account lifetime.
     val edgeFadeMotion = rememberScrollEdgeFadeMotion(appState.activeAccountRef to appState.runtimeGeneration)
     val folderArrival =
@@ -1022,15 +1026,7 @@ internal fun ChatsScreen(
                         rows
                     }
                 }
-            if (searchActive) {
-                rows
-            } else {
-                sortFolderChats(
-                    rows,
-                    selectedFolder?.sort ?: dev.ipf.whitenoise.android.state.ChatFolderSort.RECENT,
-                    appState.activeAccount?.accountIdHex,
-                ) { chatListItemDisplayTitle(it, appState, groupTitleCopy) }
-            }
+            if (searchActive) rows else sortChatListFolderRows(rows, selectedFolder?.sort, appState, groupTitleCopy)
         }
     RecordUnreadFilterFirstResultFrame(
         active = unreadOnly,
@@ -1685,13 +1681,13 @@ internal fun ChatsScreen(
     }
 
     // Consent belongs to the unobstructed Chats list, after all account setup.
-    // Keep its request in the app root so leaving Chats never consumes the choice.
-    val anotherSheetVisible =
+    fun otherSheetOpen(): Boolean =
         actionSheetChatId != null ||
             folderHandoff.pickerChatIds != null ||
             pendingBulkDelete != null ||
-            pendingLeaveAndDelete != null
-    if (!showNewChatFlow && !anotherSheetVisible && !globalSearchPresentationState.filterSheetOpen) {
+            pendingLeaveAndDelete != null ||
+            accountSheets.isOpen
+    if (!showNewChatFlow && !otherSheetOpen() && !globalSearchPresentationState.filterSheetOpen) {
         diagnosticsPrompt()
     }
 
@@ -2035,6 +2031,7 @@ internal fun ChatsScreen(
                 } else {
                     ChatListTopBar(
                         appState = appState,
+                        accountSheets = accountSheets,
                         retainedAccountAvatars = retainedAccountAvatars,
                         searchOpen = searchOpen,
                         searchQuery = searchQuery,
@@ -2348,17 +2345,27 @@ internal fun ChatsScreen(
                 // body frame's banner slot must not pad for them again (#3312).
                 .consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
         ) {
-            // Chats reset and folder management remain available with an empty list.
-            // Native folder models still own visibility/counts; this row stays above list/empty-state swaps.
-            // The prototype swaps the whole top column for the search bar and its mode chips, so the
-            // folder pills leave with it and come back when search closes.
-            if (appState.activeAccountRef != null && !searchOpen) {
-                key(appState.activeAccountRef, appState.runtimeGeneration) {
+            // Folder chips stay available above the empty list and yield to the search bar.
+            val folderAccount = appState.activeAccountRef
+            if (folderAccount != null && !searchOpen) {
+                key(folderAccount, appState.runtimeGeneration) {
+                    val selectFolder =
+                        rememberChatFolderAvatarSelection(appState, folderAccount, onSelectFolder) { id ->
+                            val rule = id?.let { appState.chatFolderPreferences.folderRule(folderAccount, it) }
+                            val source = chatFolderSource(rule, folderActiveItems, folderArchivedItems)
+                            val candidates = restrictToChatIds(source, id?.let { resolveFolderChatIds(it) })
+                            val sort = accountFolders.firstOrNull { it.id == id }?.sort
+                            val archived = rule?.smartFilter == null && rule?.archivedOnly == true
+                            val target =
+                                if (archived == showArchived) chatListState else searchViewport?.listState(archived)
+                            val ranked = sortChatListFolderRows(candidates, sort, appState, groupTitleCopy)
+                            folderAvatarViewport(ranked, target)
+                        }
                     ChatListFilterChips(
                         chips = folderChipModels,
                         chatsUnreadCount = appState.activeAccountMessageCount(),
                         selectedFolderId = selectedFolderId,
-                        onSelect = onSelectFolder,
+                        onSelect = selectFolder,
                         onEditFolder = { folderHandoff.editingFolderId = it },
                         onManageFolders = {
                             val sameOwner =
@@ -2431,6 +2438,7 @@ internal fun ChatsScreen(
                 },
                 notice = {
                     ChatListPersistentNotices(appState, historyNotices, showChatListNotices, sourceList.isNotEmpty())
+                    PrivateKeyReminder(appState, controller, showChatListNotices, onSavePrivateKey)
                 },
             ) {
                 val unreadOwnerAvailable =
@@ -2438,7 +2446,19 @@ internal fun ChatsScreen(
                         !appState.signOutInProgress &&
                         !appState.wipeInProgress
                 val unreadActionsAvailable = !searchOpen && !selectionMode && unreadOwnerAvailable
+                val otherScope = searchOpen || searchActive || showArchived || unreadOnly || selectedFolderId != null
+                val firstRunHelp = onFirstRunHelp.takeIf { controller.showsFirstRun(sourceList.isEmpty(), otherScope) }
                 key(appState.activeAccountRef, appState.runtimeGeneration, selectedFolderId, searchOpen) {
+                    val listEmpty = visibleItems.isEmpty()
+                    val emptyPageScroll = key(listEmpty, showArchived, unreadOnly) { rememberScrollState() }
+                    val unreadRefreshPending = unreadOnly && completeUnreadSnapshot == null
+                    val failedUnreadSnapshot = unreadOnly && unreadReadFailed
+                    val loadingSource = controller.isLoading && sourceList.isEmpty()
+                    val blockingLoad = loadFailurePlacement == LoadFailurePlacement.FullScreen
+                    val activeEmptyPageScroll =
+                        emptyPageScroll.takeUnless {
+                            unreadRefreshPending || failedUnreadSnapshot || loadingSource || blockingLoad
+                        }
                     ChatListUnreadPullSurface(
                         unreadOnly = unreadOnly,
                         actionsAvailable = unreadActionsAvailable,
@@ -2448,23 +2468,14 @@ internal fun ChatsScreen(
                                 actionSheetChatId == null &&
                                 !actionMenuOwner.pointerHeld,
                         atTop = {
-                            chatListUnreadPullArmed(
-                                unreadOnly = unreadOnly,
-                                listEmpty = visibleItems.isEmpty(),
-                                hasEarlierChats = hasEarlierChats,
-                                scrollInProgress = chatListState.isScrollInProgress,
-                                firstVisibleItemIndex = chatListState.firstVisibleItemIndex,
-                                firstVisibleItemScrollOffset = chatListState.firstVisibleItemScrollOffset,
-                            )
+                            chatListState.unreadPullArmed(unreadOnly, listEmpty, hasEarlierChats, activeEmptyPageScroll)
                         },
                         onUnreadOnlyChange = { setUnreadOnly(it) },
                         status = {
-                            val unreadRefreshPending = unreadOnly && completeUnreadSnapshot == null
-                            if (!unreadReadFailed && unreadRefreshPending && visibleItems.isNotEmpty()) {
+                            if (!failedUnreadSnapshot && unreadRefreshPending && !listEmpty) {
                                 CircularProgressIndicator(Modifier.size(16.dp).testTag("chats.unread_refresh"))
                             }
-                            val failedUnreadSnapshot = unreadReadFailed && unreadOnly
-                            if (failedUnreadSnapshot && visibleItems.isNotEmpty()) {
+                            if (failedUnreadSnapshot && !listEmpty) {
                                 TextButton(onClick = { unreadRetry++ }) {
                                     Text(stringResource(R.string.pull_unread_retry))
                                 }
@@ -2475,7 +2486,7 @@ internal fun ChatsScreen(
                         val keepChatListMounted =
                             !browsingAttachments &&
                                 (unreadOnly || visibleItems.isNotEmpty() || messageResultsMode) &&
-                                loadFailurePlacement != LoadFailurePlacement.FullScreen &&
+                                !blockingLoad &&
                                 !blockLocalSearchRows(
                                     loading = messageResultsPending,
                                     hasLocalRows = visibleItems.isNotEmpty() || messageResultsMode,
@@ -2528,28 +2539,25 @@ internal fun ChatsScreen(
                                                 )
                                             }
                                         }
-                                        searchSections.groups.forEachIndexed { targetIndex, item ->
-                                            this.item(
-                                                key = visibleRowId(item),
-                                                contentType = CHAT_LIST_ROW_CONTENT_TYPE,
-                                            ) {
-                                                chatRowContent(item, targetIndex)
-                                            }
-                                        }
+                                        chatListRows(
+                                            searchSections.groups,
+                                            ::visibleRowId,
+                                            avatarVisibleKeys,
+                                            content = chatRowContent,
+                                        )
                                         if (messageResultsMode) {
                                             globalSearchResultItems(messageResultsContent) { result ->
                                                 messageResultReturnFocus(result)
                                             }
                                         }
                                     } else {
-                                        visibleItems.forEachIndexed { targetIndex, item ->
-                                            if (targetIndex == pinnedBoundary) {
-                                                chatListPinnedBoundaryItem(rowPlacementDurationMillis)
-                                            }
-                                            this.item(key = item.id, contentType = CHAT_LIST_ROW_CONTENT_TYPE) {
-                                                chatRowContent(item, targetIndex)
-                                            }
-                                        }
+                                        chatListRowsWithPinnedBoundary(
+                                            visibleItems,
+                                            pinnedBoundary,
+                                            rowPlacementDurationMillis,
+                                            avatarVisibleKeys,
+                                            chatRowContent,
+                                        )
                                     }
                                 }
                             }
@@ -2566,23 +2574,19 @@ internal fun ChatsScreen(
                                         openSearchMessage(group, message, libraryChats)
                                     },
                                 )
-                            unreadOnly &&
-                                unreadReadFailed &&
-                                visibleItems.isEmpty() ->
+                            failedUnreadSnapshot && listEmpty ->
                                 Column(Modifier.fillMaxSize().padding(16.dp)) {
                                     Text(stringResource(R.string.pull_unread_load_failed))
                                     TextButton(onClick = { unreadRetry++ }) {
                                         Text(stringResource(R.string.pull_unread_retry))
                                     }
                                 }
-                            unreadOnly &&
-                                completeUnreadSnapshot == null &&
-                                visibleItems.isEmpty() -> LoadingScreen()
-                            controller.isLoading && sourceList.isEmpty() -> {
+                            unreadRefreshPending && listEmpty -> LoadingScreen()
+                            loadingSource -> {
                                 val slowCopy = stringResource(R.string.chat_list_startup_slow)
                                 LoadingScreen(message = slowCopy.takeIf { controller.startupTakingLonger })
                             }
-                            loadFailurePlacement == LoadFailurePlacement.FullScreen ->
+                            blockingLoad ->
                                 ErrorContent(
                                     stringResource(R.string.couldnt_load_chats),
                                     requireNotNull(controller.error),
@@ -2603,19 +2607,16 @@ internal fun ChatsScreen(
                                 LoadingScreen(message = stringResource(R.string.conversation_search_loading))
                             // Message results own their loading, failure, empty and end states at the list boundary.
                             messageResultsMode -> Unit
-                            sourceList.isEmpty() && showArchived && !unreadOnly -> EmptyArchivedChats()
+                            sourceList.isEmpty() && showArchived && !unreadOnly -> EmptyArchivedChats(emptyPageScroll)
                             sourceList.isEmpty() && !unreadOnly ->
                                 EmptyChats(
                                     appState,
                                     onCreate = openNewMessageFlow,
-                                    onFirstRunHelp =
-                                        onFirstRunHelp.takeIf {
-                                            controller.error == null &&
-                                                controller.archivedItems.isEmpty() &&
-                                                selectedFolderId == null &&
-                                                !searchOpen &&
-                                                !searchActive
-                                        },
+                                    scrollState = emptyPageScroll,
+                                    onFirstRunHelp = firstRunHelp,
+                                    canShareInvite = {
+                                        chatsActive() && !showNewChatFlow && !folderManagerOpen && !otherSheetOpen()
+                                    },
                                 ) { newChatFlowLaunch = NewMessageFlowLaunch(it) }
                             visibleItems.isEmpty() && identifierResolution != IdentifierResolution.None ->
                                 controller.error
@@ -2642,6 +2643,7 @@ internal fun ChatsScreen(
                                             query = searchQuery.trim(),
                                             unreadFolderSelected = unreadFolderSelected,
                                             filtersActive = filtersActive,
+                                            scrollState = emptyPageScroll,
                                         )
                                     }
                                 }
@@ -2737,5 +2739,3 @@ private const val CHAT_LIST_JUMP_TO_TOP_SHOW_INDEX = 5
 private const val CHAT_LIST_JUMP_TO_TOP_HIDE_INDEX = 2
 
 private const val CHAT_LIST_JUMP_TO_TOP_SNAP_INDEX = 10
-
-private const val CHAT_LIST_ROW_CONTENT_TYPE = "chat-row"

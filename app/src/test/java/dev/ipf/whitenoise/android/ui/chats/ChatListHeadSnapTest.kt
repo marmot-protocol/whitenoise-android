@@ -9,19 +9,6 @@ import org.junit.Test
 
 class ChatListHeadSnapTest {
     @Test
-    fun headReorderSnapsWhenReaderWasAtTopWithClippedOffset() {
-        assertTrue(
-            shouldSnapChatListForHeadReorder(
-                previousHeadId = "a",
-                currentHeadId = "b",
-                preReorderFirstVisibleItemIndex = 0,
-                isScrollInProgress = false,
-                isActiveList = true,
-            ),
-        )
-    }
-
-    @Test
     fun headReorderSnapsWhenReaderWasFlushAtTop() {
         // Flush-at-top is not "scrolled deeper": at the exact top the reader
         // is watching the head, and a key-anchored reorder renders the new

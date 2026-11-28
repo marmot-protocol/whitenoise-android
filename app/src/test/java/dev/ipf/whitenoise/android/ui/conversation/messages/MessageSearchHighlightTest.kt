@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Test
 
 /** Which parts of a message a search marks, before any of it is painted. */
@@ -50,7 +51,7 @@ class MessageSearchHighlightTest {
     fun bodiesWhoseLengthChangesWhenLowercasedAreLeftUnmarked() {
         val body = "İstanbul"
 
-        assertEquals(body.length, body.length)
+        assertNotEquals(body.length, body.lowercase().length)
         assertEquals(emptyList<IntRange>(), messageSearchMatchRanges(body, "stan"))
     }
 

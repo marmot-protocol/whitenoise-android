@@ -1,0 +1,33 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/VoiceDraftEvictionCleanup.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "A confirmed eviction retires the old voice directory across rejoin and restart",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/VoiceDraftEvictionCleanup.kt",
+        "anchor": "val isolated = draftStore.quarantine(key)",
+        "test_ids": [
+          "MED-061"
+        ]
+      },
+      {
+        "surface": "A failed first membership read queues another eviction read without dropping the draft",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/VoiceDraftEvictionCleanup.kt",
+        "anchor": "onUnresolved()",
+        "test_ids": [
+          "MED-061"
+        ]
+      },
+      {
+        "surface": "Delayed eviction readback preserves a newer voice take",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/VoiceDraftEvictionCleanup.kt",
+        "anchor": "captureIsCurrent()",
+        "test_ids": [
+          "MED-061"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

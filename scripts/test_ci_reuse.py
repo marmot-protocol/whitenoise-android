@@ -18,7 +18,9 @@ TREE = 'a' * 40
 SHA = 'b' * 40
 HEAD = 'd' * 40
 BEFORE = 'e' * 40
+BASE = 'f' * 40
 WORKFLOW = '.github/workflows/android-ci.yml'
+PROOF_JOBS = f'repos/{REPO}/actions/runs/11/jobs?per_page=100'
 BLOBS = {path: 'c' * 40 for path in ci_reuse.TRUSTED_CODE}
 
 
@@ -40,12 +42,12 @@ class FakeApi:
 
 def artifact_path(lane, tree=TREE):
     """Build the artifact listing path the script requests for one lane."""
-    return f'repos/{REPO}/actions/artifacts?name={ci_reuse.attestation_name(lane, tree)}&per_page=100'
+    return f'repos/{REPO}/actions/artifacts?name=android-ci-attest-master-{BASE}-{lane}-{tree}&per_page=100'
 
 
 def artifact(lane, run_id=11, tree=TREE, **overrides):
     """Build one listed attestation artifact that came from a same-repository run."""
-    body = {'name': ci_reuse.attestation_name(lane, tree), 'expired': False,
+    body = {'id': 100 + run_id, 'name': f'android-ci-attest-master-{BASE}-{lane}-{tree}', 'expired': False,
             'created_at': '2026-11-17T10:00:00Z',
             'workflow_run': {'id': run_id, 'repository_id': 7, 'head_repository_id': 7}}
     body.update(overrides)
@@ -65,12 +67,26 @@ def contents(sha=HEAD, blobs=BLOBS):
     return {f'repos/{REPO}/contents/{path}?ref={sha}': {'sha': blob} for path, blob in blobs.items()}
 
 
+def published_proof(artifact_id=111, receipt='success'):
+    """Serve the aggregate job that owns proof publication."""
+    return {PROOF_JOBS: {'jobs': [{
+        'name': 'Compile, test, ktlint, detekt, Android lint (draft fast lane)',
+        'status': 'completed',
+        'conclusion': 'success',
+        'steps': [{
+            'name': f'Record validated tree proof {artifact_id}',
+            'status': 'completed',
+            'conclusion': receipt,
+        }],
+    }]}}
+
+
 def decide(api, event='pull_request', action='ready_for_review', mode='full', docs_only='false', tree=TREE,
            head_sha=SHA, setting='enforce', blobs=BLOBS, cache_inputs=lambda: False,
-           lint_inputs=lambda: False):
+           lint_inputs=lambda: False, base_ref='master', base_sha=BASE):
     """Run the production decision with a fake API and return its outputs and reason."""
     return ci_reuse.decide(api, REPO, event, action, mode, docs_only, tree, head_sha, setting,
-                           blobs, cache_inputs, lint_inputs)
+                           blobs, cache_inputs, lint_inputs, base_ref=base_ref, base_sha=base_sha)
 
 
 class TreeReuseTest(unittest.TestCase):
@@ -79,7 +95,7 @@ class TreeReuseTest(unittest.TestCase):
     def attested(self, lane, **run_overrides):
         """Return a fake API that holds one attested pull request run for the lane."""
         return FakeApi({artifact_path(lane): {'artifacts': [artifact(lane)]},
-                        f'repos/{REPO}/actions/runs/11': run(**run_overrides), **contents()})
+                        f'repos/{REPO}/actions/runs/11': run(**run_overrides), **contents(), **published_proof()})
 
     def test_ready_run_reuses_a_full_pull_request_result_for_the_same_tree(self):
         """A full-lane ready run on an attested tree skips the heavy jobs."""
@@ -87,11 +103,31 @@ class TreeReuseTest(unittest.TestCase):
         self.assertEqual(outputs, {'reuse': 'tree', 'reuse_run': '11', 'tree': TREE, 'lint_writer': 'false'})
         self.assertIn('run 11', reason)
 
+    def test_proofs_cannot_cross_branches_or_base_commits(self):
+        """An attestation only covers validation against the same master commit."""
+        for target in ({'base_ref': 'develop'}, {'base_sha': ''}, {'base_sha': BEFORE}):
+            with self.subTest(target=target):
+                self.assertEqual(decide(self.attested('full'), **target)[0]['reuse'], 'none')
+        for old_name in (f'android-ci-attest-master-{BEFORE}-full-{TREE}', f'android-ci-attest-full-{TREE}'):
+            with self.subTest(old_name=old_name):
+                api = self.attested('full', pull_requests=[{'base': {'ref': 'master', 'sha': BASE}}])
+                api.responses[artifact_path('full')] = {'artifacts': [artifact('full', name=old_name)]}
+                self.assertEqual(decide(api)[0]['reuse'], 'none')
+                self.assertEqual(api.paths, [artifact_path('full')])
+
+    def test_named_artifact_requires_the_official_master_only_upload(self):
+        """A successful develop run may contain a same-named artifact but skips the official upload."""
+        for receipt in (published_proof(receipt='skipped'), published_proof(artifact_id=112)):
+            api = self.attested('full', pull_requests=[{'base': {'ref': 'master', 'sha': BASE}}])
+            api.responses.update(receipt)
+            self.assertEqual(decide(api)[0]['reuse'], 'none')
+            self.assertIn(PROOF_JOBS, api.paths)
+
     def test_full_ready_run_rejects_a_precheck_result(self):
         """A full-lane run needs the complete lane, so a precheck proof never satisfies it."""
         api = FakeApi({artifact_path('full'): {'artifacts': []},
                        artifact_path('precheck'): {'artifacts': [artifact('precheck')]},
-                       f'repos/{REPO}/actions/runs/11': run(), **contents()})
+                       f'repos/{REPO}/actions/runs/11': run(), **contents(), **published_proof()})
         self.assertEqual(decide(api)[0]['reuse'], 'none')
         self.assertNotIn(artifact_path('precheck'), api.paths)
 
@@ -105,7 +141,7 @@ class TreeReuseTest(unittest.TestCase):
         """A full-lane result proves the precheck lane too."""
         api = FakeApi({artifact_path('precheck'): {'artifacts': []},
                        artifact_path('full'): {'artifacts': [artifact('full')]},
-                       f'repos/{REPO}/actions/runs/11': run(), **contents()})
+                       f'repos/{REPO}/actions/runs/11': run(), **contents(), **published_proof()})
         outputs, _ = decide(api, event='pull_request', action='ready_for_review', mode='precheck')
         self.assertEqual(outputs['reuse'], 'tree')
 
@@ -150,7 +186,7 @@ class TreeReuseTest(unittest.TestCase):
                           workflow_run={'id': 200 + index, 'repository_id': 7, 'head_repository_id': 9})
                  for index in range(20)]
         api = FakeApi({artifact_path('full'): {'artifacts': forks + [artifact('full')]},
-                       f'repos/{REPO}/actions/runs/11': run(), **contents()})
+                       f'repos/{REPO}/actions/runs/11': run(), **contents(), **published_proof()})
         self.assertEqual(decide(api)[0]['reuse'], 'tree')
         self.assertFalse([path for path in api.paths if '/runs/2' in path])
 
@@ -201,7 +237,7 @@ class TreeReuseTest(unittest.TestCase):
         stale[f'repos/{REPO}/contents/{ci_reuse.WORKFLOW_PATH}?ref={BEFORE}'] = {'sha': 'f' * 40}
         api = FakeApi({artifact_path('full'): {'artifacts': [artifact('full'), newer]},
                        f'repos/{REPO}/actions/runs/12': run(head_sha=BEFORE),
-                       f'repos/{REPO}/actions/runs/11': run(), **stale, **contents()})
+                       f'repos/{REPO}/actions/runs/11': run(), **stale, **contents(), **published_proof()})
         outputs, reason = decide(api)
         self.assertEqual((outputs['reuse'], outputs['reuse_run']), ('tree', '11'))
         self.assertNotEqual(reason, ci_reuse.DIFFERENT_CODE_REASON)
@@ -218,7 +254,7 @@ class TreeReuseTest(unittest.TestCase):
         newer = artifact('full', run_id=12, created_at='2026-11-17T12:00:00Z')
         api = FakeApi({artifact_path('full'): {'artifacts': [artifact('full'), newer]},
                        f'repos/{REPO}/actions/runs/12': run(conclusion='failure'),
-                       f'repos/{REPO}/actions/runs/11': run(), **contents()})
+                       f'repos/{REPO}/actions/runs/11': run(), **contents(), **published_proof()})
         self.assertEqual(decide(api)[0]['reuse_run'], '11')
         self.assertLess(api.paths.index(f'repos/{REPO}/actions/runs/12'),
                         api.paths.index(f'repos/{REPO}/actions/runs/11'))
@@ -460,7 +496,7 @@ class SettingTest(unittest.TestCase):
     def api(self):
         """Return a fake API that would otherwise grant tree reuse."""
         return FakeApi({artifact_path('full'): {'artifacts': [artifact('full')]},
-                        f'repos/{REPO}/actions/runs/11': run(), **contents()})
+                        f'repos/{REPO}/actions/runs/11': run(), **contents(), **published_proof()})
 
     def test_only_enforce_reuses(self):
         """Reuse needs an explicit enforce setting."""
@@ -504,7 +540,7 @@ class CandidateResilienceTest(unittest.TestCase):
         """A 404 on the newest candidate still lets the older verified proof win."""
         newer = artifact('full', run_id=12, created_at='2026-11-17T12:00:00Z')
         api = FakeApi({artifact_path('full'): {'artifacts': [artifact('full'), newer]},
-                       f'repos/{REPO}/actions/runs/11': run(), **contents()})
+                       f'repos/{REPO}/actions/runs/11': run(), **contents(), **published_proof()})
         self.assertEqual(decide(api)[0]['reuse_run'], '11')
         self.assertIn(f'repos/{REPO}/actions/runs/12', api.paths)
 

@@ -3,6 +3,7 @@
 package dev.ipf.whitenoise.android.ui.common
 
 import androidx.annotation.DrawableRes
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,15 +31,17 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSizes
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
-/** A button on a state page: [iconRes] leads the label and [testTag] marks it for tests. */
+/** A state page action with optional leading icon, test tag and control modifier. */
 internal class StateAction(
     val label: String,
     val onClick: () -> Unit,
     @DrawableRes val iconRes: Int? = null,
     val testTag: String? = null,
+    val modifier: Modifier = Modifier,
 )
 
 /**
@@ -59,6 +62,7 @@ internal fun StatePage(
     progressLabelModifier: Modifier = Modifier,
     primary: StateAction? = null,
     secondary: StateAction? = null,
+    scrollState: ScrollState = rememberScrollState(),
     extra: @Composable ColumnScope.() -> Unit = {},
     footer: @Composable ColumnScope.() -> Unit = {},
 ) {
@@ -66,7 +70,7 @@ internal fun StatePage(
         modifier =
             modifier
                 .fillMaxSize()
-                .whiteNoiseVerticalScroll(rememberScrollState())
+                .whiteNoiseVerticalScroll(scrollState)
                 .padding(WhiteNoiseSpacing.CompactScreenMargin),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -130,13 +134,14 @@ internal fun StateContent(
     progressLabelModifier: Modifier = Modifier,
     primary: StateAction? = null,
     secondary: StateAction? = null,
+    verticalSpacing: Dp = WhiteNoiseSpacing.FormField,
     extra: @Composable ColumnScope.() -> Unit = {},
     footer: @Composable ColumnScope.() -> Unit = {},
 ) {
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),
+        verticalArrangement = Arrangement.spacedBy(verticalSpacing),
     ) {
         icon?.let {
             Icon(painterResource(it), contentDescription = null, modifier = Modifier.size(WhiteNoiseSizes.StateIcon))
@@ -174,19 +179,21 @@ internal fun StateContent(
             )
         }
         primary?.let { action ->
-            WhiteNoiseButton(onClick = action.onClick, modifier = action.modifier()) { ActionLabel(action) }
+            WhiteNoiseButton(onClick = action.onClick, modifier = action.buttonModifier()) { ActionLabel(action) }
         }
         secondary?.let { action ->
-            WhiteNoiseOutlinedButton(onClick = action.onClick, modifier = action.modifier()) { ActionLabel(action) }
+            WhiteNoiseOutlinedButton(onClick = action.onClick, modifier = action.buttonModifier()) {
+                ActionLabel(action)
+            }
         }
         footer()
     }
 }
 
 /** Full-width action button, tagged with the action's [StateAction.testTag] when it has one. */
-private fun StateAction.modifier(): Modifier {
-    val width = Modifier.fillMaxWidth()
-    return if (testTag != null) width.testTag(testTag) else width
+private fun StateAction.buttonModifier(): Modifier {
+    val button = Modifier.fillMaxWidth().then(modifier)
+    return if (testTag != null) button.testTag(testTag) else button
 }
 
 /** The action's optional leading icon followed by its label. */

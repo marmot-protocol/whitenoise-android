@@ -27,6 +27,14 @@
           "MED-061",
           "MED-008"
         ]
+      },
+      {
+        "surface": "An open chat can record after it rejoins",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationVoiceCapture.kt",
+        "anchor": "fun rememberVoiceRecorderBinding(",
+        "test_ids": [
+          "MED-061"
+        ]
       }
     ],
     "source_coverage": [
@@ -60,6 +68,22 @@
         "anchor": "R.string.voice_send_interrupted",
         "test_ids": [
           "MED-008"
+        ]
+      },
+      {
+        "surface": "A failed voice discard reports the draft write error",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationVoiceCapture.kt",
+        "anchor": "R.string.toast_draft_save_failed",
+        "test_ids": [
+          "MED-059"
+        ]
+      },
+      {
+        "surface": "Voice Send requires durable retirement of the draft",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationVoiceCapture.kt",
+        "anchor": "retireDraft = { owner.consumeForQueue(key, file) }",
+        "test_ids": [
+          "MED-059"
         ]
       }
     ]

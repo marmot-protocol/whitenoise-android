@@ -27,7 +27,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -74,8 +76,11 @@ class ShareConnectGalleryRouteTest {
     @Test
     fun realGalleryPublicationPresentsSavedNotice() {
         mount()
+        composeRule.runOnIdle { assertFalse(appState.notificationAskMoment.reached) }
         saveAndWait()
         composeRule.runOnIdle {
+            // Saving the profile card is a moment to ask for notifications (#4278).
+            assertTrue(appState.notificationAskMoment.reached)
             assertEquals(AppText.Resource(R.string.media_saved), appState.transientNotice?.title)
             assertNull(appState.toast)
             assertEquals(0, provider.completed?.getAsInteger(android.provider.MediaStore.Images.Media.IS_PENDING))

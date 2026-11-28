@@ -98,7 +98,7 @@ internal fun GroupSystemRow(
         }
     // Localized new-window label for the disappearing-timer "set to …" rows; null
     // when the event isn't a timer-on change (off/other rows need no duration).
-    val retentionLabel = event?.newRetentionSeconds?.takeIf { it > 0uL }?.let { disappearingMessagesLabel(it.toLong()) }
+    val retentionLabel = event?.newRetentionSeconds?.takeIf { it > 0uL }?.let { disappearingMessagesLabel(it) }
     val selfHex = appState.activeAccount?.accountIdHex
     val target = waveTarget(event, selfHex)
     val waveState =

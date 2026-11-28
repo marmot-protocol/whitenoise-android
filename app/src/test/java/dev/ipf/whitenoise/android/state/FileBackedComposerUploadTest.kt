@@ -7,11 +7,11 @@ import dev.ipf.whitenoise.android.ui.conversation.media.readStagedDocument
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
@@ -119,9 +119,14 @@ class FileBackedComposerUploadTest {
             val control = RecordingControl()
             val heard = mutableListOf<Long>()
 
-            withNativeTransferControl(register = {}, onProgress = { heard += it }, newControl = { control }) {
+            val runningCounterReported = CompletableDeferred<Unit>()
+            val report: (Long) -> Unit = { bytes ->
+                heard += bytes
+                if (bytes == 10L) runningCounterReported.complete(Unit)
+            }
+            withNativeTransferControl(register = {}, onProgress = report, newControl = { control }) {
                 control.counter = 10L
-                delay(500)
+                withTimeout(10_000L) { runningCounterReported.await() }
                 control.counter = 30L
             }
 
@@ -159,7 +164,6 @@ class FileBackedComposerUploadTest {
 
             val result =
                 withNativeTransferControl(register = {}, onProgress = { heard += it }, newControl = { control }) {
-                    delay(300)
                     "sent"
                 }
 

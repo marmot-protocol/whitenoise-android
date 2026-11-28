@@ -93,6 +93,14 @@
     <string name="link_request_linked">The new device is linked.</string>
     <string name="link_request_added_elsewhere">%1$s was added by %2$s.</string>
     <string name="link_request_added_elsewhere_unnamed">The device was added by another of your devices.</string>
+    <string name="link_request_notice">A new device is asking to link to your account.</string>
+    <string name="link_request_notice_other_profile">A new device is asking to link to %1$s.</string>
+    <string name="link_request_repeated_notice">Repeated link requests: someone may have your key.</string>
+    <string name="link_request_repeated_notice_other_profile">Repeated link requests for %1$s: someone may have your key.</string>
+    <string name="link_request_repeated_title">Repeated link requests</string>
+    <string name="link_request_repeated_detail">Devices asked to link to this account more than once within an hour. Someone may have your private key, so linking isn\'t offered. If you made these requests yourself, try again later from one device.</string>
+    <string name="link_request_dont_link">Don\'t link</string>
+    <string name="link_request_review_devices">Review devices</string>
     <string name="device_detail_rename">Rename</string>
     <string name="device_detail_rename_detail">The name shown for this device on all your devices.</string>
     <string name="device_detail_keep">Keep while inactive</string>

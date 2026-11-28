@@ -102,6 +102,10 @@ store-assets:
 install-zsp:
     ./scripts/install-zsp.sh
 
+# Verify the latest MarmotKit RC and preview the develop pin diff.
+sync-rc:
+    python3 scripts/sync_marmotkit_rc.py
+
 # Build the staging arm64-v8a APK.
 apk-staging:
     ./scripts/release.sh --flavor staging --abi arm64-v8a

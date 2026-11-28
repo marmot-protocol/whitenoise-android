@@ -149,11 +149,20 @@ internal fun SelectedMessageDraftAttachmentFfi.toDraftAttachment(body: ByteArray
 internal class MarmotMessageDraftGateway(
     private val marmot: () -> MarmotInterface,
 ) : MessageDraftGateway {
-    /** Reads the selected draft, with file-backed attachments as body-less entries. */
+    /**
+     * Reads the selected draft, with file-backed attachments as body-less entries. A chat MDK no longer knows has
+     * no draft, because a local removal deletes the draft with the chat, so its `UnknownGroup` is reported as
+     * null. Only this plain read does that — [readRevisioned] keeps the error, so no write is based on it.
+     */
     override fun read(
         accountRef: String,
         groupIdHex: String,
-    ): MessageDraftFfi? = readRevisioned(accountRef, groupIdHex).draft
+    ): MessageDraftFfi? =
+        try {
+            readRevisioned(accountRef, groupIdHex).draft
+        } catch (_: MarmotKitException.UnknownGroup) {
+            null
+        }
 
     /** Writes the draft through MDK's unconditional save. */
     override fun save(

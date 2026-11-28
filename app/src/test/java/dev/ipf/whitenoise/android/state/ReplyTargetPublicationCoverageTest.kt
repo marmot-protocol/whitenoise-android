@@ -142,7 +142,7 @@ class ReplyTargetPublicationCoverageTest {
                 "sendComposerTextWithToken <- state/DurableLocalSends.kt#publishDurableComposerText",
                 "sendTaggedSticker <- state/StickerConversationActions.kt#sendSticker",
                 "sendTextWithCustomEmoji <- state/ConversationControllerSend.kt#publishComposerTextOnce",
-                "stageMediaReply <- state/ConversationControllerMedia.kt#prepareQueuedMediaReply",
+                "stageMediaReply <- state/MediaReplyDraft.kt#prepareQueuedMediaReply",
             )
         val CALL = Regex("""(?<!\w)(${REPLY_CALLS.joinToString("|")})\s*\(""")
         val DECLARATION_TAIL = Regex("""\bfun\s+(?:<[^>]*>\s*)?(?:[\w<>?,*. ]+\.)?$""")

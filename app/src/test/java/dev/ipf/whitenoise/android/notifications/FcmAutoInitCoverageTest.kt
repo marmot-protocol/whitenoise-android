@@ -315,7 +315,7 @@ class FcmAutoInitCoverageTest {
         val signOut = autoInit.functionBody("settleFcmAfterSignOut")
         assertTrue(signOut.contains("remaining.any { it.isSignedInSigningAccount() }"))
         assertTrue(signOut.contains("applyFcmAutoInit(enabled = false)"))
-        assertTrue(appState.contains(".wipeSettlingFcmAutoInit { marmotIo { signOutAndWipe(wipedRef) } }"))
+        assertTrue(appState.contains(".wipeSettlingFcmAutoInit { wipeAccountAndPurgeVoiceDrafts(wipedRef) }"))
         val wipe = appModuleSource(PUSH_CLEARS).functionBody("wipeSettlingFcmAutoInit")
         assertTrue(wipe.contains("withContext(NonCancellable) { disableFcmAutoInitWithoutNativeAccountDemand() }"))
     }

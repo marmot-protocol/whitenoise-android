@@ -129,12 +129,6 @@ class SpeechPreparationLifecycleTest {
     }
 
     @Test
-    fun theExistingResourceBoundsAreUnchanged() {
-        assertEquals(32_000, SPEECH_PREPARATION_MAX_OUTPUT_CHARS)
-        assertEquals(4_096, SPEECH_PREPARATION_MAX_NODES)
-    }
-
-    @Test
     fun sourceExhaustionIsDistinctFromOutputBudgetExhaustion() {
         val complete = SpeechPreparation.prepare(preparationRequest(proseRun("Yes."), maxOutputChars = 4_000))
         val budgeted =

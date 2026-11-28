@@ -5,6 +5,14 @@
     "composable_surfaces": [],
     "notification_content_contracts": [
       {
+        "surface": "forward captured conversation ownership through account channel cleanup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
+        "anchor": "fun clearRevokedConversationShortcutsForAccount(",
+        "test_ids": [
+          "NTF-059"
+        ]
+      },
+      {
         "surface": "silent active-card contact nickname reconciliation",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
         "anchor": "suspend fun refreshContactSenderName(",

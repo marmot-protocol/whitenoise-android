@@ -50,7 +50,7 @@ internal fun rememberDurableAvatar(
         key(appState, appState.runtimeGeneration, accountRef, lifetime, cacheKey, ownedAsset?.availability) {
             val initial = prepared ?: cacheKey?.let { AvatarImageLoader.cachedImage(it) ?: seededImage }
             val missing = ownedAsset?.takeIf { initial != null && it.wantsAcquisition() }
-            if (missing != null) {
+            if (missing != null && LocalAvatarLoadsAllowed.current) {
                 LaunchedEffect(missing.target, missing.acquisition) {
                     appState.requestAvatars(listOf(missing.target), accountRef)
                 }

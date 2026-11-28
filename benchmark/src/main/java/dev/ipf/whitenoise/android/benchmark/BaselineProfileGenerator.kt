@@ -22,11 +22,11 @@ class BaselineProfileGenerator {
     @get:Rule
     val baselineProfileRule = BaselineProfileRule()
 
-    /** Includes cold populated startup through the authenticated chat list in the startup profile. */
+    /** Includes the cold chat-list path after verifying the fixture restores stored group pictures. */
     @Test
     fun generateStartup() {
         val journeys = WhiteNoiseJourneys()
-        journeys.prepareAuthenticatedChatList()
+        journeys.prepareAuthenticatedChatList(requireAvatarPack = true)
         baselineProfileRule.collect(
             packageName = BenchmarkConfig.TARGET_PACKAGE,
             includeInStartupProfile = true,

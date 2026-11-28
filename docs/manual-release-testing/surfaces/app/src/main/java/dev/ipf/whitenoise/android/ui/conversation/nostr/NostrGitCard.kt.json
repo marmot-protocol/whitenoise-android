@@ -98,6 +98,14 @@
         "test_ids": [
           "RDR-002"
         ]
+      },
+      {
+        "surface": "Git card links by tag priority with shell-safe clone addresses",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrGitCard.kt",
+        "anchor": "fun NostrEvent.gitCardLinks(",
+        "test_ids": [
+          "RDR-002"
+        ]
       }
     ]
   },

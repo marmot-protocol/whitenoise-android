@@ -89,7 +89,8 @@ internal object StickerPresentation {
 
     /**
      * What Discover shows. Cached packs stay listed when a refresh fails;
-     * a failed refresh or read never reads as "there are none".
+     * a failed refresh or read never reads as "there are none". A failed local read shows its retry even while a
+     * relay sync is still running, because that retry re-reads the store without waiting for the relays.
      */
     fun discoveryState(
         isLoading: Boolean,
@@ -100,8 +101,8 @@ internal object StickerPresentation {
     ): DiscoveryState =
         when {
             packCount > 0 -> DiscoveryState.Packs
-            isLoading -> DiscoveryState.Loading
             readFailed -> DiscoveryState.LoadFailed
+            isLoading -> DiscoveryState.Loading
             syncFailed -> DiscoveryState.Unreachable
             search.isNotBlank() -> DiscoveryState.NoMatches
             else -> DiscoveryState.NoneOnRelays

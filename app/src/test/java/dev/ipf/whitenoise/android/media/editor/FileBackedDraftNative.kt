@@ -51,6 +51,9 @@ internal class FileBackedDraftNative(
     /** When set, every read of the selected draft fails with this, as a transient native failure would. */
     var selectedReadFailure: Exception? = null
 
+    /** Chats the store no longer knows: a selected read of one fails as MarmotKit's does after a local removal. */
+    val removedGroups = mutableSetOf<String>()
+
     /** Moves the draft to a new revision without changing what it holds, as a text save elsewhere would. */
     fun moveRevision() {
         revision = newRevision()
@@ -103,13 +106,14 @@ internal class FileBackedDraftNative(
 
     /** Overrides throw MarmotKit's own exception types, which a reflective proxy would wrap. */
     private inner class Engine : MarmotInterface by unexpectedNativeCalls() {
-        /** Returns the current descriptors and revision. */
+        /** Returns the current descriptors and revision, or MarmotKit's typed refusal for a removed chat. */
         override fun selectedMessageDraft(
             accountRef: String,
             groupIdHex: String,
         ): SelectedMessageDraftFfi =
             record("selectedMessageDraft") {
                 selectedReadFailure?.let { throw it }
+                if (groupIdHex in removedGroups) throw MarmotKitException.UnknownGroup(groupIdHex)
                 selected()
             }
 
@@ -325,5 +329,36 @@ internal class InMemoryEditorStrings : EditorStringStore {
     }
 
     /** Removes every stored value. */
+    override fun clear() = values.clear()
+}
+
+/** An in-memory encrypted payload store, enough to hold the editor sources a reconciliation test stages. */
+internal class InMemoryEditorPayloads : EditorEncryptedPayloadStore {
+    private val values = linkedMapOf<String, ByteArray>()
+
+    /** Needs no preparation. */
+    override fun prepare() = Unit
+
+    /** Whether a payload is stored under [key]. */
+    override fun contains(key: String): Boolean = key in values
+
+    /** A copy of the payload under [key], or null when none is stored. */
+    override fun get(key: String): ByteArray? = values[key]?.copyOf()
+
+    /** Stores a copy of [bytes] under [key]. */
+    override fun put(
+        key: String,
+        bytes: ByteArray,
+    ): Boolean {
+        values[key] = bytes.copyOf()
+        return true
+    }
+
+    /** Removes the payload under [key]. */
+    override fun remove(key: String) {
+        values.remove(key)
+    }
+
+    /** Removes every payload. */
     override fun clear() = values.clear()
 }

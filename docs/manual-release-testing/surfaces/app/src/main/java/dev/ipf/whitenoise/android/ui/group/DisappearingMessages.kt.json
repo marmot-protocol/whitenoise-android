@@ -10,6 +10,14 @@
         "test_ids": [
           "GRP-043"
         ]
+      },
+      {
+        "surface": "disappearingMessagesLabel for protocol retention values",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingMessages.kt",
+        "anchor": "fun disappearingMessagesLabel(secs: ULong)",
+        "test_ids": [
+          "GRP-043"
+        ]
       }
     ]
   },

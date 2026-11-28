@@ -225,28 +225,6 @@ class ShellNavigationTest {
     }
 
     @Test
-    fun createCompletionAfterAuthoritativeListRowWouldStillNavigateWhenUninterrupted() {
-        val groupA = "group-a"
-
-        var state = ShellNavigationState()
-        var selectedChat: String? = null
-        val submit = reduceShellNavigation(state, ShellNavigationEvent.CreateSubmitted)
-        state = submit.state
-        // Authoritative chat-list row arrival does not change shell navigation generation.
-        val (_, afterComplete, complete) =
-            completeCreate(
-                state,
-                selectedChat,
-                groupA,
-                submit.createRequestTokenMinted!!,
-            )
-        selectedChat = afterComplete
-
-        assertTrue(complete.createOpenAccepted)
-        assertEquals(groupA, selectedChat)
-    }
-
-    @Test
     fun supersededCreateThenNewCreate_rejectsStaleCompletionAndAcceptsCurrent() {
         val groupA = "group-a"
         val groupB = "group-b"

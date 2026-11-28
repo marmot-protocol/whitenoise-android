@@ -32,6 +32,7 @@ internal class VoiceNoteSessionOwner(
     private val newController: (VoiceNoteKey, VoiceRecorderHooks) -> VoiceRecordingController,
     private val presentError: (Throwable) -> Unit,
     private val presentElsewhere: () -> Unit,
+    private val hasMicrophonePermission: () -> Boolean = { false },
     private val startForeground: (String) -> Boolean = { false },
 ) {
     private val controllers = mutableStateMapOf<VoiceNoteKey, VoiceRecordingController>()
@@ -39,6 +40,7 @@ internal class VoiceNoteSessionOwner(
     private val lost = mutableStateListOf<VoiceNoteKey>()
     private val recovered = mutableSetOf<VoiceNoteKey>()
     private val permissionRequests = mutableMapOf<VoiceNoteKey, () -> Boolean>()
+    private val bindingVersions = mutableStateMapOf<VoiceNoteKey, Int>()
     private var persisted: Set<String>? = null
     private var foregroundRequest: Pair<VoiceNoteKey, String>? = null
     private val sendOnArrival = mutableMapOf<VoiceNoteKey, File>()
@@ -56,6 +58,9 @@ internal class VoiceNoteSessionOwner(
         if (recovered.add(key) && key !in controllers) recover(key)
         return controllers.getOrPut(key) { newController(key, hooks(key)) }
     }
+
+    /** Changes when chat teardown revokes the recorder that an open conversation may still be presenting. */
+    fun bindingVersion(key: VoiceNoteKey): Int = bindingVersions[key] ?: 0
 
     /**
      * The chat closed. A locked or paused take keeps recording, a hold in progress is kept as a draft, and an idle
@@ -106,18 +111,47 @@ internal class VoiceNoteSessionOwner(
         return when {
             controller?.isRecording == true && controller.isPaused -> VoiceNoteActivity.Paused
             controller?.isRecording == true -> VoiceNoteActivity.Recording
-            drafts[key] != null || persistedDraft(key) -> VoiceNoteActivity.Draft
+            draft(key) != null || persistedDraft(key) -> VoiceNoteActivity.Draft
             else -> VoiceNoteActivity.None
         }
     }
 
-    /** Deletes exactly [file] after Send or Discard; a newer take for the same chat is untouched. */
+    /** Whether eviction readback could close capture or clear a saved take for the exact chat. */
+    fun hasCaptureOrDraft(key: VoiceNoteKey): Boolean {
+        val recorder = controllers[key]
+        return recorder?.isFinalizing == true || activity(key) != VoiceNoteActivity.None
+    }
+
+    /** Captures the current recorder, start request and saved take so a delayed eviction cannot retire a newer one. */
+    fun captureTargetIsCurrent(key: VoiceNoteKey): () -> Boolean {
+        val recorder = controllers[key]
+        val generation = recorder?.captureGeneration
+        val file = drafts[key]?.file
+        return {
+            controllers[key] === recorder &&
+                recorder?.captureGeneration == generation &&
+                drafts[key]?.file == file
+        }
+    }
+
+    /** Commits Discard for exactly [file] before clearing its presentation. */
     fun consume(
         key: VoiceNoteKey,
         file: File,
-    ) {
-        store.delete(key, file)
+    ): Boolean {
+        if (!store.delete(key, file)) return false
         if (drafts[key]?.file == file) drafts.remove(key)
+        return true
+    }
+
+    /** The queue can take ownership only after the exact draft can no longer be recovered as unsent. */
+    fun consumeForQueue(
+        key: VoiceNoteKey,
+        file: File,
+    ): Boolean {
+        if (drafts[key]?.file != file || !store.consumeAccepted(key, file)) return false
+        drafts.remove(key)
+        return true
     }
 
     /** The chat explained an automatic stop; it is not shown again. */
@@ -126,25 +160,34 @@ internal class VoiceNoteSessionOwner(
         drafts[key] = store.withStopReason(key, draft, null)
     }
 
-    /** Sign-out or wipe: stop the account's recording and delete every draft it left. */
-    fun onAccountUnavailable(accountRef: String) {
+    /** Stops the account's capture while keeping its saved takes recoverable. */
+    fun stopAccountCapture(accountRef: String) {
         controllers.keys.filter { it.accountRef == accountRef }.forEach(::forget)
-        drafts.keys.removeAll { it.accountRef == accountRef }
-        lost.removeAll { it.accountRef == accountRef }
-        store.purgeAccount(accountRef)
-        persisted = null
     }
 
-    /** The account left this chat: stop its recording and delete its draft. */
+    /** Deletes only this account's saved takes after it has been removed. */
+    fun purgeAccountDrafts(accountRef: String): Boolean {
+        drafts.keys.removeAll { it.accountRef == accountRef }
+        lost.removeAll { it.accountRef == accountRef }
+        persisted = null
+        return store.purgeAccount(accountRef)
+    }
+
+    /** Revokes capture immediately and lets confirmed removal journal its work before deleting files. */
     fun onTargetRemoved(
         accountRef: String,
         groupIdHex: String,
-    ) {
+        beforePurge: () -> Unit = {},
+    ): Boolean {
         val key = VoiceNoteKey(accountRef, groupIdHex)
+        if (key in permissionRequests) bindingVersions[key] = bindingVersion(key) + 1
         forget(key)
         drafts.remove(key)
-        store.purge(key)
+        lost.remove(key)
+        recovered.add(key)
         persisted = null
+        beforePurge()
+        return store.purge(key)
     }
 
     fun foregroundRecorder(token: String): VoiceRecordingController? {
@@ -189,8 +232,8 @@ internal class VoiceNoteSessionOwner(
 
     private fun hooks(key: VoiceNoteKey) =
         VoiceRecorderHooks(
-            outputDirectory = store.recordingDirectory(key),
-            onPermissionRequest = { permissionRequests[key]?.invoke() == true },
+            outputDirectory = store.directory(key),
+            onPermissionRequest = { prepareRecording(key) },
             onRecordingStarted = { requestForeground(key) },
             onRecordingComplete = { file, durationMs -> complete(key, file, durationMs) },
             onReleasedRecordingComplete = { file, durationMs ->
@@ -201,6 +244,12 @@ internal class VoiceNoteSessionOwner(
                 drafts[key]?.let { draft -> drafts[key] = store.withStopReason(key, draft, reason) }
             },
         )
+
+    /** Honors the visible chat's send gate before requesting permission or opening a new recording file. */
+    private fun prepareRecording(key: VoiceNoteKey): Boolean =
+        store.canRecord(key) &&
+            (permissionRequests[key]?.invoke() ?: hasMicrophonePermission()) &&
+            store.recordingDirectory(key).isDirectory
 
     private fun complete(
         key: VoiceNoteKey,

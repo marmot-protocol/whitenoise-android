@@ -453,6 +453,15 @@ internal fun MainShell(
         }
     val visibleShareRequest = preparedShareRequest ?: shellStateHolder.pendingShareRequest.value
     val currentShareRequestId by rememberUpdatedState(visibleShareRequest?.requestId ?: inboundShareRequest?.requestId)
+    val chatsActive = {
+        appState.canShareFromChats(sectionName, selectedChat, pendingConversationOpen) &&
+            quickAccountSwitchTransition == null &&
+            currentShareRequestId == null
+    }
+    val openSettingsAt: (SettingsDetail) -> Unit = { root ->
+        shellNav(ShellNavEvent.OpenSettings(root))
+        firstRunHelpRoot = root
+    }
     val visiblePickerRequest = visibleShareRequest.takeUnless { inboundDirectGroupId != null }
     var pendingStagedShareOpen by shellStateHolder::pendingStagedShareOpen
     val clearSharePickerRequest: () -> Unit = {
@@ -1831,11 +1840,9 @@ internal fun MainShell(
                                         chatListReturnHeadSnap =
                                             onConversationReturnHeadHandled(chatListReturnHeadSnap)
                                     },
-                                    onFirstRunHelp = { support ->
-                                        val root = firstRunHelpDetail(support)
-                                        shellNav(ShellNavEvent.OpenSettings(root))
-                                        firstRunHelpRoot = root
-                                    },
+                                    chatsActive = chatsActive,
+                                    onFirstRunHelp = { support -> openSettingsAt(firstRunHelpDetail(support)) },
+                                    onSavePrivateKey = { openSettingsAt(SettingsDetail.AccountKeys) },
                                     onOpenSettings = {
                                         firstRunHelpRoot = null
                                         pendingConversationOpen = null

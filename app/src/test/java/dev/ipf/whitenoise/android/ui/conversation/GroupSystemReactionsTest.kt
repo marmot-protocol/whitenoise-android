@@ -22,6 +22,7 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.MESSAGE_ACTION_REACTI
 import dev.ipf.whitenoise.android.ui.conversation.reactions.LocalReactionMotion
 import dev.ipf.whitenoise.android.ui.conversation.reactions.REACTION_PILL_TEST_TAG
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -43,7 +44,7 @@ import java.time.Duration
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
 @OptIn(ExperimentalCoroutinesApi::class)
-class GroupSystemReactionsTest : GroupSystemReactionTestFixtures() {
+class GroupSystemReactionsTest : GroupSystemReactionTestFixtures(Dispatchers.Unconfined) {
     @get:Rule val composeRule = createComposeRule(effectContext = UnconfinedTestDispatcher())
     private val menuOpen = mutableStateOf(false)
     private val readOnly = mutableStateOf(false)

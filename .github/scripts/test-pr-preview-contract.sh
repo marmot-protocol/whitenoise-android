@@ -3,6 +3,7 @@ set -euo pipefail
 
 workflow=.github/workflows/android-pr-preview-publish.yml
 build=.github/workflows/android-pr-apk.yml
+cleanup=.github/workflows/android-pr-preview-cleanup.yml
 gradle=app/build.gradle.kts
 publisher=.github/scripts/publish-pr-apk-to-github-release.sh
 
@@ -91,6 +92,24 @@ grep -Fq 'GH_TOKEN: ${{ github.token }}' "$workflow"
 grep -Fq 'PREVIEW_CHANNEL="$channel"' "$workflow"
 grep -Fq '.github/scripts/publish-pr-apk-to-github-release.sh' "$workflow"
 reject 'BLOSSOM_UPLOAD_NSEC' "$workflow"
+# Cleanup and publication must share a queue. The cleanup job runs only
+# trusted code on close, with release write access and PR read access.
+grep -Fq 'pull_request_target:' "$cleanup"
+grep -Fq 'types: [closed]' "$cleanup"
+grep -Fq 'ref: ${{ github.event.repository.default_branch }}' "$cleanup"
+grep -Fq 'persist-credentials: false' "$cleanup"
+grep -Fq 'group: android-pr-preview-publish-pr-${{ github.event.number }}' "$cleanup"
+grep -Fq 'queue: max' "$cleanup"
+grep -Fq 'queue: max' "$workflow"
+grep -Fq 'contents: write' "$cleanup"
+grep -Fq 'pull-requests: read' "$cleanup"
+reject 'pull-requests: write' "$cleanup"
+reject 'secrets.' "$cleanup"
+reject 'github.event.pull_request.head.sha' "$cleanup"
+grep -Fq '.github/scripts/pr-preview-release-assets.sh prune' "$cleanup"
+grep -Fq '.github/scripts/pr-preview-release-assets.sh check-capacity "${channels[@]}"' "$workflow"
+bash .github/scripts/test-pr-preview-release-assets.sh
+
 # Both the pre-checkout prepare job and the post-checkout publish job must bind
 # artifact downloads explicitly to this repository. Without --repo, gh fails
 # before checkout with "not a git repository" and no preview links are posted.

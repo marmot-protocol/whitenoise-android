@@ -3,6 +3,7 @@
     <string name="voice_recording_stopped_announcement">Registrazione interrotta</string>
     <string name="voice_message_seek">Posizione di riproduzione</string>
     <string name="video_failed">Impossibile caricare il video</string>
+    <string name="video_seek_failed">Impossibile passare a questo punto del video</string>
     <string name="conversation_new_message_from">Nuovo messaggio da %1$s</string>
     <plurals name="conversation_new_messages">
         <item quantity="one">%1$d nuovo messaggio</item>
@@ -245,9 +246,12 @@
     <string name="error_missing_key_package_for">Non abbiamo trovato una chiave di chat utilizzabile per %1$s. Chiedi di installare o aggiornare White Noise e aprirlo, poi riprova.</string>
     <string name="invite_to_white_noise">Invita su White Noise</string>
     <string name="invite_friends">Invita amici</string>
-    <string name="invite_to_white_noise_description">%1$s non è ancora su White Noise. Condividi l\'app per avviare una chat sicura.</string>
-    <string name="unknown_invite_to_white_noise_description">Questo utente non è ancora su White Noise. Condividi l\'app per avviare una chat sicura.</string>
     <string name="invite_message">Unisciti a me su White Noise. Nessun numero di telefono. Nessuna sorveglianza. Solo vera privacy. Scarica qui: https://www.whitenoise.chat/download</string>
+    <string name="start_chat_not_on_white_noise_for">%1$s non è ancora su White Noise</string>
+    <string name="start_chat_not_on_white_noise">Questa persona non è ancora su White Noise</string>
+    <string name="start_chat_not_on_white_noise_detail">Inviale un invito. Quando avrà installato e aperto White Noise, riprova.</string>
+    <string name="send_invite">Invia invito</string>
+    <string name="invite_message_personal">Sono %1$s su White Noise, un’app di messaggistica privata che non richiede un numero di telefono. Installala, tocca Nuova chat e incolla la mia chiave per scrivermi: %2$s\nScarica: https://www.whitenoise.chat/download</string>
     <string name="error_invalid_identity_reference">Quel destinatario non è una chiave pubblica Nostr valida. Utilizza un npub, un collegamento al profilo o una chiave pubblica hex.</string>
     <string name="error_group_create_failed_retry">Si è verificato un problema durante la configurazione della chat crittografata. Controlla la connessione e riprova.</string>
     <string name="error_no_group_members_selected">Non è stato possibile aggiungere nessuna delle persone selezionate. Chiedi loro di controllare la configurazione della chat oppure modifica la selezione.</string>
@@ -1702,9 +1706,20 @@
     <string name="emoji_sets_builtin_shown">Preinstallato · %1$s</string>
     <string name="emoji_sets_builtin_hidden">Nascosto nel selettore. Resta visibile nei messaggi.</string>
     <string name="emoji_sets_update_available">Aggiornamento disponibile</string>
-    <string name="emoji_sets_load_image">Carica immagine di anteprima</string>
-    <string name="emoji_sets_image_privacy">Caricare un’anteprima o installare un set condivide il tuo indirizzo IP con i suoi host di immagini.</string>
-    <string name="emoji_sets_preview_host">Host dell’immagine di anteprima: %1$s</string>
+    <string name="emoji_sets_load_emoji">Carica emoji</string>
+    <plurals name="emoji_sets_image_hosts">
+        <item quantity="one">Le immagini provengono da %1$s. I server che le ospitano ricevono il tuo indirizzo IP quando le carichi o le installi.</item>
+        <item quantity="other">Le immagini provengono da %1$s. I server che le ospitano ricevono il tuo indirizzo IP quando le carichi o le installi.</item>
+    </plurals>
+    <plurals name="emoji_sets_more_hosts">
+        <item quantity="one">%1$d altro server</item>
+        <item quantity="other">altri %1$d server</item>
+    </plurals>
+    <string name="emoji_sets_image_hosts_unknown">I server che ospitano queste immagini ricevono il tuo indirizzo IP quando le carichi o le installi.</string>
+    <string name="emoji_sets_untitled">Set senza nome</string>
+    <string name="emoji_sets_emoji_loading">Caricamento di %1$s</string>
+    <string name="emoji_sets_emoji_failed">Impossibile caricare %1$s.</string>
+    <string name="emoji_sets_emoji_unavailable">%1$s non è disponibile su questo dispositivo.</string>
     <string name="emoji_sets_install">Installa set</string>
     <string name="emoji_sets_update">Aggiorna set</string>
     <string name="emoji_sets_check_update">Cerca aggiornamenti</string>
@@ -2879,4 +2894,11 @@
     <string name="dictation_transcribe_voice_messages_title">Trascrivi automaticamente i messaggi vocali</string>
     <string name="dictation_transcribe_voice_messages_subtitle">Mostra nella conversazione le trascrizioni dei messaggi vocali scaricati. Richiede Offline Speech to Text.</string>
     <string name="toast_unsupported_link">Questo link non è supportato.</string>
+    <string name="private_key_reminder_title">Salva la tua chiave privata</string>
+    <string name="private_key_reminder_body">Se perdi questo telefono, la tua chiave è l’unico modo per conservare la tua identità e i tuoi contatti.</string>
+    <string name="private_key_reminder_save">Salva chiave</string>
+    <string name="private_key_reminder_not_now">Non ora</string>
+    <string name="first_run_chats_title">Inizia la tua prima conversazione</string>
+    <string name="first_run_chats_detail">Invita una persona con cui parli. Nell’attesa, puoi chiedere qualsiasi cosa al team di White Noise.</string>
+    <string name="first_run_new_chat">Nuova chat</string>
 </resources>

@@ -39,8 +39,8 @@ import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.diagnostics.DmCreationDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.DmCreationInteraction
-import dev.ipf.whitenoise.android.share.launchInviteShare
-import dev.ipf.whitenoise.android.share.presentOutboundShareFailure
+import dev.ipf.whitenoise.android.share.activeAccountInvite
+import dev.ipf.whitenoise.android.share.shareAppInviteText
 import dev.ipf.whitenoise.android.state.BlockOutcome
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -301,6 +301,7 @@ internal fun ProfileSheet(
     // the "name from profile" section and the nickname dialog deliberately keep
     // the real profile name (`title`) so the user sees what they're renaming.
     val displayTitle = contactNickname ?: title
+    val inviteName = contactNickname ?: personName
     val pictureUrl = hex?.let { appState.contactAvatarSource(it) } ?: profile.pictureUrl
     val bannerUrl = profile.bannerUrl
     val avatarImageAvailable = rememberAvatarImageAvailable(pictureUrl, AvatarImageLoader.publicProfiles())
@@ -374,8 +375,7 @@ internal fun ProfileSheet(
             busy = followBusy,
             creatingChat = creatingChat,
         )
-    val inviteTitle = stringResource(R.string.invite_to_white_noise)
-    val inviteMessage = stringResource(R.string.invite_message)
+    val invite = activeAccountInvite(appState)
     val groupPickerRevision = appState.profileGroupPickerRevision
     val liveGroupsRevision = appState.forwardTargetsRevision
     // Chats beyond the retained chat-list window, so groups in common and both pickers see every chat (#2983).
@@ -472,6 +472,9 @@ internal fun ProfileSheet(
                                     appState.loadCreatedChatListItem(id)
                                 },
                                 displayName = appState::displayName,
+                                invitationRecipientName = {
+                                    appState.contactDisplayNameCachedOrNull(it) ?: inviteName
+                                },
                                 markCreateOpenStage = appState::markChatCreateOpenStage,
                                 abandonCreateOpenTiming = appState::abandonChatCreateOpenTiming,
                                 diagnosticAttempt = diagnosticAttempt,
@@ -748,8 +751,7 @@ internal fun ProfileSheet(
                         onRetry = { openOrCreateProfileChat(error.retryGroupIdHex) },
                         onInvite = {
                             if (owner.canAct()) {
-                                launchInviteShare(context, inviteMessage, inviteTitle)
-                                    .onFailure { appState.presentOutboundShareFailure("PROFILE_INVITE_SHARE", it) }
+                                appState.shareAppInviteText(context, invite, "PROFILE_INVITE_SHARE")
                             }
                         },
                         onCopy = { clipboard.copy(it) },

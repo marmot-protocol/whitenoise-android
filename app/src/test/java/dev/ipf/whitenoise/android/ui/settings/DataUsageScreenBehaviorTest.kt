@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
@@ -43,19 +45,26 @@ class DataUsageScreenBehaviorTest {
     /** Starts from cleared preferences so the matrix is the shipped default and nothing is paused. */
     @Test
     fun publicLinkPreviewsStartOffAndPersistForOnlyTheSendingAccount() {
-        composeRule.onNodeWithTag("data_usage.public_jpeg_previews").performClick()
-        composeRule.waitUntil { appState.publicJpegPreviewPreferences.enabled("ab".repeat(32)) }
+        togglePublicLinkPreviews(enabled = true)
         assertFalse(appState.publicJpegPreviewPreferences.enabled("another-account"))
-        composeRule.onNodeWithTag("data_usage.public_jpeg_previews").performClick()
-        composeRule.waitUntil { !appState.publicJpegPreviewPreferences.enabled("ab".repeat(32)) }
+        togglePublicLinkPreviews(enabled = false)
     }
 
     /** A wipe's retention pass that predates this account must not block its switch (#3623). */
     @Test
     fun accountPublishedAfterAWipeCanTurnOnPublicLinkPreviews() {
         composeRule.runOnIdle { appState.publicJpegPreviewPreferences.retainAccounts(listOf("cd".repeat(32))) }
-        composeRule.onNodeWithTag("data_usage.public_jpeg_previews").performClick()
-        composeRule.waitUntil { appState.publicJpegPreviewPreferences.enabled("ab".repeat(32)) }
+        togglePublicLinkPreviews(enabled = true)
+    }
+
+    private fun togglePublicLinkPreviews(enabled: Boolean) {
+        val tag = "data_usage.public_jpeg_previews"
+        composeRule.onNodeWithTag(tag).assertIsEnabled().performClick()
+        // The choice is persisted on IO before the UI re-enables the switch.
+        composeRule.waitUntil(timeoutMillis = 10_000L) {
+            composeRule.onAllNodes(hasTestTag(tag) and isEnabled()).fetchSemanticsNodes().isNotEmpty() &&
+                appState.publicJpegPreviewPreferences.enabled("ab".repeat(32)) == enabled
+        }
     }
 
     /** Clears stored preferences and builds a fresh single-account app state. */

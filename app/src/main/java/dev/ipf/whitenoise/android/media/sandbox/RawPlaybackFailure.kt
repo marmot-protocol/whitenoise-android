@@ -11,6 +11,11 @@ internal class RawOutputFailure(
 /** Coarse demuxer invalid-container refusal from OPEN or READ; MDK owns cache invalidation. */
 internal class RawContainerFailure : IOException("Selected media container is malformed")
 
+/** The previous paused frame remains valid and the exact seek can be retried. */
+internal class RawPausedSeekFailure(
+    val positionMs: Long,
+) : IOException("Paused video frame unavailable")
+
 /** Converts only the native demuxer INVALIDDATA marker; all other layouts retain normal validation. */
 internal fun checkedNativeRead(values: LongArray): LongArray {
     if (values.size == 1 && values[0] == -1L) throw RawContainerFailure()
