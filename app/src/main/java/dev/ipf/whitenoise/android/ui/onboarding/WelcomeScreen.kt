@@ -53,7 +53,7 @@ import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 /** Selects Welcome or Sign In while the existing owner retains creation, import, signer and recovery state. */
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable
-fun OnboardingContent(
+internal fun OnboardingContent(
     identity: String,
     creatingIdentity: Boolean,
     signingInBusy: Boolean,
