@@ -946,13 +946,13 @@ internal fun MainShell(
         previousActiveAccountRef = nextNavAccountRef(previousActiveAccountRef, current)
     }
 
-    // A sign-in notice, alert or notification opens Settings → Account, which opens that account's devices.
     SignInDevicesRouteEffect(appState, previousActiveAccountRef) {
         supersedePendingTtsDestinationNavigation()
         closeConversationForNotificationRoute()
         pendingConversationOpen = null
         appState.clearPresentedProfile()
         profileGroupForegroundState.close()
+        clearSharePickerRequest()
         sectionName = MainSection.Settings.name
         settingsDetailName = SettingsDetail.Account.name
     }
