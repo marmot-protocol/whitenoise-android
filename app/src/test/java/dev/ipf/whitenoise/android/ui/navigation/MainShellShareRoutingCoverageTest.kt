@@ -153,6 +153,20 @@ class MainShellShareRoutingCoverageTest {
         assertTrue(route.indexOf("pendingStagedShareOpen = null") in 0 until settingsIndex)
     }
 
+    /** The invite chooser reads the live route, so a Settings open just before staging ends wins. */
+    @Test
+    fun invitePromptChecksTheLiveSectionBeforeLaunchingTheChooser() {
+        val chatsActive =
+            mainShellSource()
+                .readText()
+                .substringAfter("val chatsActive = {", missingDelimiterValue = "")
+                .substringBefore("\n    }", missingDelimiterValue = "")
+        assertTrue(
+            "chatsActive must read the navigator's section, not a value captured by the last composition",
+            "appState.canShareFromChats(shellStateHolder.sectionState.sectionName," in chatsActive,
+        )
+    }
+
     private fun mainShellSource(): File =
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt"),

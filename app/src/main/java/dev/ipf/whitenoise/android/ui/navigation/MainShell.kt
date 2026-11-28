@@ -455,7 +455,7 @@ internal fun MainShell(
     val visibleShareRequest = preparedShareRequest ?: shellStateHolder.pendingShareRequest.value
     val ownsShare = { id: String -> shellStateHolder.visibleShareRequest?.requestId == id }
     val chatsActive = {
-        appState.canShareFromChats(sectionName, selectedChat, pendingConversationOpen) &&
+        appState.canShareFromChats(shellStateHolder.sectionState.sectionName, selectedChat, pendingConversationOpen) &&
             quickAccountSwitchTransition == null &&
             shellStateHolder.visibleShareRequest == null
     }
