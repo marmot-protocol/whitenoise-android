@@ -172,9 +172,10 @@ class MediaSavePresentationTest {
         )
     }
 
+    /** Files-tab share, URL open and viewer share report launch failures through the capability-aware presenter. */
     @Test
     fun shareAndUrlFlowsUseTheCapabilityAwarePresenter() {
-        val mediaLibrarySource = source("src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/MediaLibrary.kt")
+        val mediaLibrarySource = source("src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/LibraryFileShare.kt")
         val urlTabSource = source("src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/MediaLibraryUrlTab.kt")
         val mediaViewerSource = source("src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt")
         val launchFailure = Regex("appState\\.presentMediaLaunchFailure\\(")
