@@ -76,6 +76,8 @@ object NotificationChannels {
                 NotificationChannelSpec.GROUP_MEMBERSHIP,
                 NotificationChannelSpec.AGENT_ACTIVITY,
                 NotificationChannelSpec.APP_UPDATES,
+                NotificationChannelSpec.SIGN_IN_REVIEW,
+                NotificationChannelSpec.ACCOUNT_SECURITY,
                 -> Unit
 
                 NotificationChannelSpec.USER_EVENT_SUMMARY -> {
@@ -100,6 +102,8 @@ object NotificationChannels {
             NotificationChannelSpec.GROUP_MEMBERSHIP -> R.string.notification_channel_group_membership
             NotificationChannelSpec.AGENT_ACTIVITY -> R.string.notification_channel_agent_activity
             NotificationChannelSpec.APP_UPDATES -> R.string.notification_channel_app_updates
+            NotificationChannelSpec.SIGN_IN_REVIEW -> R.string.sign_in_alert_badge_review
+            NotificationChannelSpec.ACCOUNT_SECURITY -> R.string.notification_channel_account_security
             NotificationChannelSpec.USER_EVENT_SUMMARY -> R.string.notification_channel_summary
         }
 
@@ -113,6 +117,8 @@ object NotificationChannels {
             NotificationChannelSpec.GROUP_MEMBERSHIP -> R.string.notification_channel_group_membership_default
             NotificationChannelSpec.AGENT_ACTIVITY -> R.string.notification_channel_agent_activity_default
             NotificationChannelSpec.APP_UPDATES -> R.string.notification_channel_app_updates_global
+            NotificationChannelSpec.SIGN_IN_REVIEW -> R.string.sign_in_alert_badge_review
+            NotificationChannelSpec.ACCOUNT_SECURITY -> R.string.notification_channel_account_security_global
             NotificationChannelSpec.USER_EVENT_SUMMARY -> R.string.notification_channel_summary
         }
 
@@ -127,6 +133,9 @@ object NotificationChannels {
                 R.string.notification_channel_group_membership_default_description
             NotificationChannelSpec.AGENT_ACTIVITY -> R.string.notification_channel_agent_activity_default_description
             NotificationChannelSpec.APP_UPDATES -> R.string.notification_channel_app_updates_global_description
+            NotificationChannelSpec.SIGN_IN_REVIEW -> R.string.sign_in_alert_review_body
+            NotificationChannelSpec.ACCOUNT_SECURITY ->
+                R.string.notification_channel_account_security_global_description
             NotificationChannelSpec.USER_EVENT_SUMMARY -> R.string.notification_channel_summary_description
         }
 

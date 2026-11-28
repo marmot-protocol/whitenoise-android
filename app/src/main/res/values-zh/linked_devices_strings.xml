@@ -133,8 +133,8 @@
     <string name="sign_in_signed_out">已不再登录</string>
     <string name="sign_in_question_new">这是你本人吗？</string>
     <string name="sign_in_question_before">你还持有这台设备吗？</string>
-    <string name="sign_in_detail_new">有人在另一台设备上登录了此账号。如果是你本人，可以关联那台设备。否则，请点按“不是我本人”。</string>
-    <string name="sign_in_detail_before">这台设备在当前设备之前就已登录此账户。如果你还持有它，请从它那里关联当前设备。如果没有，你可以重新开始。</string>
+    <string name="sign_in_detail_new">有人在另一台设备上登录了此账号。如果是你本人，可以关联那台设备。如果是你不想关联的自己的应用，请点按“是我的，不关联”。如果不是你，请点按“不是我本人”。</string>
+    <string name="sign_in_detail_before">这台设备在当前设备之前就已登录此账户。如果你还持有它，请从它那里关联当前设备，或者重新开始。如果你不认识它，请点按“我不认识这台设备”。</string>
     <string name="sign_in_previously_linked">之前在此关联的一台设备不在此设备当前的列表中。请打开两台设备以检查关联。</string>
     <string name="sign_in_reject">不是我本人</string>
     <string name="sign_in_reject_confirm">你的所有设备都会标记此次登录并非你本人操作，并显示安全警告。那台设备仍会保持登录，你的密钥也不会改变。</string>
@@ -146,10 +146,10 @@
     <string name="start_fresh_title">没有，重新开始</string>
     <string name="start_fresh_detail">暂时单独使用这台设备。以后仍可从之前登录过的设备上关联它。</string>
     <string name="started_fresh_note">此设备已重新开始。这里只会显示你今后受邀加入的聊天。</string>
-    <string name="compromise_warning_title">安全警告</string>
-    <string name="compromise_warning_rejected">此账户的一次登录已被标记为非本人操作。可能有其他人持有此账户的密钥或与其签名器的会话。</string>
-    <string name="compromise_warning_foreign_key">此设备在自己的槽位中发现了并非由它创建的邀请密钥，并已替换。可能有其他人持有此账户的密钥或与其签名器的会话。</string>
-    <string name="compromise_warning_dismiss">标记为已查看</string>
+    <string name="compromise_warning_title">可能有其他人持有你的私钥</string>
+    <string name="compromise_warning_rejected">此账号的一次登录已被标记为不是你本人。</string>
+    <string name="compromise_warning_foreign_key">这台设备在自己的槽位中发现了不是它生成的邀请密钥。</string>
+    <string name="compromise_warning_dismiss">在此设备上隐藏</string>
     <string name="compromise_warning_dismiss_detail">仅在此设备上隐藏此警告。不会移除设备、拒绝登录或保护你的密钥。</string>
     <string name="device_move_section">正在移动此设备</string>
     <string name="device_move_waiting">正在等待其他设备添加</string>
@@ -187,4 +187,28 @@
     <string name="unlinked_remove_sign_in_detail">这台设备已解除关联。要从这台设备删除此个人资料的聊天和数据，并用刚才输入的密钥登录吗？其他设备的数据会保留。</string>
     <string name="invite_decline_wait_for_sync">等待此聊天同步后，再次点按“拒绝”。</string>
     <string name="invite_decline_check_delivery">你的上一次群组更改尚未送达所有中继。请先查看聊天中是否有投递警告，再重试。</string>
+    <string name="sign_in_claim">自称：%1$s</string>
+    <string name="sign_in_mine">是我的，不关联</string>
+    <string name="sign_in_mine_state">你的，未关联</string>
+    <string name="sign_in_dont_recognize">我不认识这台设备</string>
+    <string name="compromise_warning_explainer">你的密钥可以在任何地方登录，且无法更改或撤销。White Noise 会把未知设备挡在你的已关联设备之外，但无法将它们拒之门外。</string>
+    <string name="compromise_warning_steps_title">该怎么做</string>
+    <string name="compromise_warning_step_remove">1. 移除任何你不认识的设备。</string>
+    <string name="compromise_warning_step_signer">2. 如果你使用签名应用，请在其中移除你不认识的应用。</string>
+    <string name="compromise_warning_step_move">3. 迁移到新账号。你的联系人需要重新添加它。</string>
+    <string name="compromise_alert_review">查看设备</string>
+    <string name="compromise_warning_hide_failed">无法隐藏警告。请重试。</string>
+    <string name="sign_in_alert_review_banner">一台你未关联的设备登录了你的账号。请确认它是否属于你。</string>
+    <string name="sign_in_alert_review_action">查看</string>
+    <string name="sign_in_alert_badge_review">有待查看的登录</string>
+    <string name="sign_in_alert_badge_compromise">安全警告</string>
+    <string name="sign_in_alert_review_body">一台你未关联的设备登录了你的账号。打开 White Noise 确认它是否属于你。</string>
+    <string name="sign_in_alert_review_public">有待查看的登录</string>
+    <string name="sign_in_alert_compromise_body">打开 White Noise 查看发生了什么以及该怎么做。</string>
+    <string name="sign_in_alert_compromise_public">需要进行安全检查</string>
+    <string name="device_detail_remove_stolen">如果这台设备丢失或被盗，持有它的人可能仍有你的密钥。</string>
+    <plurals name="sign_in_alert_review_title">
+        <item quantity="other">%d 个新登录待查看</item>
+    </plurals>
+    <string name="link_request_expired_attempt">%1$s 有设备尝试关联。</string>
 </resources>

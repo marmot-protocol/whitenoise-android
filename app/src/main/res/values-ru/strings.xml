@@ -1755,6 +1755,9 @@
     <string name="notification_channel_app_updates">Обновления приложения</string>
     <string name="notification_channel_app_updates_global">Обновления приложения · Для всего приложения</string>
     <string name="notification_channel_app_updates_global_description">Уведомления Android об обновлениях приложения White Noise</string>
+    <string name="notification_channel_account_security">Безопасность учётной записи</string>
+    <string name="notification_channel_account_security_global">Безопасность учётной записи · Для всего приложения</string>
+    <string name="notification_channel_account_security_global_description">Уведомления Android о неизвестных входах и предупреждениях о безопасности</string>
 
     <string name="chat_bubble_colors">Цвета сообщений</string>
     <string name="custom_emoji">Свои эмодзи</string>

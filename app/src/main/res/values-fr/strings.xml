@@ -1687,6 +1687,9 @@
     <string name="notification_channel_app_updates">Mises à jour de l\'application</string>
     <string name="notification_channel_app_updates_global">Mises à jour de l\'application · Toute l\'application</string>
     <string name="notification_channel_app_updates_global_description">Comportement d’alerte Android pour les mises à jour de White Noise</string>
+    <string name="notification_channel_account_security">Sécurité du compte</string>
+    <string name="notification_channel_account_security_global">Sécurité du compte · Toute l’application</string>
+    <string name="notification_channel_account_security_global_description">Comportement d’alerte Android pour les connexions inconnues et les avertissements de sécurité</string>
 
     <string name="chat_bubble_colors">Couleurs des bulles</string>
     <string name="custom_emoji">Emoji personnalisés</string>
