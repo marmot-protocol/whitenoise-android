@@ -43,7 +43,11 @@ class AddProfileSessionTest {
         session.dispose()
         session.dismiss()
         session.error(42)
-        assertEquals("", session.key.text.toString())
+        assertEquals(
+            "",
+            session.signInField.key.text
+                .toString(),
+        )
         assertEquals(null, session.errorRes)
         assertEquals(0, dismissals)
         assertFalse(session.begin(OnboardingAction.Creating))
@@ -64,7 +68,11 @@ class AddProfileSessionTest {
         session.edit("submitted private draft")
         assertTrue(session.begin(OnboardingAction.Importing))
         session.edit("other draft")
-        assertEquals("submitted private draft", session.key.text.toString())
+        assertEquals(
+            "submitted private draft",
+            session.signInField.key.text
+                .toString(),
+        )
     }
 
     /** Returning from Sign In clears draft/validation only, with no native completion or external dismiss. */
@@ -74,7 +82,11 @@ class AddProfileSessionTest {
         session.edit("local private draft")
         session.error(42)
         session.clearDraft()
-        assertEquals("", session.key.text.toString())
+        assertEquals(
+            "",
+            session.signInField.key.text
+                .toString(),
+        )
         assertEquals(null, session.errorRes)
         assertEquals(0, dismissals)
         assertTrue(session.ownsEntry())

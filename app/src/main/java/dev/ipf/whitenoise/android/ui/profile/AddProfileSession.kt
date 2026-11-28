@@ -1,7 +1,5 @@
 package dev.ipf.whitenoise.android.ui.profile
 
-import androidx.compose.foundation.text.input.TextFieldState
-import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -11,6 +9,7 @@ import dev.ipf.whitenoise.android.state.NoticeTier
 import dev.ipf.whitenoise.android.state.ToastMessage
 import dev.ipf.whitenoise.android.state.TransientNotice
 import dev.ipf.whitenoise.android.ui.onboarding.OnboardingAction
+import dev.ipf.whitenoise.android.ui.onboarding.SignInFieldState
 
 /** Presentation lifetime only: existing AppState mutations still own accepted identity work after this view closes. */
 @Suppress("TooManyFunctions") // One short-lived presentation owns its key, action, feedback and dismissal fences.
@@ -18,7 +17,7 @@ internal class AddProfileSession(
     private val ownerAvailable: () -> Boolean,
     private val onDismiss: () -> Unit,
 ) {
-    val key = TextFieldState()
+    val signInField = SignInFieldState()
     var action by mutableStateOf(OnboardingAction.Idle)
         private set
     var errorRes by mutableStateOf<Int?>(null)
@@ -48,7 +47,7 @@ internal class AddProfileSession(
     /** Field edits clear only this presentation's validation state and cannot alter a busy submitted request. */
     fun edit(value: String) {
         if (!ownsEntry() || action != OnboardingAction.Idle) return
-        if (key.text.toString() != value) key.setTextAndPlaceCursorAtEnd(value)
+        if (signInField.key.text.toString() != value) signInField.replaceText(value)
         errorRes = null
     }
 
@@ -59,7 +58,7 @@ internal class AddProfileSession(
 
     /** Explicit local navigation clears key material without changing any native identity/checkpoint. */
     fun clearDraft() {
-        key.setTextAndPlaceCursorAtEnd("")
+        signInField.replaceText("")
         errorRes = null
     }
 

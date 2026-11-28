@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
@@ -76,7 +75,7 @@ internal fun OnboardingContent(
     reactivatingAccountLabel: String? = null,
     onContinueWithSavedAccount: (String) -> Unit = {},
     onRecoverSavedAccount: (String) -> Unit = {},
-    privateKeyState: TextFieldState? = null,
+    signInField: SignInFieldState? = null,
     onUseRemoteSigner: ((RemoteSignerEntry) -> Unit)? = null,
 ) {
     var signingIn by remember { mutableStateOf(signingInBusy || loggingInWithAmber) }
@@ -99,7 +98,7 @@ internal fun OnboardingContent(
             recoveryConsentVisible = recoveryConsentVisible,
             onRecoveryConsentConfirm = onRecoveryConsentConfirm,
             onRecoveryConsentDismiss = onRecoveryConsentDismiss,
-            privateKeyState = privateKeyState,
+            signInField = signInField,
             amberSignerAvailable = amberSignerAvailable,
             loggingInWithAmber = loggingInWithAmber,
             amberSignInStage = amberSignInStage,

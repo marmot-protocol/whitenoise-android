@@ -17,6 +17,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.onboarding.OnboardingSavedAccountActions
 import dev.ipf.whitenoise.android.ui.onboarding.OnboardingSavedAccountUi
 import dev.ipf.whitenoise.android.ui.onboarding.SignInContent
+import dev.ipf.whitenoise.android.ui.onboarding.SignInFieldState
 import dev.ipf.whitenoise.android.ui.onboarding.SignInKeyField
 
 private const val ORIGINAL_FIXTURE_IDENTITY = "fixture original identity"
@@ -35,13 +36,14 @@ internal fun MaestroConsentModalPresentation(fixture: MaestroPresentationFixture
 @Composable
 @Suppress("FunctionNaming")
 private fun SignInConsentPresentation(fixture: MaestroPresentationFixture) {
-    val key = remember(fixture) { TextFieldState(ORIGINAL_FIXTURE_IDENTITY) }
+    val signInField = remember(fixture) { SignInFieldState(ORIGINAL_FIXTURE_IDENTITY) }
+    val key = signInField.key
     var showing by remember { mutableStateOf(true) }
     val busy = fixture.scenario.endsWith("busy")
     Box(Modifier.fillMaxSize()) {
         SignInContent(
             identity = ORIGINAL_FIXTURE_IDENTITY,
-            privateKeyState = key,
+            signInField = signInField,
             busy = busy,
             errorRes = null,
             onIdentityChange = { error("Consent must retain the original identity") },

@@ -180,7 +180,7 @@ class WelcomeSignInPresentationTest {
 
     /** Submit reads the native text at the tap boundary, even when an older string projection was supplied. */
     @Test fun nativeTextIsTheSubmittedSnapshotAndStaysMasked() {
-        val key = TextFieldState(SECRET)
+        val signInField = SignInFieldState(SECRET)
         val imports = mutableListOf<String>()
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -192,7 +192,7 @@ class WelcomeSignInPresentationTest {
                     onErrorChange = {},
                     onBack = {},
                     onSignIn = {},
-                    privateKeyState = key,
+                    signInField = signInField,
                     onSignInValue = { imports.add(it) },
                 )
             }
@@ -206,7 +206,7 @@ class WelcomeSignInPresentationTest {
 
     /** Retrying the same key must not report another edit and invalidate a recovery acknowledgement. */
     @Test fun unchangedKeyRetryDoesNotReportAnotherEdit() {
-        val key = TextFieldState(SECRET)
+        val signInField = SignInFieldState(SECRET)
         var edits = 0
         var submits = 0
         composeRule.setContent {
@@ -219,7 +219,7 @@ class WelcomeSignInPresentationTest {
                     onErrorChange = {},
                     onBack = {},
                     onSignIn = { submits++ },
-                    privateKeyState = key,
+                    signInField = signInField,
                 )
             }
         }
@@ -234,7 +234,8 @@ class WelcomeSignInPresentationTest {
      * again.
      */
     @Test fun ownerClearDisablesTheSignInAction() {
-        val key = TextFieldState(SECRET)
+        val signInField = SignInFieldState(SECRET)
+        val key = signInField.key
         composeRule.setContent {
             WhiteNoiseTheme {
                 SignInContent(
@@ -245,7 +246,7 @@ class WelcomeSignInPresentationTest {
                     onErrorChange = {},
                     onBack = {},
                     onSignIn = {},
-                    privateKeyState = key,
+                    signInField = signInField,
                 )
             }
         }
@@ -258,7 +259,8 @@ class WelcomeSignInPresentationTest {
     @Test fun pasteFillsOnlyAfterTheUserRequestsIt() {
         val clipboard = context.getSystemService(ClipboardManager::class.java)
         clipboard.setPrimaryClip(ClipData.newPlainText("synthetic test key", SECRET))
-        val key = TextFieldState()
+        val signInField = SignInFieldState()
+        val key = signInField.key
         var imports = 0
         var systemPaste: (() -> Unit)? = null
         val toolbar =
@@ -292,7 +294,7 @@ class WelcomeSignInPresentationTest {
                         onErrorChange = {},
                         onBack = {},
                         onSignIn = { imports++ },
-                        privateKeyState = key,
+                        signInField = signInField,
                     )
                 }
             }
@@ -308,8 +310,8 @@ class WelcomeSignInPresentationTest {
         clipboard.clearPrimaryClip()
     }
 
-    /** A provider clip pasted on Sign In can be retired by pairing without a second read. */
-    @Test fun signInForwardsTheProviderClipboardIdentityWithTheBunkerLink() {
+    /** Resuming a retained Sign In draft after backing out of pairing can retire the original provider copy. */
+    @Test fun retainedProviderBunkerLinkCanBeRetiredAfterLeavingAndReopeningSignIn() {
         val clipboard = context.getSystemService(ClipboardManager::class.java)
         val link = "bunker://test?relay=wss://signer.example"
         var reads = 0
@@ -327,49 +329,65 @@ class WelcomeSignInPresentationTest {
             "setTimestamp",
             ReflectionHelpers.ClassParameter.from(Long::class.javaPrimitiveType, 1L),
         )
-        var entry: RemoteSignerEntry? = null
+        val signInField = SignInFieldState()
+        val entry = mutableStateOf<RemoteSignerEntry?>(null)
         composeRule.setContent {
             WhiteNoiseTheme {
-                SignInContent(
-                    "",
-                    false,
-                    null,
-                    onIdentityChange = {},
-                    onErrorChange = {},
-                    onBack = {},
-                    onSignIn = { error("A bunker link should open remote signer pairing") },
-                    onUseRemoteSigner = { entry = it },
-                )
+                if (entry.value == null) {
+                    OnboardingContent(
+                        identity = signInField.key.text.toString(),
+                        creatingIdentity = false,
+                        signingInBusy = false,
+                        onIdentityChange = {},
+                        onCreateIdentity = {},
+                        onImportIdentity = { error("A bunker link should open remote signer pairing") },
+                        signInField = signInField,
+                        onUseRemoteSigner = { entry.value = it },
+                    )
+                }
             }
         }
 
+        composeRule.onNodeWithTag("onboarding.welcome.sign_in").performScrollTo().performClick()
         composeRule.onNodeWithContentDescription(context.getString(R.string.paste)).performClick()
         composeRule.onNodeWithTag("onboarding.sign_in.action").performClick()
+        composeRule.onNodeWithTag("onboarding.sign_in.action").assertDoesNotExist()
         composeRule.runOnIdle {
-            val request = requireNotNull(entry)
+            assertEquals(link, requireNotNull(entry.value).link)
+            entry.value = null
+        }
+        composeRule.onNodeWithTag("onboarding.welcome.sign_in").performScrollTo().performClick()
+        composeRule.onNodeWithTag("onboarding.sign_in.action").performClick()
+        composeRule.runOnIdle {
+            val request = requireNotNull(entry.value)
             assertEquals(link, request.link)
-            val session = FakeRemoteSignerSession()
-            val fakeHost = FakeRemoteSignerHost(session)
-            val host =
-                object : RemoteSignerPairingHost by fakeHost {
-                    /** Runs the real clipboard cleanup through the pairing host contract. */
-                    override fun onBunkerLinkSpent(
-                        link: String,
-                        paste: BunkerClipboardPaste?,
-                    ) = clearClipboardIfHolding(context, link, paste)
-                }
-            val pairing =
-                RemoteSignerPairing(
-                    host,
-                    CoroutineScope(Dispatchers.Unconfined),
-                    sessionDispatcher = Dispatchers.Unconfined,
-                )
-            pairing.choose(RemoteSignerMethod.BunkerLink, request.link, request.clipboardPaste)
-            pairing.approve()
-            session.connectReply.complete("a1b2c3")
+            completePairing(request)
             assertFalse(clipboard.hasPrimaryClip())
             assertEquals(1, reads)
         }
+    }
+
+    /** Completes the real pairing state machine using a synthetic signer and the clipboard cleanup callback. */
+    private fun completePairing(request: RemoteSignerEntry) {
+        val session = FakeRemoteSignerSession()
+        val fakeHost = FakeRemoteSignerHost(session)
+        val host =
+            object : RemoteSignerPairingHost by fakeHost {
+                /** Runs the real clipboard cleanup through the pairing host contract. */
+                override fun onBunkerLinkSpent(
+                    link: String,
+                    paste: BunkerClipboardPaste?,
+                ) = clearClipboardIfHolding(context, link, paste)
+            }
+        val pairing =
+            RemoteSignerPairing(
+                host,
+                CoroutineScope(Dispatchers.Unconfined),
+                sessionDispatcher = Dispatchers.Unconfined,
+            )
+        pairing.choose(RemoteSignerMethod.BunkerLink, request.link, request.clipboardPaste)
+        pairing.approve()
+        session.connectReply.complete("a1b2c3")
     }
 
     /** While Amber is awaiting its second prompt both credential import and Back stay gated. */

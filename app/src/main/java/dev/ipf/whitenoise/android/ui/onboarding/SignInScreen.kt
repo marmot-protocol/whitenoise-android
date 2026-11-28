@@ -2,8 +2,6 @@ package dev.ipf.whitenoise.android.ui.onboarding
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.text.input.TextFieldState
-import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -23,7 +21,6 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
-import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.BunkerClipboardPaste
 import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.RemoteSignerEntry
 import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.isBunkerLink
 import kotlinx.coroutines.flow.collect
@@ -48,7 +45,7 @@ internal fun SignInContent(
     recoveryConsentVisible: Boolean = false,
     onRecoveryConsentConfirm: () -> Unit = {},
     onRecoveryConsentDismiss: () -> Unit = {},
-    privateKeyState: TextFieldState? = null,
+    signInField: SignInFieldState? = null,
     amberSignerAvailable: Boolean = false,
     loggingInWithAmber: Boolean = false,
     amberSignInStage: Int? = null,
@@ -59,22 +56,22 @@ internal fun SignInContent(
 ) {
     WindowSecureFlag()
     // The real onboarding owner supplies the native state; the fallback retains existing standalone callers/tests.
-    val key = privateKeyState ?: remember { TextFieldState(identity) }
+    val field = signInField ?: remember { SignInFieldState(identity) }
+    val key = field.key
     val changed by rememberUpdatedState(onIdentityChange)
     var lastReportedKey by remember(key) { mutableStateOf(key.text.toString()) }
-    var bunkerPaste by remember(key) { mutableStateOf<BunkerClipboardPaste?>(null) }
 
     /** Reports a key edit once per distinct value. */
     fun reportKeyEdit(value: String) {
-        bunkerPaste = bunkerPaste?.takeIf { it.matchesLink(value) }
+        field.discardPasteForDifferentValue(value)
         if (value != lastReportedKey) {
             lastReportedKey = value
             changed(value)
         }
     }
-    if (privateKeyState == null) {
+    if (signInField == null) {
         LaunchedEffect(identity) {
-            if (key.text.toString() != identity) key.setTextAndPlaceCursorAtEnd(identity)
+            if (key.text.toString() != identity) field.replaceText(identity)
         }
     }
     LaunchedEffect(key) {
@@ -89,7 +86,7 @@ internal fun SignInContent(
         // Flush a just-typed edit before native work; its queued observer cannot erase the resulting error or consent.
         reportKeyEdit(value)
         if (onUseRemoteSigner != null && isBunkerLink(value)) {
-            onUseRemoteSigner(RemoteSignerEntry(value.trim(), bunkerPaste))
+            onUseRemoteSigner(RemoteSignerEntry(value.trim(), field.clipboardPaste))
             return
         }
         when (IdentityEntryInput.classify(value)) {
@@ -144,7 +141,7 @@ internal fun SignInContent(
             ::reportKeyEdit,
             onErrorChange,
             ::submit,
-            onBunkerClipboardPaste = { bunkerPaste = it },
+            onBunkerClipboardPaste = { field.clipboardPaste = it },
         )
         if (onUseRemoteSigner != null) {
             WhiteNoiseOutlinedButton(

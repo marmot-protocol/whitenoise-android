@@ -1,7 +1,5 @@
 package dev.ipf.whitenoise.android.ui.profile
 
-import androidx.compose.foundation.text.input.TextFieldState
-import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -10,6 +8,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import dev.ipf.whitenoise.android.ui.onboarding.OnboardingAction
 import dev.ipf.whitenoise.android.ui.onboarding.SignInContent
+import dev.ipf.whitenoise.android.ui.onboarding.SignInFieldState
 import dev.ipf.whitenoise.android.ui.onboarding.WelcomeScreen
 import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.RemoteSignerEntry
 
@@ -29,16 +28,17 @@ internal fun AddAccountSheetContent(
     onIdentityChange: (String) -> Unit,
     onErrorChange: (Int?) -> Unit,
     onImport: () -> Unit,
-    privateKeyState: TextFieldState? = null,
+    signInField: SignInFieldState? = null,
     amberSignInStage: Int? = null,
     onBack: () -> Unit = {},
     onUseRemoteSigner: ((RemoteSignerEntry) -> Unit)? = null,
 ) {
     val busy = inFlightAction != OnboardingAction.Idle
-    val key = privateKeyState ?: remember { TextFieldState(identity) }
-    if (privateKeyState == null) {
+    val field = signInField ?: remember { SignInFieldState(identity) }
+    val key = field.key
+    if (signInField == null) {
         LaunchedEffect(identity) {
-            if (key.text.toString() != identity) key.setTextAndPlaceCursorAtEnd(identity)
+            if (key.text.toString() != identity) field.replaceText(identity)
         }
     }
     var signingIn by remember {
@@ -53,14 +53,14 @@ internal fun AddAccountSheetContent(
             onErrorChange = onErrorChange,
             onBack = {
                 if (!busy) {
-                    key.setTextAndPlaceCursorAtEnd("")
+                    field.replaceText("")
                     onIdentityChange("")
                     onErrorChange(null)
                     signingIn = false
                 }
             },
             onSignIn = onImport,
-            privateKeyState = key,
+            signInField = field,
             amberSignerAvailable = amberSignerAvailable,
             loggingInWithAmber = inFlightAction == OnboardingAction.AmberLogin,
             amberSignInStage = amberSignInStage,
