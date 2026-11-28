@@ -1982,7 +1982,7 @@ class ConversationScrollCoordinatorTest {
         val mention =
             screen
                 .substringAfter("fun jumpToNextUnreadMention()")
-                .substringBefore("LaunchedEffect(controller)")
+                .substringBefore("/** Remembers the jump")
         val positioned = mention.indexOf("scrollCoordinator.jumpToMentionReadingStart(")
         val guard = mention.indexOf("if (!reached || !navigationRequest.isCurrent()) return@launch")
         val read = mention.indexOf("controller.markReadUpTo(targetMessageId)")
