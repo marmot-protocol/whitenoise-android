@@ -75,10 +75,17 @@ class ChatListProfileReturnSnapCoverageTest {
             "direct list opens must capture through the shared visible head",
             "visibleReturnHead()" in chatsScreen.kotlinFunctionBody("openGroupFromVisibleList"),
         )
-        assertTrue(
-            "the open and New Message holders read the head through that shared function",
-            "chatListVisibleReturnHead(visibleItems, showArchived, advancedFolder)" in chatsScreen,
-        )
+        val sharedHeadRead = "chatListVisibleReturnHead(visibleItems, showArchived, advancedFolder)"
+        val openHolder =
+            chatsScreen
+                .substringAfter("class ChatListNavigation(")
+                .substringBefore("fun rememberChatListNavigation(")
+        val newChatFlowHolder =
+            chatsScreen
+                .substringAfter("class ChatListNewChatFlowHead(")
+                .substringBefore("fun rememberChatListNewChatFlowHead(")
+        assertTrue("chat opens read the head through that shared function", sharedHeadRead in openHolder)
+        assertTrue("the New Message head reads it through the same function", sharedHeadRead in newChatFlowHolder)
 
         val returnEffect =
             chatsScreen.requiredSection(
