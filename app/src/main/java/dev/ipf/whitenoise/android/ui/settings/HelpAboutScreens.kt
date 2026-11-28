@@ -176,22 +176,21 @@ internal fun BugReportContent(
     }
 }
 
-/** About & licenses: the installed build, then the bundled notices and the privacy policy. */
-@Suppress("FunctionNaming")
+/**
+ * About & licenses: the installed build, then the bundled notices and the privacy policy. [onOpenLicenses] opens the
+ * notices as their own Settings page, which Back returns here from (#4095).
+ */
+@Suppress("FunctionNaming", "LongParameterList")
 @Composable
 internal fun AboutScreen(
     appState: WhiteNoiseAppState,
     onOpenDeveloper: () -> Unit,
+    onOpenLicenses: () -> Unit,
     versionName: String,
     buildNumber: String,
     mdkShortSha: String,
     onBack: () -> Unit,
 ) {
-    var licensesOpen by rememberSaveable { mutableStateOf(false) }
-    if (licensesOpen) {
-        OpenSourceLicensesScreen(onBack = { licensesOpen = false })
-        return
-    }
     val context = LocalContext.current
     val alreadyEnabled =
         rememberTransientNoticeOf(R.string.developer_tools_already_enabled, TransientNoticeKind.Information)
@@ -210,7 +209,7 @@ internal fun AboutScreen(
         },
         onOpenDeveloper = onOpenDeveloper,
         onOpenLicenses = {
-            licensesOpen = true
+            onOpenLicenses()
             true
         },
         onOpenPrivacy = { openHelpUrl(context, WhiteNoiseUrls.PRIVACY_POLICY) },
@@ -313,6 +312,7 @@ internal fun AboutContent(
                         SettingsLink(
                             context = context,
                             title = stringResource(R.string.open_source_licenses),
+                            routeKey = SettingsDetail.Licenses,
                             explanation = stringResource(R.string.explanation_organize_help_licenses),
                             onClick = ::showLicenses,
                             modifier = Modifier.testTag("about.licenses"),

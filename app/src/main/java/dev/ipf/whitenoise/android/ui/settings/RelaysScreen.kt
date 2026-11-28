@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.ui.settings
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -12,6 +11,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -43,14 +43,20 @@ import kotlinx.coroutines.flow.first
  * Relays: the account's published relay lists with their recovery actions, then every relay the account uses with
  * the lists it serves, an Add relay sheet, a detail page per relay and Restore default relays. Every edit goes
  * through MarmotKit's validated publish path; nothing here mutates group routes (D08).
+ *
+ * The list and one relay are separate Settings pages (#4095): the list opens a relay through [onOpenRelay], and the
+ * relay page passes its URL as [selectedUrl]. A relay that is no longer in the account's lists, as after Remove,
+ * returns to the list.
  */
-@Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod")
+@Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod", "LongParameterList")
 @Composable
 internal fun RelaysScreen(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,
     onFeedback: (dev.ipf.whitenoise.android.state.ToastMessage) -> Unit = {},
     destination: SettingsDetail = SettingsDetail.Relays,
+    selectedUrl: String? = null,
+    onOpenRelay: (String) -> Unit = {},
 ) {
     val account = appState.activeAccountRef
     val feedbackRuntime = appState.runtimeGeneration
@@ -65,7 +71,6 @@ internal fun RelaysScreen(
     var publication by remember(account) { mutableStateOf(RelayPublicationState()) }
     val operations = remember(appState, account) { appState.relayOperationState(account) }
     val busy = operations.busy
-    var selectedUrl by rememberSaveable(account) { mutableStateOf<String?>(null) }
     var addSheet by rememberSaveable(account) { mutableStateOf(false) }
     var rejectedUrl by rememberSaveable(account) { mutableStateOf<String?>(null) }
     var restoreDialog by rememberSaveable(account) { mutableStateOf(false) }
@@ -111,14 +116,19 @@ internal fun RelaysScreen(
     selectedUrl?.let { url ->
         val relay = relays.firstOrNull { it.url == url }
         if (relay == null) {
-            selectedUrl = null
+            val currentOnBack by rememberUpdatedState(onBack)
+            // Lists still loading show the page's frame; loaded lists without the relay return to the list.
+            LaunchedEffect(lists, busy) { if (lists != null && !busy) currentOnBack() }
+            SettingsScaffold(title = stringResource(R.string.relay), onBack = onBack) {
+                CircularProgressIndicator(Modifier.padding(WhiteNoiseSpacing.Section).testTag("relay.details.loading"))
+            }
+            return
         } else {
-            BackHandler { selectedUrl = null }
             RelayDetailsScreen(
                 relay = relay,
                 lists = lists,
                 busy = busy,
-                onBack = { selectedUrl = null },
+                onBack = onBack,
                 onSetRole = { role, enabled ->
                     runEdit {
                         if (enabled) {
@@ -136,7 +146,7 @@ internal fun RelaysScreen(
                         }
                         updated
                     }
-                    selectedUrl = null
+                    onBack()
                 },
             )
             return
@@ -147,7 +157,7 @@ internal fun RelaysScreen(
         state = RelaysUiState(lists = lists, publication = publication, busy = busy),
         destination = destination,
         onBack = onBack,
-        onOpenRelay = { selectedUrl = it },
+        onOpenRelay = onOpenRelay,
         onAdd = { addSheet = true },
         onRefresh = {
             runPublication(RelayPublicationOperation.Refresh) { account?.let { appState.refreshAccountRelayLists(it) } }

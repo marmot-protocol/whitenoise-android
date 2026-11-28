@@ -239,7 +239,11 @@ internal fun settingsHomeState(
 // home. Kept pure so the back-stack shape (Key Packages → Developer tools → Help & support → home,
 // Sounds & vibration → Notifications → home) is unit-testable without Compose.
 
-/** Parent destination a nested settings detail returns to. */
+/**
+ * Parent destination a nested settings detail returns to when no opener is known, as for a deep link. One flat table,
+ * so its length and branch count grow with the destinations rather than with logic.
+ */
+@Suppress("LongMethod", "CyclomaticComplexMethod")
 internal fun settingsDetailParent(detail: SettingsDetail): SettingsDetail? =
     when (detail) {
         SettingsDetail.Profile,
@@ -295,4 +299,11 @@ internal fun settingsDetailParent(detail: SettingsDetail): SettingsDetail? =
         SettingsDetail.HistoryBackups,
         SettingsDetail.ManageStorage,
         -> SettingsDetail.Data
+        SettingsDetail.Licenses -> SettingsDetail.About
+        SettingsDetail.LicenseNotice -> SettingsDetail.Licenses
+        SettingsDetail.LinkedDevices -> SettingsDetail.Account
+        SettingsDetail.NotificationProfiles -> SettingsDetail.Notifications
+        SettingsDetail.RelayDetails -> SettingsDetail.Relays
+        SettingsDetail.StoredAttachments -> SettingsDetail.ManageStorage
+        SettingsDetail.EmojiSetPreview -> SettingsDetail.EmojiSets
     }

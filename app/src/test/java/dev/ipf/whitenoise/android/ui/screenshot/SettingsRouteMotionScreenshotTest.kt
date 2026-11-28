@@ -27,6 +27,7 @@ import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
+import dev.ipf.whitenoise.android.ui.navigation.settingsChain
 import dev.ipf.whitenoise.android.ui.settings.SETTINGS_CARD_MORPH_MILLIS
 import dev.ipf.whitenoise.android.ui.settings.SettingsHomeViewport
 import dev.ipf.whitenoise.android.ui.settings.SettingsScreen
@@ -114,7 +115,7 @@ class SettingsRouteMotionScreenshotTest {
     ) {
         val app: Application = ApplicationProvider.getApplicationContext()
         val state = actualHomeState(app)
-        val detail = mutableStateOf<SettingsDetail?>(null)
+        val stack = mutableStateOf(settingsChain(null))
         var backDispatcher: OnBackPressedDispatcher? = null
         rule.setContent {
             backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
@@ -124,8 +125,8 @@ class SettingsRouteMotionScreenshotTest {
                     {},
                     {},
                     {},
-                    detail.value,
-                    { detail.value = it },
+                    stack.value,
+                    { stack.value = it },
                     SettingsHomeViewport.Top,
                     {},
                     selfUpdateEnabled = true,
@@ -142,7 +143,7 @@ class SettingsRouteMotionScreenshotTest {
             captureDenseSource("${name}_cycle_$cycle")
             entry.performClick()
             rule.mainClock.advanceTimeByFrame()
-            org.junit.Assert.assertEquals(destination, detail.value)
+            org.junit.Assert.assertEquals(destination, stack.value.last().detail)
             // Capture the production draw path while its real destination controls are inert.
             val early = rule.onRoot().captureToImage()
             assertTrue(early.width > 0 && early.height > 0)
@@ -191,7 +192,7 @@ class SettingsRouteMotionScreenshotTest {
                 // Include a final frame for route cleanup after the animation settles.
                 rule.mainClock.advanceTimeByFrame()
             }
-            org.junit.Assert.assertEquals(null, detail.value)
+            org.junit.Assert.assertEquals(null, stack.value.last().detail)
             entry.assertIsDisplayed()
             org.junit.Assert.assertEquals(sourceBounds, entry.fetchSemanticsNode().boundsInRoot)
             val restoredPixels = rule.onRoot().captureToImage().asAndroidBitmap()
@@ -286,7 +287,7 @@ class SettingsRouteMotionScreenshotTest {
                 profileReader = { null },
                 profileDisplayNameReader = { "Motion fixture" },
             )
-        val detail = mutableStateOf<SettingsDetail?>(SettingsDetail.Chats)
+        val stack = mutableStateOf(settingsChain(SettingsDetail.Chats))
         rule.mainClock.autoAdvance = false
         rule.setContent {
             CompositionLocalProvider(
@@ -299,8 +300,8 @@ class SettingsRouteMotionScreenshotTest {
                             {},
                             {},
                             {},
-                            detail.value,
-                            { detail.value = it },
+                            stack.value,
+                            { stack.value = it },
                             SettingsHomeViewport.Top,
                             {},
                             // Pin the flavor-dependent update card so Play and Zapstore share one baseline.

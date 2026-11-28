@@ -6,8 +6,12 @@ import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
+import dev.ipf.whitenoise.android.ui.navigation.ShellRoute
 
-/** Settings root hosting the hub and every detail destination. */
+/**
+ * Settings root hosting the hub and every detail destination. [stack] is the section's open pages, home first, and
+ * [onStackChange] receives the next one, see [rememberSettingsRouteRenderer].
+ */
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable
 internal fun SettingsScreen(
@@ -15,8 +19,8 @@ internal fun SettingsScreen(
     onBackToChats: () -> Unit,
     onOpenDiagnostics: () -> Unit,
     onOpenSupportChat: (ChatListItem) -> Unit,
-    detail: SettingsDetail?,
-    onDetailChange: (SettingsDetail?) -> Unit,
+    stack: List<ShellRoute.Settings>,
+    onStackChange: (List<ShellRoute.Settings>) -> Unit,
     homeViewport: SettingsHomeViewport,
     onHomeViewportChange: (SettingsHomeViewport) -> Unit,
     suppressMotion: Boolean = false,
@@ -29,14 +33,15 @@ internal fun SettingsScreen(
             onBackToChats = onBackToChats,
             onOpenDiagnostics = onOpenDiagnostics,
             onOpenSupportChat = onOpenSupportChat,
-            detail = detail,
-            onDetailChange = onDetailChange,
+            stack = stack,
+            onStackChange = onStackChange,
             homeViewport = homeViewport,
             onHomeViewportChange = onHomeViewportChange,
             suppressMotion = suppressMotion,
             selfUpdateEnabled = selfUpdateEnabled,
             firstRunHelpRoot = firstRunHelpRoot,
         )
+    val detail = stack.lastOrNull()?.detail
     SettingsRouteMotion(
         target = detail,
         depth = render.depthOf(detail),
@@ -53,21 +58,16 @@ internal class SettingsRouteRenderer(
     val content: @Composable (SettingsDetail?) -> Unit,
 )
 
-/** Back handler: nested detail, then home, blocked during sign-out. */
+/** Back handler: [onDetailBack] from an open [detail], [onHomeBack] from home, blocked during sign-out. */
 @Composable
 internal fun settingsBackHandler(
     signOutInProgress: Boolean,
     detail: SettingsDetail?,
-    parentOf: (SettingsDetail) -> SettingsDetail?,
-    onBackToChats: () -> Unit,
-    onDetailChange: (SettingsDetail?) -> Unit,
+    onHomeBack: () -> Unit,
+    onDetailBack: () -> Unit,
 ) {
     BackHandler {
         if (signOutInProgress) return@BackHandler
-        if (detail == null) {
-            onBackToChats()
-        } else {
-            onDetailChange(parentOf(detail))
-        }
+        if (detail == null) onHomeBack() else onDetailBack()
     }
 }

@@ -18,6 +18,8 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
+import dev.ipf.whitenoise.android.ui.navigation.ShellRoute
+import dev.ipf.whitenoise.android.ui.navigation.settingsChain
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -42,7 +44,7 @@ class SupportNavigationTest {
         val hub = context.getString(R.string.settings_help_support)
         var current: SettingsDetail? = null
         composeRule.setContent {
-            var detail by remember { mutableStateOf<SettingsDetail?>(null) }
+            var stack by remember { mutableStateOf(settingsChain(null)) }
             var viewport by remember { mutableStateOf(SettingsHomeViewport.Top) }
             WhiteNoiseTheme {
                 SettingsScreen(
@@ -50,10 +52,10 @@ class SupportNavigationTest {
                     {},
                     {},
                     {},
-                    detail,
-                    onDetailChange = {
-                        detail = it
-                        current = it
+                    stack,
+                    onStackChange = {
+                        stack = it
+                        current = it.last().detail
                     },
                     homeViewport = viewport,
                     onHomeViewportChange = { viewport = it },
@@ -84,5 +86,42 @@ class SupportNavigationTest {
         composeRule.waitForIdle()
         val restored = composeRule.onNodeWithText(hub).fetchSemanticsNode().boundsInRoot
         assertTrue("expected $original but was $restored", kotlin.math.abs(original.top - restored.top) <= 1f)
+    }
+
+    /** Developer opened from Help & support returns there, and Licenses and a notice page Back through About. */
+    @Test fun pagesReturnToThePageThatOpenedThem() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val appState = supportTestAccount(context, "alice")
+        composeRule.runOnIdle { appState.updateDeveloperMode(true) }
+        var stack by mutableStateOf(settingsChain(SettingsDetail.HelpSupport))
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                SettingsScreen(
+                    appState,
+                    {},
+                    {},
+                    {},
+                    stack,
+                    onStackChange = { stack = it },
+                    homeViewport = SettingsHomeViewport.Top,
+                    onHomeViewportChange = {},
+                )
+            }
+        }
+        val back = context.getString(R.string.back)
+        val developerTools = context.getString(R.string.settings_developer_tools)
+        composeRule.onNodeWithText(developerTools).performScrollTo().performClick()
+        composeRule.runOnIdle { assertEquals(SettingsDetail.Developer, stack.last().detail) }
+        composeRule.onNodeWithContentDescription(back).performClick()
+        composeRule.runOnIdle { assertEquals(settingsChain(SettingsDetail.HelpSupport), stack) }
+
+        composeRule.runOnIdle { stack = settingsChain(SettingsDetail.About) }
+        composeRule.onNodeWithTag("about.licenses").performScrollTo().performClick()
+        composeRule.runOnIdle { assertEquals(settingsChain(SettingsDetail.Licenses), stack) }
+        composeRule.runOnIdle { stack = stack + ShellRoute.Settings(SettingsDetail.LicenseNotice, "missing") }
+        // A notice this build does not bundle returns to the list, then Back leaves the list for About.
+        composeRule.waitUntil(5_000) { stack.last().detail == SettingsDetail.Licenses }
+        composeRule.onNodeWithContentDescription(back).performClick()
+        composeRule.runOnIdle { assertEquals(settingsChain(SettingsDetail.About), stack) }
     }
 }

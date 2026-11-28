@@ -15,7 +15,7 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
+import dev.ipf.whitenoise.android.ui.navigation.settingsChain
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
 import org.junit.Assert.assertTrue
@@ -141,15 +141,15 @@ class SettingsUpdatePlacementTest {
     private fun mountSettings() {
         composeRule.setContent {
             WhiteNoiseTheme {
-                var detail by remember { mutableStateOf<SettingsDetail?>(null) }
+                var stack by remember { mutableStateOf(settingsChain(null)) }
                 var homeViewport by remember { mutableStateOf(SettingsHomeViewport.Top) }
                 SettingsScreen(
                     appState = appState(),
                     onBackToChats = {},
                     onOpenDiagnostics = {},
                     onOpenSupportChat = {},
-                    detail = detail,
-                    onDetailChange = { detail = it },
+                    stack = stack,
+                    onStackChange = { stack = it },
                     homeViewport = homeViewport,
                     onHomeViewportChange = { homeViewport = it },
                 )

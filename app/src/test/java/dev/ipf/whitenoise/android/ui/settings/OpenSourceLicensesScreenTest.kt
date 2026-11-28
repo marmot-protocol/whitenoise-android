@@ -27,36 +27,66 @@ class OpenSourceLicensesScreenTest {
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
+    /** The list retries a failed read and reports the tapped notice, and toolbar Back leaves the list page. */
     @Test
-    fun productionRetryAndBothBackPathsRetainTheLicenseList() {
+    fun theListRetriesAndOpensANoticeByItsId() {
         val reads = AtomicInteger()
         var parentReturns = 0
+        val opened = mutableListOf<String>()
         val notice = OpenSourceNotice("notice", "Example library", "Full notice body")
         val loader: suspend (Resources) -> List<OpenSourceNotice> = {
             if (reads.incrementAndGet() == 1) error("Controlled resource failure")
             listOf(notice)
         }
         composeRule.setContent {
-            WhiteNoiseTheme { OpenSourceLicensesScreen({ parentReturns++ }, loader) }
+            WhiteNoiseTheme {
+                OpenSourceLicensesScreen({ parentReturns++ }, onSelect = { opened += it.id }, noticesLoader = loader)
+            }
         }
         waitFor("licenses.failed")
         composeRule.onNodeWithText("Retry").performClick()
         waitFor("licenses.list")
         assertEquals(2, reads.get())
         composeRule.onNodeWithText(notice.name).performClick()
-        composeRule.onNodeWithTag("licenses.text").assertIsDisplayed()
-        composeRule.runOnUiThread { composeRule.activity.onBackPressedDispatcher.onBackPressed() }
-        composeRule.onNodeWithTag("licenses.list").assertIsDisplayed()
-        assertEquals(0, parentReturns)
-        composeRule.onNodeWithText(notice.name).performClick()
-        composeRule.onNodeWithContentDescription("Back").performClick()
-        composeRule.onNodeWithTag("licenses.list").assertIsDisplayed()
-        assertEquals(0, parentReturns)
+        composeRule.runOnIdle { assertEquals(listOf(notice.id), opened) }
         composeRule.onNodeWithContentDescription("Back").performClick()
         assertEquals(1, parentReturns)
-        assertEquals(2, reads.get())
     }
 
+    /** A notice page shows its text under the notice's name, and toolbar Back returns to the list page. */
+    @Test
+    fun aNoticePageShowsItsTextAndBackLeavesIt() {
+        var parentReturns = 0
+        val notice = OpenSourceNotice("notice", "Example library", "Full notice body")
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                OpenSourceLicensesScreen(
+                    { parentReturns++ },
+                    selectedId = notice.id,
+                    noticesLoader = { listOf(notice) },
+                )
+            }
+        }
+        waitFor("licenses.text")
+        composeRule.onNodeWithText(notice.name).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Back").performClick()
+        assertEquals(1, parentReturns)
+    }
+
+    /** A notice that is no longer bundled returns to the list instead of showing an empty page. */
+    @Test
+    fun aMissingNoticeReturnsToTheList() {
+        var parentReturns = 0
+        val notice = OpenSourceNotice("notice", "Example library", "Full notice body")
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                OpenSourceLicensesScreen({ parentReturns++ }, selectedId = "gone", noticesLoader = { listOf(notice) })
+            }
+        }
+        composeRule.waitUntil(5_000) { parentReturns == 1 }
+    }
+
+    /** A loader that changes after a failure is read again only once Retry is tapped. */
     @Test
     fun aChangedLoaderWaitsForExplicitRetryAfterFailure() {
         val reads = AtomicInteger()
@@ -69,7 +99,7 @@ class OpenSourceLicensesScreenTest {
                 },
             )
         composeRule.setContent {
-            WhiteNoiseTheme { OpenSourceLicensesScreen({}, loader) }
+            WhiteNoiseTheme { OpenSourceLicensesScreen({}, noticesLoader = loader) }
         }
         waitFor("licenses.failed")
         composeRule.runOnIdle {

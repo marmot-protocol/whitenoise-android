@@ -214,6 +214,26 @@ internal class EmojiSetsController(
             refresh()
         }
 
+    /**
+     * Rereads the local projection filtered by [search] without contacting relays, so a browser that comes back from
+     * a set's page finds the results it last searched for again.
+     */
+    suspend fun restoreSearch(search: String) =
+        operate {
+            this.search = search.trim().ifBlank { null }
+            refresh()
+        }
+
+    /**
+     * Opens the set at [coordinate] for its own page: the version in the local projection when it has one, else the
+     * one fetched as [open] does for a pasted address.
+     */
+    suspend fun preview(coordinate: String) {
+        operate { refresh() }
+        val local = state.sets.firstOrNull { it.coordinate == coordinate }
+        if (local != null) show(local) else open(coordinate)
+    }
+
     /** Opens a version from the current projection. */
     fun show(set: EmojiSetFfi) {
         state = state.copy(preview = set, notice = null, installedWithSkips = null)
