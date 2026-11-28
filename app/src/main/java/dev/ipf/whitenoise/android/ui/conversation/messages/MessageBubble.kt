@@ -354,15 +354,15 @@ internal fun MessageBubble(
     val colorScheme = MaterialTheme.colorScheme
     val customBubbleColorActive =
         bubbleTheme != BubbleTheme.Amoled && customBubbleArgb != null && !deleted && !persistedFailure
-    val bubblePresentation =
-        messageBubblePresentation(
+    // Reply quotes use the displayed fill; status and borders use the semantic presentation.
+    val (bubblePresentation, bubbleBackgroundColor, bubbleContentColor) =
+        messageBubbleAppearance(
+            record = record,
             deleted = deleted,
             mine = mine,
-            customArgb = customBubbleArgb,
             persistedFailure = persistedFailure,
+            customColor = BubbleCustomColor(customBubbleArgb, customBubbleColorActive),
         )
-    val bubbleBackgroundColor = colorFromArgb(bubblePresentation.backgroundArgb)
-    val bubbleContentColor = colorFromArgb(bubblePresentation.contentArgb)
     val replyQuoteColors =
         messageReplyQuoteColors(
             customBubbleColorActive = customBubbleColorActive,

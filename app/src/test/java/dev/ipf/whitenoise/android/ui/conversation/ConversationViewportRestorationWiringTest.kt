@@ -9,6 +9,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.dp
+import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ScriptedConversationLiveSubscriptions
 import dev.ipf.whitenoise.android.state.conversationTimelineTestAppState
@@ -16,6 +17,7 @@ import dev.ipf.whitenoise.android.state.conversationTimelineTestGroup
 import dev.ipf.whitenoise.android.state.notifiedMessagePreview
 import dev.ipf.whitenoise.android.state.timelinePage
 import dev.ipf.whitenoise.android.state.timelineRecord
+import dev.ipf.whitenoise.android.ui.conversation.agent.AgentRecordingFixtures
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -87,6 +89,7 @@ class ConversationViewportRestorationWiringTest {
     fun savedEffectWaitsForSeedThenWinsOverUnreadAndDoesNotReplayOnOwnerReplacement() {
         val fixture = EffectFixture()
         try {
+            composeRule.runOnUiThread { fixture.controller.isLoading = true }
             setEffectContent(fixture)
             composeRule.waitForIdle()
             assertTrue(fixture.writer.writes.isEmpty())
@@ -95,6 +98,7 @@ class ConversationViewportRestorationWiringTest {
             assertEquals(listOf(1 to 23, 1 to 23), fixture.writer.writes)
             assertEquals(1, fixture.completions)
             assertTrue(fixture.anchored.value)
+            assertTrue(fixture.controller.isLoading)
             assertEquals(ConversationScrollMode.ReadingHistory("2".repeat(64), 23), fixture.coordinator.value.mode)
             composeRule.runOnUiThread {
                 fixture.coordinator.value = ConversationScrollCoordinator(fixture.writer)
@@ -103,6 +107,29 @@ class ConversationViewportRestorationWiringTest {
             assertEquals(2, fixture.writer.writes.size)
             assertEquals(1, fixture.completions)
             assertEquals(0, fixture.scripted.timelineSubscriptionOpenCount)
+        } finally {
+            fixture.controller.onCleared()
+        }
+    }
+
+    @Test
+    fun savedEffectWaitsForInviteAuthorityAfterTimelinePublication() {
+        val fixture = EffectFixture()
+        try {
+            composeRule.runOnUiThread {
+                fixture.controller.inviteConfirmationUnresolved = true
+                fixture.publishAuthoritativePage()
+            }
+            setEffectContent(fixture)
+            composeRule.waitForIdle()
+            assertFalse(fixture.controller.group.pendingConfirmation)
+            assertTrue(fixture.writer.writes.isEmpty())
+            assertFalse(fixture.anchored.value)
+
+            composeRule.runOnUiThread { fixture.controller.inviteConfirmationUnresolved = false }
+            composeRule.waitForIdle()
+            assertTrue(fixture.anchored.value)
+            assertEquals(1, fixture.completions)
         } finally {
             fixture.controller.onCleared()
         }
@@ -128,6 +155,54 @@ class ConversationViewportRestorationWiringTest {
         }
     }
 
+    @Test
+    fun savedEffectCompletesWithoutMeasuringAnExhaustedBackgroundOnlyWindow() {
+        val fixture = EffectFixture()
+        try {
+            composeRule.runOnUiThread { fixture.controller.isLoading = true }
+            setEffectContent(fixture)
+            composeRule.runOnUiThread { fixture.publishAuthoritativePage(listOf(backgroundRecord())) }
+            composeRule.waitForIdle()
+            assertTrue(fixture.writer.writes.isEmpty())
+            assertTrue(fixture.anchored.value)
+            assertTrue(fixture.controller.isLoading)
+            assertEquals(1, fixture.completions)
+            assertEquals(ConversationScrollMode.FollowingTail, fixture.coordinator.value.mode)
+        } finally {
+            fixture.controller.onCleared()
+        }
+    }
+
+    @Test
+    fun savedEffectStillAnchorsWhenAVisiblePageArrivesAfterBackfillStalls() {
+        val fixture = EffectFixture()
+        try {
+            setEffectContent(fixture)
+            composeRule.runOnUiThread {
+                fixture.publishAuthoritativePage(listOf(backgroundRecord()), hasMoreBefore = true)
+            }
+            composeRule.waitForIdle()
+            assertTrue(fixture.backfillStalled.value)
+            assertFalse(fixture.anchored.value)
+
+            composeRule.runOnUiThread { fixture.publishAuthoritativePage() }
+            composeRule.waitForIdle()
+            assertFalse(fixture.backfillStalled.value)
+            assertTrue(fixture.anchored.value)
+            assertEquals(1, fixture.completions)
+        } finally {
+            fixture.controller.onCleared()
+        }
+    }
+
+    private fun backgroundRecord(): TimelineMessageRecordFfi {
+        val item =
+            AgentRecordingFixtures
+                .load("codex_approval_allowed", events = 6)
+                .firstNotNullOf { it.projected?.agentItem?.takeIf { agent -> agent.itemType == "tool" } }
+        return timelineRecord("2".repeat(64), 2uL).copy(kind = 1201uL, agentItem = item)
+    }
+
     private fun setEffectContent(fixture: EffectFixture) {
         composeRule.setContent {
             if (fixture.shown.value) {
@@ -140,7 +215,9 @@ class ConversationViewportRestorationWiringTest {
                         fixture.gate,
                     )
                 LazyColumn(state = list, modifier = Modifier.height(240.dp)) {
-                    items(fixture.controller.timeline.size) { Text("row-$it", Modifier.height(40.dp)) }
+                    items(fixture.controller.timeline.count(::conversationTimelineRowVisible)) {
+                        Text("row-$it", Modifier.height(40.dp))
+                    }
                 }
                 ConversationViewportRestorationEffects(
                     fixture.controller,
@@ -154,6 +231,7 @@ class ConversationViewportRestorationWiringTest {
                             fixture.anchored.value = true
                         },
                         retireUnreadDivider = { error("Saved restore must take precedence over unread entry") },
+                        onSavedBackfillStalled = { fixture.backfillStalled.value = it },
                     ),
                 )
             }
@@ -174,6 +252,7 @@ class ConversationViewportRestorationWiringTest {
         val gate = ConversationPostInitialReanchorGate()
         val anchored = mutableStateOf(false)
         val shown = mutableStateOf(true)
+        val backfillStalled = mutableStateOf(false)
         var completions = 0
 
         fun inputs() =
@@ -187,15 +266,18 @@ class ConversationViewportRestorationWiringTest {
                 seedTailAwaitingAuthoritative = false,
             )
 
-        fun publishAuthoritativePage() =
-            runBlocking {
-                val records = (1..3).map { timelineRecord(it.toString().repeat(64), it.toULong()) }
-                controller.applyTimelinePage(
-                    page = timelinePage(*records.toTypedArray()),
-                    replaceWindow = true,
-                    updatePagination = true,
-                )
-            }
+        private val ordinaryRows = (1..3).map { timelineRecord(it.toString().repeat(64), it.toULong()) }
+
+        fun publishAuthoritativePage(
+            records: List<TimelineMessageRecordFfi> = ordinaryRows,
+            hasMoreBefore: Boolean = false,
+        ) = runBlocking {
+            controller.applyTimelinePage(
+                page = timelinePage(*records.toTypedArray()).copy(hasMoreBefore = hasMoreBefore),
+                replaceWindow = true,
+                updatePagination = true,
+            )
+        }
     }
 
     private class RecordingWriter : ConversationScrollWriter {

@@ -5,6 +5,7 @@ import dev.ipf.whitenoise.android.conversationControllerSource
 import dev.ipf.whitenoise.android.functionBody
 import dev.ipf.whitenoise.android.motionOwnerSource
 import dev.ipf.whitenoise.android.notificationDeliveryControllerSource
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -506,6 +507,31 @@ class AppStateSendLockCoverageTest {
                 .resolve("ConversationViewportRestorationEffects.kt")
                 .motionOwnerSource()
                 .replace(Regex("\\s+"), " ")
+        val savedRestore =
+            effects
+                .substringAfter("private suspend fun ConversationController.commitSavedViewport(")
+                .substringBefore("private fun savedViewportPosition(")
+        val savedRestoreKeys =
+            effects
+                .substringAfter("private fun ConversationSavedViewportEffect(")
+                .substringAfter("LaunchedEffect(")
+                .substringBefore(")")
+
+        assertEquals(
+            "saved restoration restarts only when its ownership or retry changes",
+            "controller, restore, owner, invitePending, inputs.savedBackfillRetryGeneration",
+            savedRestoreKeys,
+        )
+        assertTrue("saved restoration retries only while active", "while (isCurrent())" in savedRestore)
+        assertTrue(
+            "saved restoration commits the measured position",
+            "owner.commitInitialPosition(position," in savedRestore,
+        )
+        assertTrue(
+            "saved restoration measures its anchor",
+            "viewport.initialAnchorLayout(position.index)" in savedRestore,
+        )
+        assertTrue("saved restoration retries on a new frame", "withFrameNanos { }" in savedRestore)
 
         assertTrue(
             "startup materialization and same-row media hydration must not restart durable history anchoring",
@@ -515,7 +541,6 @@ class AppStateSendLockCoverageTest {
                 "ConversationViewportStructureEffect(" in source &&
                 "coordinator.commitInitialAnchor(" in owner &&
                 "coordinator.commitInitialTailAnchor(" in owner &&
-                "while (!owner.commitInitialPosition(" in effects &&
                 "reanchorGate.commit(" in owner &&
                 "reanchorGate.onStructure(" in owner &&
                 "anchored && changed" in owner &&
@@ -526,18 +551,20 @@ class AppStateSendLockCoverageTest {
     }
 
     @Test
-    fun voiceAutoChainSkipsDerivedEditRows() {
+    fun voiceAutoChainSkipsHiddenConversationRowsAndGroupSystemRows() {
         val source = conversationScreenSource().motionOwnerSource()
         val autoChain =
             source.substring(
                 source.indexOf("fun voicePlaybackHosts()"),
                 source.indexOf("val nextMsg", source.indexOf("fun voicePlaybackHosts()")),
             )
+        val visibility = conversationScreenSource().resolveSibling("AgentActivityProjection.kt").motionOwnerSource()
 
         assertTrue(
-            "auto-chain should skip invisible edit and group-system rows before checking the immediate visible voice neighbor",
-            "MessageProjector.isEdit(controller.timeline[nextIdx].record)" in autoChain &&
-                "MessageProjector.isGroupSystem(controller.timeline[nextIdx].record)" in autoChain,
+            "Voice autoplay skips background agent, edit and group-system rows",
+            "!conversationTimelineRowVisible(controller.timeline[nextIdx])" in autoChain &&
+                "MessageProjector.isGroupSystem(controller.timeline[nextIdx].record)" in autoChain &&
+                "if (MessageProjector.isEdit(row.record)) return false" in visibility,
         )
     }
 

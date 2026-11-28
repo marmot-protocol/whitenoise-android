@@ -2960,7 +2960,7 @@ class ConversationController(
         get() = hasMoreAfter
 
     /** Pages the subscription window older; true when the window actually advanced. */
-    suspend fun loadOlderTimelinePage(): Boolean = loadOlderPage()
+    suspend fun loadOlderTimelinePage(anchorMessageIdHex: String? = null): Boolean = loadOlderPage(anchorMessageIdHex)
 
     /** Pages the subscription window newer; true when the window actually advanced. */
     suspend fun loadNewerTimelinePage(origin: PagingOrigin = PagingOrigin.EXPLICIT): Boolean = loadNewerPage(origin)

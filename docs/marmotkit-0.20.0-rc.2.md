@@ -1,0 +1,11 @@
+# MarmotKit 0.20.0-rc.2 Android qualification
+
+The Android RC2 candidate pinned MDK commit `a3228a2c572f2c91bbc5948160bbe890f20888a2` via the [published 0.20.0-rc.2 Android archive](https://github.com/marmot-protocol/mdk/releases/tag/marmotkit-v0.20.0-rc.2). The archive checksum, source and builder commit agree with the [publishing run](https://github.com/marmot-protocol/mdk/actions/runs/45917991806).
+
+The manifest omits the feature list. The [arm64-v8a](https://github.com/marmot-protocol/mdk/actions/runs/45917991806/job/140265131054), [armeabi-v7a](https://github.com/marmot-protocol/mdk/actions/runs/45917991806/job/140265131088), [x86](https://github.com/marmot-protocol/mdk/actions/runs/45917991806/job/140265131000), and [x86_64](https://github.com/marmot-protocol/mdk/actions/runs/45917991806/job/140265131168) build logs record both exporter flags enabled. The [pinned build script](https://github.com/marmot-protocol/mdk/blob/a3228a2c572f2c91bbc5948160bbe890f20888a2/crates/marmot-uniffi/kotlin-bindings.sh) passes them to Cargo as `otlp-export` and `product-analytics-export`.
+
+The binding keeps the agent item and timeline placement APIs from the November 26 nightly. The new inbox-list record and relay check method change the onboarding and relay-health bindings. Android displays the new relay rate-limit finding and supplies the retention fields in reply-preview fixtures.
+
+The upgrade from 0.19.0 includes migration 0227, which records expired invitations. On Android commit `f343d196bced0113e1c14b3e0bd1a0b4b79c914c`, the populated upgrade, key migration, cold restart, and all seven recovery cases against a relay that explicitly rejects history comparison passed in both audit modes. [RC2 qualification run](https://github.com/marmot-protocol/whitenoise-android/actions/runs/46012226377)
+
+Against a relay that silently ignores history comparison, six of seven recovery cases passed in each audit mode. In both runs, `healthyAccountReceivesAfterLocalDeletionAndRestart` saw four live send attempts and only the original message in the timeline. Full recovery qualification remains blocked on [MDK #3643](https://github.com/marmot-protocol/mdk/issues/3643). The production release also requires a final Stable archive. The [November 26 qualification record](marmotkit-nightly-20261126.md) covers the older artifact.

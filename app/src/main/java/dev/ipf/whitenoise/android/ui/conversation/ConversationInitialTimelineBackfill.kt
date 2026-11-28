@@ -1,5 +1,8 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.isLoadingPage
+
 internal data class ConversationInitialTimelineBackfillSnapshot(
     val hasRenderableRows: Boolean,
     val hasMoreBefore: Boolean,
@@ -17,17 +20,34 @@ internal enum class ConversationInitialTimelineBackfillResult {
     Superseded,
 }
 
+/** Captures only the bounded state needed to decide whether startup backfill can progress. */
+internal fun ConversationController.initialTimelineBackfillSnapshot() =
+    ConversationInitialTimelineBackfillSnapshot(
+        hasRenderableRows = timeline.any(::conversationTimelineRowVisible),
+        hasMoreBefore = hasMoreBefore,
+        loadInFlight = isLoadingPage || (isLoading && !hasPublishedAuthoritativeTimeline),
+        hasLoadFailure = error != null,
+        rawWindowMessageIds =
+            timelineSubscription
+                ?.latestInstalledWindow()
+                ?.page
+                ?.messages
+                ?.map { it.messageIdHex }
+                ?: timeline.map { it.record.messageIdHex },
+    )
+
 /**
  * Walks backward through raw timeline pages until the conversation has a row
- * Compose can render. Edit records are derived state and can otherwise fill a
- * bounded subscription window without giving the initial anchor a target.
+ * Compose can render. Edits and background agent events can otherwise fill a
+ * bounded subscription window. Anchor at the oldest loaded record so MDK
+ * keeps the newly fetched history when it trims a full window.
  *
  * The caller owns lifecycle cancellation. [isCurrent] is an additional guard
  * for a controller replacement that races a non-cancellable binding call.
  */
 internal suspend fun backfillInitialConversationTimeline(
     snapshot: () -> ConversationInitialTimelineBackfillSnapshot,
-    loadOlder: suspend () -> Boolean,
+    loadOlder: suspend (anchorMessageId: String?) -> Boolean,
     isCurrent: () -> Boolean = { true },
 ): ConversationInitialTimelineBackfillResult {
     var current = snapshot()
@@ -35,7 +55,7 @@ internal suspend fun backfillInitialConversationTimeline(
     val visitedWindows = hashSetOf(current.rawWindowMessageIds)
 
     while (result == null && current.hasMoreBefore) {
-        val madeProgress = loadOlder()
+        val madeProgress = loadOlder(current.rawWindowMessageIds.firstOrNull())
         if (!isCurrent()) {
             result = ConversationInitialTimelineBackfillResult.Superseded
         } else {

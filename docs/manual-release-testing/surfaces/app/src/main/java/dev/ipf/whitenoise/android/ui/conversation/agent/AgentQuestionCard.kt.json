@@ -1,0 +1,89 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentQuestionCard.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "AgentAskedQuestion",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentQuestionCard.kt",
+        "anchor": "fun AgentAskedQuestion(",
+        "test_ids": [
+          "CON-058"
+        ]
+      },
+      {
+        "surface": "AgentQuestionCard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentQuestionCard.kt",
+        "anchor": "fun AgentQuestionCard(",
+        "test_ids": [
+          "CON-058"
+        ]
+      },
+      {
+        "surface": "AgentQuestionNote",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentQuestionCard.kt",
+        "anchor": "fun AgentQuestionNote(",
+        "test_ids": [
+          "CON-058"
+        ]
+      },
+      {
+        "surface": "AgentQuestionOptionRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentQuestionCard.kt",
+        "anchor": "fun AgentQuestionOptionRow(",
+        "test_ids": [
+          "CON-058"
+        ]
+      },
+      {
+        "surface": "R.string.agent_question_multiple_choice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentQuestionCard.kt",
+        "anchor": "R.string.agent_question_multiple_choice",
+        "test_ids": [
+          "CON-058"
+        ]
+      },
+      {
+        "surface": "R.string.agent_question_reply_in_chat",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentQuestionCard.kt",
+        "anchor": "R.string.agent_question_reply_in_chat",
+        "test_ids": [
+          "CON-058"
+        ]
+      },
+      {
+        "surface": "R.string.agent_question_secret",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentQuestionCard.kt",
+        "anchor": "R.string.agent_question_secret",
+        "test_ids": [
+          "CON-058"
+        ]
+      },
+      {
+        "surface": "R.string.agent_question_send",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentQuestionCard.kt",
+        "anchor": "R.string.agent_question_send",
+        "test_ids": [
+          "CON-058"
+        ]
+      },
+      {
+        "surface": "R.string.agent_question_single_choice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentQuestionCard.kt",
+        "anchor": "R.string.agent_question_single_choice",
+        "test_ids": [
+          "CON-058"
+        ]
+      },
+      {
+        "surface": "R.string.agent_question_text_hint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentQuestionCard.kt",
+        "anchor": "R.string.agent_question_text_hint",
+        "test_ids": [
+          "CON-058"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

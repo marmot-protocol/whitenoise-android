@@ -1300,6 +1300,46 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivitySheet.kt",
+      "symbol": "ActivitySheet",
+      "bindings": [
+        {
+          "case": "groups-details-return",
+          "selector": {
+            "text": "No agent activity in this part of the chat"
+          },
+          "scope": "Opens Agent activity from Chat details in a generated native group and dismisses it back to that conversation.",
+          "entry_assertion": {
+            "text": "No agent activity in this part of the chat"
+          },
+          "opened_by": {
+            "text": "Agent activity"
+          }
+        }
+      ],
+      "remaining": "CON-057 still exercises opening from the conversation header with live agent activity."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivitySheet.kt",
+      "symbol": "AgentActivitySheet",
+      "bindings": [
+        {
+          "case": "groups-details-return",
+          "selector": {
+            "text": "No agent activity in this part of the chat"
+          },
+          "scope": "The production sheet renders the empty state from the generated group's native history window.",
+          "entry_assertion": {
+            "text": "No agent activity in this part of the chat"
+          },
+          "opened_by": {
+            "text": "Agent activity"
+          }
+        }
+      ],
+      "remaining": "CON-057 still exercises tool and edit details and paging. CON-059 still exercises Stop and settlement."
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPickerContent.kt",
       "symbol": "EmojiPickerContent",
       "bindings": [
@@ -3497,6 +3537,24 @@
           "scope": "Reset an invalid draft to default, verify disabled unchanged Save, then enter a valid draft and verify Save becomes enabled. Back/reopen retains original default. UI reopening only; no process-death or cross-account proof. Generation-private preference cleanup remains required."
         }
       ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentKeyReviewScreen.kt",
+      "symbol": "AgentKeyReviewScreen",
+      "bindings": [
+        {
+          "case": "settings-connectors",
+          "selector": {
+            "id": "ai_agents.key_action",
+            "enabled": false
+          },
+          "scope": "Manual setup opens agent key review with an empty field and a disabled Check key action. Back returns to AI Agents.",
+          "opened_by": {
+            "id": "ai_agents.review_key"
+          }
+        }
+      ],
+      "remaining": "Exercise clipboard paste, malformed or own keys, canonical key comparison and the profile handoff on-device."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",

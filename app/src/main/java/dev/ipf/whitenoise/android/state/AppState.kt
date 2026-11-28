@@ -6585,7 +6585,7 @@ class WhiteNoiseAppState private constructor(
         ContactNotesPreferences.writeNotes(preferences, account, accountIdHex, notes)
     }
 
-    private fun displayNameForAccount(
+    internal fun displayNameForAccount(
         accountRef: String?,
         accountIdHex: String,
     ): String {

@@ -169,13 +169,14 @@ internal suspend fun MarmotInterface.openTimelineWithFallback(
     account: String,
     groupIdHex: String,
     limit: UInt,
+    mode: ConversationOpenModeFfi = ConversationOpenModeFfi.AUTOMATIC,
 ): ConversationTimelineSubscriptionHandle =
     try {
         val window =
             openConversationWindow(
                 accountRef = account,
                 groupIdHex = groupIdHex,
-                mode = ConversationOpenModeFfi.AUTOMATIC,
+                mode = mode,
                 messageIdHex = null,
                 initialRows = limit.coerceIn(1u, CONVERSATION_WINDOW_MAX_ROWS),
                 timeoutMs = CONVERSATION_WINDOW_DEFAULT_DEADLINE,

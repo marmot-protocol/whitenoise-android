@@ -1,0 +1,89 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityHistory.kt",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ActivityPagingControls",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityHistory.kt",
+        "anchor": "fun ActivityPagingControls(",
+        "test_ids": [
+          "CON-057"
+        ]
+      },
+      {
+        "surface": "AgentActivityHistory",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityHistory.kt",
+        "anchor": "fun AgentActivityHistory(",
+        "test_ids": [
+          "CON-057"
+        ]
+      },
+      {
+        "surface": "AgentActivityStatus",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityHistory.kt",
+        "anchor": "fun AgentActivityStatus(",
+        "test_ids": [
+          "CON-057"
+        ]
+      },
+      {
+        "surface": "R.string.agent_activity_empty",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityHistory.kt",
+        "anchor": "R.string.agent_activity_empty",
+        "test_ids": [
+          "CON-057"
+        ]
+      },
+      {
+        "surface": "R.string.agent_activity_loading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityHistory.kt",
+        "anchor": "R.string.agent_activity_loading",
+        "test_ids": [
+          "CON-057"
+        ]
+      },
+      {
+        "surface": "R.string.agent_activity_newer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityHistory.kt",
+        "anchor": "R.string.agent_activity_newer",
+        "test_ids": [
+          "CON-057"
+        ]
+      },
+      {
+        "surface": "R.string.agent_activity_older",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityHistory.kt",
+        "anchor": "R.string.agent_activity_older",
+        "test_ids": [
+          "CON-057"
+        ]
+      },
+      {
+        "surface": "R.string.agent_activity_page_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityHistory.kt",
+        "anchor": "R.string.agent_activity_page_failed",
+        "test_ids": [
+          "CON-057"
+        ]
+      },
+      {
+        "surface": "R.string.agent_activity_retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityHistory.kt",
+        "anchor": "R.string.agent_activity_retry",
+        "test_ids": [
+          "CON-057"
+        ]
+      },
+      {
+        "surface": "activeAgentSessions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityHistory.kt",
+        "anchor": "fun activeAgentSessions(",
+        "test_ids": [
+          "CON-057"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": [],
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8"
+}

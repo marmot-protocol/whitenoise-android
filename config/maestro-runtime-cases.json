@@ -149,7 +149,7 @@
       "manual_ids": [
         "SET-016"
       ],
-      "assertions": "AI Agents opens its expected content; toolbar Back returns to Settings and Chats.",
+      "assertions": "AI Agents shows the connector list and opens key review with an empty input and disabled Check key action. Toolbar Back returns through AI Agents and Settings to Chats.",
       "postcondition": "none"
     },
     "settings-help": {
@@ -428,10 +428,11 @@
     "groups-details-return": {
       "suite": "groups",
       "manual_ids": [
+        "CON-057",
         "GRP-001",
         "NAV-008"
       ],
-      "assertions": "Conversation header opens real group details and Back restores its history.",
+      "assertions": "Conversation header opens real group details and Back restores its history. Agent activity opens from Chat details for an empty activity history and closes back to the conversation.",
       "postcondition": "none"
     },
     "groups-members": {

@@ -355,16 +355,13 @@ class LocalizationResourceTest {
         val requirements = requireNotNull(agentConnectorCopyRequirements["values"])
         val codexPrompt =
             "This is an installation prompt for connecting this Codex setup to White Noise through Marmot. " +
-                "Read the authoritative Codex harness guide at $CODEX_HARNESS_README_URL and the evergreen " +
-                "connector guide at $AGENT_CONNECTOR_DOCS_URL. Explain to me how the connector works and what " +
-                "the installation will change. Confirm prerequisites: Codex CLI is installed, authenticated, " +
-                "and available on PATH, and this machine uses the same public relay set as my phone. Then " +
-                "propose the installation steps for my public npub: %1\$s, and ask for my approval before " +
-                "making any changes. Once I approve, use the checksum-verified install-codex-marmot.sh release " +
-                "flow, bootstrap wn-agent for that npub with the allowed welcomer, verify wn-codex --version, " +
-                "and reply with your agent npub. Ask me to invite it from White Noise and send a test message. " +
-                "Do not report setup complete until wn-codex returns a reply through White Noise; otherwise " +
-                "mark device verification required."
+                "Read the Marmot Agents installation guide at $CODEX_HARNESS_README_URL. " +
+                "Explain to me how the connector works and what the installation will change. " +
+                "Confirm that the Codex CLI is installed, signed in and available on PATH. " +
+                "Use my public npub %1\$s and ask for my approval before making any changes. " +
+                "Once I approve, follow the canary branch source installation guide. " +
+                "Run install/codex.sh --from-source --owner with my npub, a project with --cwd and an unused --name. " +
+                "Record the source revision with git rev-parse HEAD. Complete setup after a reply in White Noise."
 
         assertTrue(
             agentConnectorPromptViolations(
@@ -374,6 +371,9 @@ class LocalizationResourceTest {
             ).isEmpty(),
         )
         assertTrue(codexConnectorPromptTokenViolations(codexPrompt).isEmpty())
+        assertTrue(codexConnectorPromptTokenViolations(codexPrompt.replace("--from-source ", "")).isNotEmpty())
+        assertTrue(codexConnectorPromptTokenViolations(codexPrompt.replace("--name", "name")).isNotEmpty())
+        assertTrue(codexConnectorPromptTokenViolations("$codexPrompt Run wn-codex.").isNotEmpty())
 
         val unsafePrompt =
             codexPrompt +
@@ -792,16 +792,13 @@ class LocalizationResourceTest {
 
     private fun codexConnectorPromptTokenViolations(prompt: String): List<String> {
         val violations = mutableListOf<String>()
-        if (prompt.windowed(CODEX_HARNESS_README_URL.length).count { it == CODEX_HARNESS_README_URL } != 1) {
-            violations += "missing Codex harness README URL"
-        }
         agentConnectorCodexRequiredPatterns.forEach { (label, pattern) ->
             if (!pattern.containsMatchIn(prompt)) {
                 violations += "missing $label"
             }
         }
-        if (Regex("""\bwn-codex\b""").findAll(prompt).count() < 2) {
-            violations += "missing connector round-trip verification"
+        if (Regex("""\bwn-(?:agent|codex)\b|install-codex-marmot\.sh""").containsMatchIn(prompt)) {
+            violations += "references the legacy connector"
         }
         return violations
     }
@@ -812,7 +809,9 @@ class LocalizationResourceTest {
         mode: AgentConnectorPromptGuardMode = AgentConnectorPromptGuardMode.Generic,
     ): List<String> {
         val violations = mutableListOf<String>()
-        if (prompt.windowed(AGENT_CONNECTOR_DOCS_URL.length).count { it == AGENT_CONNECTOR_DOCS_URL } != 1) {
+        val docsUrl =
+            if (mode == AgentConnectorPromptGuardMode.Codex) CODEX_HARNESS_README_URL else AGENT_CONNECTOR_DOCS_URL
+        if (prompt.windowed(docsUrl.length).count { it == docsUrl } != 1) {
             violations += "missing evergreen docs URL"
         }
         if (prompt.windowed(AGENT_CONNECTOR_NPUB_PLACEHOLDER.length).count {
@@ -914,9 +913,9 @@ class LocalizationResourceTest {
         const val AGENT_CONNECTOR_DOCS_URL =
             "https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md"
         const val CODEX_HARNESS_README_URL =
-            "https://github.com/marmot-protocol/mdk/blob/master/integrations/codex/marmot/README.md"
+            "https://github.com/marmot-protocol/marmot-agents/blob/canary/README.md#installing-an-agent"
         const val CODEX_PREREQUISITES_MARKER = "PATH"
-        const val CODEX_INSTALLER_SCRIPT = "install-codex-marmot.sh"
+        const val CODEX_INSTALLER_SCRIPT = "install/codex.sh"
         const val CLAUDE_HARNESS_README_URL =
             "https://github.com/marmot-protocol/mdk/blob/master/integrations/claude/marmot/README.md"
         const val CLAUDE_INSTALLER_SCRIPT = "install-claude-marmot.sh"
@@ -1020,9 +1019,10 @@ class LocalizationResourceTest {
 
         val agentConnectorCodexRequiredPatterns =
             listOf(
-                "Codex installer script" to Regex("""install-codex-marmot\.sh"""),
-                "wn-agent bootstrap" to Regex("""\bwn-agent\b"""),
-                "wn-codex version check" to Regex("""wn-codex\s+--version"""),
+                "Codex source installer and owner" to Regex("""install/codex\.sh\s+--from-source\s+--owner\b"""),
+                "project directory" to Regex("""--cwd\b"""),
+                "new agent name" to Regex("""--name\b"""),
+                "source revision check" to Regex("""git\s+rev-parse\s+HEAD\b"""),
             )
 
         val agentConnectorCodexForbiddenPatterns =

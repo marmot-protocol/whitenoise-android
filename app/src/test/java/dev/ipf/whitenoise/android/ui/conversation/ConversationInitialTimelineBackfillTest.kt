@@ -10,32 +10,32 @@ import org.junit.Test
 
 class ConversationInitialTimelineBackfillTest {
     @Test
-    fun editOnlyPagesAreLoadedUntilRenderableTargetAppears() =
+    fun hiddenPagesAnchorAtTheirOldestRecordUntilRenderableTargetAppears() =
         runTest {
             val windows =
                 ArrayDeque(
                     listOf(
-                        snapshot(ids = editIds(50), hasMore = true),
-                        snapshot(ids = editIds(100), hasMore = true),
-                        snapshot(ids = editIds(150), hasMore = true),
-                        snapshot(ids = editIds(150) + "target", hasMore = false, renderable = true),
+                        snapshot(ids = listOf("agent-5", "agent-6"), hasMore = true),
+                        snapshot(ids = listOf("agent-3", "agent-4"), hasMore = true),
+                        snapshot(ids = listOf("agent-1", "agent-2"), hasMore = true),
+                        snapshot(ids = listOf("message"), hasMore = false, renderable = true),
                     ),
                 )
             var current = windows.removeFirst()
-            var loads = 0
+            val anchors = mutableListOf<String?>()
 
             val result =
                 backfillInitialConversationTimeline(
                     snapshot = { current },
-                    loadOlder = {
-                        loads += 1
+                    loadOlder = { anchor ->
+                        anchors += anchor
                         current = windows.removeFirst()
                         true
                     },
                 )
 
             assertEquals(ConversationInitialTimelineBackfillResult.Renderable, result)
-            assertEquals(3, loads)
+            assertEquals(listOf("agent-5", "agent-3", "agent-1"), anchors)
         }
 
     @Test

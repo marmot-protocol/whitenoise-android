@@ -535,6 +535,10 @@
           "represented_by": "AiAgents.public_key"
         },
         {
+          "declaration": "\"review_agent_key\"",
+          "represented_by": "AiAgents.review_agent_key"
+        },
+        {
           "declaration": "connector.id",
           "represented_by": "home.AiAgents"
         }

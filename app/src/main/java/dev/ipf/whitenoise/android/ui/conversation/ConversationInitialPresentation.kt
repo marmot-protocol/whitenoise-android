@@ -19,7 +19,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.state.ConversationController
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -33,15 +32,16 @@ internal fun conversationFirstFrameSeedPresentation(
     hasFocusedDestination: Boolean,
     notificationOpenRequestId: Long,
 ): ConversationFirstFrameSeedPresentation {
-    val rendered = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
+    val rendered = controller.timeline.filter(::conversationTimelineRowVisible)
     val anchorTailImmediately =
-        shouldAnchorConversationTailOnFirstFrame(
-            entryUnreadCount = entryUnreadCount,
-            projectionAvailable = projectionAvailable,
-            hasScrollRestore = hasScrollRestore,
-            hasFocusedDestination = hasFocusedDestination,
-            notificationOpenRequestId = notificationOpenRequestId,
-        )
+        canSeedConversationTail(rendered.isNotEmpty(), controller.hasMoreBefore) &&
+            shouldAnchorConversationTailOnFirstFrame(
+                entryUnreadCount = entryUnreadCount,
+                projectionAvailable = projectionAvailable,
+                hasScrollRestore = hasScrollRestore,
+                hasFocusedDestination = hasFocusedDestination,
+                notificationOpenRequestId = notificationOpenRequestId,
+            )
     return ConversationFirstFrameSeedPresentation(
         anchorTailImmediately = anchorTailImmediately,
         // Start on the real keyed tail row. Compose then keeps that message key
@@ -58,6 +58,12 @@ internal data class ConversationFirstFrameSeedPresentation(
     val latestTimelineId: String?,
     val awaitingAuthoritativeTimeline: Boolean,
 )
+
+/** Defers the initial tail if the loaded window has no row to show but older history is available. */
+internal fun canSeedConversationTail(
+    hasRenderableRows: Boolean,
+    hasMoreBefore: Boolean,
+): Boolean = hasRenderableRows || !hasMoreBefore
 
 /** Allows immediate tail ownership only when no unread, restore, focus, or notification owner wins. */
 internal fun shouldAnchorConversationTailOnFirstFrame(

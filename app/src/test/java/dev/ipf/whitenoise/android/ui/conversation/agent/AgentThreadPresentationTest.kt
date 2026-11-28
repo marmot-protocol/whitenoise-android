@@ -1,0 +1,181 @@
+package dev.ipf.whitenoise.android.ui.conversation.agent
+
+import dev.ipf.marmotkit.AgentItemStateFfi
+import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
+import dev.ipf.marmotkit.MarmotEventFfi
+import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.marmotkit.MessageTagFfi
+import dev.ipf.marmotkit.RuntimeProjectionUpdateFfi
+import dev.ipf.marmotkit.TimelineMessageChangeFfi
+import dev.ipf.marmotkit.TimelineMessageRecordFfi
+import dev.ipf.marmotkit.TimelinePageFfi
+import dev.ipf.marmotkit.TimelineProjectionUpdateFfi
+import dev.ipf.marmotkit.TimelineThreadRefFfi
+import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
+import dev.ipf.whitenoise.android.state.isUnreadEligible
+import dev.ipf.whitenoise.android.state.readLatestAgentSession
+import dev.ipf.whitenoise.android.ui.conversation.conversationTimelineRowVisible
+import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class AgentThreadPresentationTest {
+    private val recording = AgentRecordingFixtures.load("codex_approval_allowed", events = 6, prompt = "Run greet.py")
+    private val approval = recording.single { it.projected?.agentItem?.itemType == "approval" }
+    private val item = requireNotNull(approval.projected?.agentItem)
+    private val root = "ae".repeat(32)
+    private val child = "be".repeat(32)
+
+    @Test
+    fun nativeThreadParentsPlaceNestedWorkAndPeopleReplies() {
+        val base = requireNotNull(approval.projected)
+        val task = base.copy(messageIdHex = root, agentItem = item.copy(itemType = "task"))
+        val nested = base.copy(messageIdHex = child, agentItem = item.copy(itemType = "task")).inThread(root)
+        val waiting = base.inThread(child)
+        val words =
+            base
+                .copy(messageIdHex = "cc".repeat(32), kind = 1111uL, agentItem = null)
+                .inThread(child)
+                .let { it.copy(tags = it.tags + MessageTagFfi(listOf("P", it.sender))) }
+        val reply = words.copy(messageIdHex = "dd".repeat(32), sender = "ad".repeat(32)).inThread(words.messageIdHex)
+        val replyToApproval =
+            reply
+                .copy(
+                    messageIdHex = "ee".repeat(32),
+                    tags = reply.tags + MessageTagFfi(listOf("k", "1201")),
+                ).inThread(waiting.messageIdHex)
+        val rows = listOf(task, nested, waiting, words, reply, replyToApproval)
+        val page = TimelinePageFfi(rows, false, false)
+
+        val timeline = activityHistoryRows(page, emptySet(), threadTaskId = child)
+        assertEquals(child, agentThreadDestination(reply) { timeline })
+        assertEquals(listOf(root), activityHistoryRows(page, emptySet()).map { it.id })
+        assertEquals(listOf(child), activityHistoryRows(page, emptySet(), threadTaskId = root).map { it.id })
+        assertEquals(
+            listOf(waiting.messageIdHex, words.messageIdHex, reply.messageIdHex, replyToApproval.messageIdHex),
+            activityHistoryRows(page, emptySet(), threadTaskId = child).map { it.id },
+        )
+        val olderParentOutsidePage = TimelinePageFfi(listOf(waiting, words, reply, replyToApproval), true, false)
+        assertTrue(activityHistoryRows(olderParentOutsidePage, emptySet(), threadTaskId = root).isEmpty())
+        assertEquals(
+            listOf(waiting.messageIdHex, words.messageIdHex, reply.messageIdHex, replyToApproval.messageIdHex),
+            activityHistoryRows(olderParentOutsidePage, emptySet(), threadTaskId = child).map { it.id },
+        )
+    }
+
+    @Test
+    fun readsAnOffPageParentAndRestoresAThreadFromItsRetainedEdit() =
+        runTest {
+            val base = requireNotNull(approval.projected)
+            val nested =
+                base
+                    .copy(messageIdHex = child, agentItem = item.copy(itemType = "task", itemId = "inner"))
+                    .inThread(root)
+            val waiting = base.inThread(child)
+            val oldNote =
+                base
+                    .copy(messageIdHex = "59".repeat(32), agentItem = null, kind = 1111uL)
+                    .inThread(waiting.messageIdHex)
+            val reply = oldNote.copy(messageIdHex = "67".repeat(32)).inThread(oldNote.messageIdHex)
+            val held =
+                base
+                    .copy(messageIdHex = "68".repeat(32), agentItemFirstEventMissing = true)
+                    .inThread(root)
+                    .let { it.copy(tags = it.tags + MessageTagFfi(listOf("subagent", "inner"))) }
+            val replyToHeld = reply.copy(messageIdHex = "69".repeat(32)).inThread(held.messageIdHex)
+            val missingParent = "70".repeat(32)
+            val replyToMissing = reply.copy(messageIdHex = "71".repeat(32)).inThread(missingParent)
+            val loaded = listOf(replyToMissing, reply, held, replyToHeld)
+            val retained = listOf(nested, waiting, oldNote).associateBy { it.messageIdHex }
+            val extra =
+                agentThreadParentRecords(loaded, child) { id ->
+                    if (id == missingParent) throw MarmotKitException.ConversationWindowMessageNotRetained()
+                    retained[id]
+                }
+            val page = TimelinePageFfi(loaded, true, false)
+
+            assertEquals(
+                listOf(reply.messageIdHex, held.messageIdHex, replyToHeld.messageIdHex),
+                activityHistoryRows(page, emptySet(), threadTaskId = child, threadParents = extra).map { it.id },
+            )
+            assertTrue(activityHistoryRows(page, emptySet(), threadTaskId = root).isEmpty())
+        }
+
+    @Test
+    fun waitingThreadRequestRemainsVisibleInTheMainChat() {
+        val base = requireNotNull(approval.projected).inThread(root)
+        assertTrue(conversationTimelineRowVisible(approval.copy(projected = base)))
+        val settled = base.copy(agentItem = item.copy(state = AgentItemStateFfi.DONE))
+        assertFalse(conversationTimelineRowVisible(approval.copy(projected = settled)))
+        val message = recording.first()
+        val words = requireNotNull(message.projected).copy(kind = 1111uL)
+        assertTrue(conversationTimelineRowVisible(message.copy(projected = words)))
+        val humanReply = words.inThread(root)
+        assertTrue(conversationTimelineRowVisible(message.copy(projected = humanReply)))
+        val agentWords =
+            humanReply.copy(
+                sender = AgentRecordingFixtures.AGENT_ID,
+                tags = humanReply.tags + MessageTagFfi(listOf("P", AgentRecordingFixtures.AGENT_ID)),
+            )
+        assertFalse(conversationTimelineRowVisible(message.copy(projected = agentWords)))
+        val received = message.record.copy(kind = 1111uL, direction = "received")
+        assertFalse(message.copy(record = received, projected = agentWords).isUnreadEligible())
+    }
+
+    @Test
+    fun latestSessionUsesNativeOrderAcrossPagesAndSkipsUnavailableRows() {
+        val base = requireNotNull(approval.projected)
+        val session = base.copy(agentItem = item.copy(itemType = "session"), timelineAt = 20uL)
+        val older = session.copy(messageIdHex = "88".repeat(32), timelineAt = 30uL)
+        val invalidated = session.copy(messageIdHex = "89".repeat(32), invalidationStatus = "LosingBranch")
+        val deleted = session.copy(messageIdHex = "90".repeat(32), deleted = true)
+        val cursors = mutableListOf<String?>()
+        val selected =
+            readLatestAgentSession("group", session.sender) { query ->
+                assertEquals(session.sender, query.sender)
+                cursors += query.beforeMessageId
+                if (query.beforeMessageId == null) {
+                    TimelinePageFfi(listOf(invalidated, deleted), true, false)
+                } else {
+                    assertEquals(invalidated.timelineAt, query.before)
+                    TimelinePageFfi(listOf(older, session), false, true)
+                }
+            }
+        assertEquals(listOf(null, invalidated.messageIdHex), cursors)
+        assertEquals(session, selected)
+    }
+
+    @Test
+    fun offWindowSessionChangesRefreshOnlyTheirOwnAccountAndGroup() {
+        val base = requireNotNull(approval.projected)
+        val session = base.copy(agentItem = item.copy(itemType = "session"))
+
+        fun event(row: TimelineMessageRecordFfi) =
+            MarmotEventFfi.ProjectionUpdated(
+                RuntimeProjectionUpdateFfi(
+                    "account-id",
+                    "account",
+                    TimelineProjectionUpdateFfi(
+                        "group",
+                        emptyList(),
+                        listOf(TimelineMessageChangeFfi.Upsert(TimelineUpdateTriggerFfi.AGENT_ITEM, row)),
+                        null,
+                        ChatListUpdateTriggerFfi.SNAPSHOT_REFRESH,
+                    ),
+                ),
+            )
+        assertTrue(event(session).affectsAgentSessions("account", "group"))
+        assertTrue(event(session.copy(deleted = true, agentItem = null)).affectsAgentSessions("account", "group"))
+        assertFalse(event(session).affectsAgentSessions("other", "group"))
+        assertFalse(event(session).affectsAgentSessions("account", "other"))
+        assertFalse(event(base).affectsAgentSessions("account", "group"))
+    }
+
+    private fun TimelineMessageRecordFfi.inThread(parent: String) =
+        copy(
+            thread = TimelineThreadRefFfi(root, parent),
+            tags = tags + MessageTagFfi(listOf("K", "1201")),
+        )
+}

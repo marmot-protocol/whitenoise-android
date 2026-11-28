@@ -17,6 +17,7 @@ import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.MessageDebugClassifier
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.TimelineRowKind
+import dev.ipf.whitenoise.android.core.agent.AgentItemReader
 import dev.ipf.whitenoise.android.core.timelineRowKind
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationLoadFailureEdge
@@ -26,6 +27,9 @@ import dev.ipf.whitenoise.android.state.chatHistoryTransfer
 import dev.ipf.whitenoise.android.state.importedHistoryBoundary
 import dev.ipf.whitenoise.android.state.isLoadingOlder
 import dev.ipf.whitenoise.android.state.usesDirectTranscriptChrome
+import dev.ipf.whitenoise.android.ui.conversation.agent.AgentItemRowContext
+import dev.ipf.whitenoise.android.ui.conversation.agent.AgentItemTimelineRow
+import dev.ipf.whitenoise.android.ui.conversation.agent.agentThreadDestination
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerOpenRequest
 import dev.ipf.whitenoise.android.ui.conversation.media.DocumentSaveFallback
@@ -196,6 +200,44 @@ internal fun TimelineRow(
                             )
                             return@Column
                         }
+                    }
+                }
+                TimelineRowKind.AgentItem -> {
+                    val agentItem =
+                        remember(item.record, item.projected) { AgentItemReader.read(item.record, item.projected) }
+                    if (agentItem != null) {
+                        AgentItemTimelineRow(
+                            agentItem = agentItem,
+                            controller = controller,
+                            appState = appState,
+                            context =
+                                AgentItemRowContext(
+                                    showSenderName =
+                                        older?.let { candidate ->
+                                            conversationBubbleRowsShareSenderRun(
+                                                first = candidate,
+                                                second = item,
+                                                streamingDebugEnabled = appState.streamingDebugEnabled,
+                                                deletedMessageIds = controller.deletedMessageIds,
+                                            )
+                                        } != true,
+                                    readOnly =
+                                        composerGate != ComposerGate.COMPOSER ||
+                                            selectionMode ||
+                                            controller.group.pendingConfirmation,
+                                    showSenderAvatar =
+                                        newer?.let { candidate ->
+                                            conversationBubbleRowsShareSenderRun(
+                                                first = item,
+                                                second = candidate,
+                                                streamingDebugEnabled = appState.streamingDebugEnabled,
+                                                deletedMessageIds = controller.deletedMessageIds,
+                                            )
+                                        } != true,
+                                    threadTaskId = agentThreadDestination(item.projected) { controller.timeline },
+                                ),
+                        )
+                        return@Column
                     }
                 }
                 TimelineRowKind.DebugRow -> {

@@ -172,6 +172,9 @@ import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
 import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
+import dev.ipf.whitenoise.android.ui.conversation.agent.LocalAgentRequestProgress
+import dev.ipf.whitenoise.android.ui.conversation.agent.LocalOpenAgentThread
+import dev.ipf.whitenoise.android.ui.conversation.agent.rememberConversationAgentActivity
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerDraftOwnerKey
 import dev.ipf.whitenoise.android.ui.conversation.composer.conversationDictationDraftWriter
@@ -260,16 +263,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicBoolean
-
-/** Captures only the bounded state needed to decide whether startup backfill can progress. */
-private fun ConversationController.initialTimelineBackfillSnapshot() =
-    ConversationInitialTimelineBackfillSnapshot(
-        hasRenderableRows = timeline.any { !MessageProjector.isEdit(it.record) },
-        hasMoreBefore = hasMoreBefore,
-        loadInFlight = isLoading || isLoadingPage,
-        hasLoadFailure = error != null,
-        rawWindowMessageIds = timeline.map { it.id },
-    )
 
 private val InitialTimelineBackfillNoProgressError =
     ErrorPresentation(
@@ -672,14 +665,15 @@ internal fun ConversationScreen(
         remember(controller, chat.id, conversationAccountRef, appState.runtimeGeneration) {
             mutableStateOf<BatchDeleteRetryState?>(null)
         }
-    // Edits mutate their original message and must not occupy a lazy-list slot.
+    // Edits and background agent activity do not occupy lazy-list slots.
     // Keep every reveal and scroll decision on the same filtered projection.
     val timelinePublication = controller.timeline
+    val agentActivity = rememberConversationAgentActivity(controller)
     val renderedTimeline =
         ConversationTranscriptDrawProbe.rowsForComposition(
             controller,
             remember(timelinePublication) {
-                timelinePublication.filterNot { MessageProjector.isEdit(it.record) }
+                timelinePublication.filter(::conversationTimelineRowVisible)
             },
         )
     DisposableEffect(controller) {
@@ -957,7 +951,7 @@ internal fun ConversationScreen(
 
     /** Captures the logical first visible message against the latest filtered timeline. */
     fun currentScrollAnchor(): ConversationScrollAnchor {
-        val liveRenderedTimeline = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
+        val liveRenderedTimeline = controller.timeline.filter(::conversationTimelineRowVisible)
         return conversationScrollAnchor(
             listState = listState,
             timelineViewport = timelineViewport,
@@ -1179,7 +1173,7 @@ internal fun ConversationScreen(
 
     /** Resolves a saved logical anchor after current header and error rows. */
     fun resolveScrollAnchorIndex(anchor: ConversationScrollAnchor): Int? {
-        val liveRenderedTimeline = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
+        val liveRenderedTimeline = controller.timeline.filter(::conversationTimelineRowVisible)
         val timelineIndex =
             anchor.messageId
                 ?.takeIf { it.isNotBlank() }
@@ -1198,7 +1192,7 @@ internal fun ConversationScreen(
 
     /** Reads near-bottom from the live rows, so a settle never sees stale derived state. */
     fun liveNearBottom(): Boolean {
-        val liveRenderedSize = controller.timeline.count { !MessageProjector.isEdit(it.record) }
+        val liveRenderedSize = controller.timeline.count(::conversationTimelineRowVisible)
         return isNearBottom(
             listState = listState,
             timelineViewport = timelineViewport,
@@ -1270,7 +1264,7 @@ internal fun ConversationScreen(
     fun scrollSnapshotOnLeaveEffect() {
         DisposableEffect(controller) {
             onDispose {
-                val rendered = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
+                val rendered = controller.timeline.filter(::conversationTimelineRowVisible)
                 val hasOlderHeader = controller.hasMoreBefore || controller.isLoadingOlder
                 val hasInlineTopError =
                     rendered.isNotEmpty() &&
@@ -1852,14 +1846,11 @@ internal fun ConversationScreen(
                     val completedMsgId = completedKey.substringBefore('#')
                     val completedIdx = controller.timeline.indexOfFirst { it.record.messageIdHex == completedMsgId }
                     if (completedIdx >= 0) {
-                        // Walk forward only as long as the next item is a derived-
-                        // state row (edit / group system) — those are invisible to
-                        // the user, so skipping them doesn't violate "immediate
-                        // neighbor" semantics.
+                        // Skip hidden chat rows and group system events before checking the next voice note.
                         var nextIdx = completedIdx + 1
                         while (nextIdx < controller.timeline.size &&
                             (
-                                MessageProjector.isEdit(controller.timeline[nextIdx].record) ||
+                                !conversationTimelineRowVisible(controller.timeline[nextIdx]) ||
                                     MessageProjector.isGroupSystem(controller.timeline[nextIdx].record)
                             )
                         ) {
@@ -1927,13 +1918,13 @@ internal fun ConversationScreen(
 
     /** Resolves a message id to its current list index after every leading structural row. */
     fun currentTimelineListIndex(messageId: String): Int? {
+        val visibleTimeline = controller.timeline.filter(::conversationTimelineRowVisible)
         val timelineIndex =
-            controller.timeline
-                .filterNot { MessageProjector.isEdit(it.record) }
+            visibleTimeline
                 .indexOfFirst { it.record.messageIdHex == messageId }
                 .takeIf { it >= 0 }
                 ?: return null
-        val liveSize = controller.timeline.count { !MessageProjector.isEdit(it.record) }
+        val liveSize = visibleTimeline.size
         return conversationTimelineListIndex(
             timelineIndex = timelineIndex,
             timelineSize = liveSize,
@@ -2065,7 +2056,7 @@ internal fun ConversationScreen(
                     }
                     val timelineIndex =
                         controller.timeline
-                            .filterNot { MessageProjector.isEdit(it.record) }
+                            .filter(::conversationTimelineRowVisible)
                             .indexOfFirst { it.record.messageIdHex == targetMessageId }
                     if (timelineIndex < 0) {
                         appState.present(R.string.toast_original_message_unavailable)
@@ -2118,6 +2109,7 @@ internal fun ConversationScreen(
     val transcriptLocale = LocalConfiguration.current.locales[0]
     val seededTailAlignmentReady =
         firstFrameSeed.anchorTailImmediately &&
+            canSeedConversationTail(renderedTimeline.isNotEmpty(), controller.hasMoreBefore) &&
             (!navigationState.seedTailAwaitingAuthoritative || controller.hasPublishedAuthoritativeTimeline)
     SeededConversationAnchorBaselineEffect(
         enabled = seededTailAlignmentReady,
@@ -2153,29 +2145,22 @@ internal fun ConversationScreen(
     @Composable
     @Suppress("CyclomaticComplexMethod")
     fun initialBackfillEffect() {
-        // Edit events are derived state, so a raw subscription page can be non-empty
-        // while offering no row for the initial anchor. Page backward before the
-        // transcript is revealed; the pure coordinator stops on renderable content,
-        // exhaustion, failure, no progress, cancellation, or controller replacement.
+        // Edit and background agent events can fill the window without an anchor.
+        // Wait for other paging inside the effect so our own page cannot restart it.
         LaunchedEffect(
             controller,
             navigationState.initialTimelineLoadStarted,
-            controller.isLoading,
-            controller.isLoadingPage,
+            controller.inviteBlocksHistory,
+            controller.timeline.isEmpty(),
             latestTimelineItemId,
             navigationState.initialTimelineBackfillRetryGeneration,
         ) {
+            snapshotFlow { controller.isLoading || controller.isLoadingPage }.first { !it }
             val hasEstablishedInitialPosition = initialTimelineAnchored || scrollRestore != null
             val timelineCannotBackfill =
-                !navigationState.initialTimelineLoadStarted ||
-                    controller.group.pendingConfirmation ||
-                    controller.timeline.isEmpty()
-            if (
-                hasEstablishedInitialPosition ||
-                timelineCannotBackfill ||
-                renderedTimeline.isNotEmpty()
-            ) {
-                if (renderedTimeline.isNotEmpty()) {
+                !navigationState.initialTimelineLoadStarted || controller.inviteBlocksHistory
+            if (hasEstablishedInitialPosition || timelineCannotBackfill || renderedTimeline.isNotEmpty()) {
+                if (renderedTimeline.isNotEmpty() || controller.inviteBlocksHistory) {
                     navigationState.initialTimelineBackfillNoProgress = false
                 }
                 return@LaunchedEffect
@@ -2184,9 +2169,9 @@ internal fun ConversationScreen(
                 backfillInitialConversationTimeline(
                     snapshot = controller::initialTimelineBackfillSnapshot,
                     loadOlder = controller::loadOlderTimelinePage,
-                    isCurrent = { currentController === controller },
+                    isCurrent = { currentController === controller && !controller.inviteBlocksHistory },
                 )
-            if (currentController !== controller) return@LaunchedEffect
+            if (currentController !== controller || controller.inviteBlocksHistory) return@LaunchedEffect
             when (result) {
                 ConversationInitialTimelineBackfillResult.Exhausted -> {
                     navigationState.initialTimelineBackfillNoProgress = false
@@ -2432,7 +2417,7 @@ internal fun ConversationScreen(
                 val oldestAnchoredIndex = visible.lastOrNull { conversationAnchorMessageId(it.key) != null }?.index
                 oldestAnchoredIndex to listState.isScrollInProgress
             }.collect { (oldestVisibleIndex, scrolling) ->
-                val liveRenderedSize = controller.timeline.count { !MessageProjector.isEdit(it.record) }
+                val liveRenderedSize = controller.timeline.count(::conversationTimelineRowVisible)
                 if (liveRenderedSize == 0) return@collect
                 val edgeListIndex =
                     conversationTimelineListIndex(
@@ -2455,7 +2440,7 @@ internal fun ConversationScreen(
                     listState.layoutInfo.visibleItemsInfo.lastOrNull { conversationAnchorMessageId(it.key) != null }
                 // Observe the complete demand, including history flags and the initial anchor. A live
                 // recovery may enable paging without changing visible keys or list geometry.
-                val liveRenderedSize = controller.timeline.count { !MessageProjector.isEdit(it.record) }
+                val liveRenderedSize = controller.timeline.count(::conversationTimelineRowVisible)
                 val oldestMessageListIndex =
                     conversationTimelineListIndex(
                         timelineIndex = 0,
@@ -2479,7 +2464,7 @@ internal fun ConversationScreen(
                     recoveryGeneration = controller.olderPagingRecoveryGeneration,
                 )
             }.collect { demand ->
-                val edgeMessageId = controller.timeline.firstOrNull { !MessageProjector.isEdit(it.record) }?.id
+                val edgeMessageId = controller.timeline.firstOrNull(::conversationTimelineRowVisible)?.id
                 // MDK places a replacement relative to the window's anchor, so tell it which row the
                 // reader is actually on before paging. Without this an upward page is placed against
                 // whatever the read pointer last reported, which only ever moves towards newer
@@ -2493,7 +2478,7 @@ internal fun ConversationScreen(
         // that edge so chronological scrolling never ends at a stale window tail.
         LaunchedEffect(listState, controller) {
             snapshotFlow {
-                val liveRenderedSize = controller.timeline.count { !MessageProjector.isEdit(it.record) }
+                val liveRenderedSize = controller.timeline.count(::conversationTimelineRowVisible)
                 val liveTrailingRowCount = controller.conversationTrailingRowCount(liveRenderedSize)
                 val liveNewestEdgeIndex =
                     conversationTimelineTailListIndex(liveRenderedSize, liveTrailingRowCount)
@@ -2623,6 +2608,7 @@ internal fun ConversationScreen(
                     entryProjectionAvailable = entryProjectionAvailable,
                     notificationOpenRequestId = notificationOpenRequestId,
                     seedTailAwaitingAuthoritative = navigationState.seedTailAwaitingAuthoritative,
+                    savedBackfillRetryGeneration = navigationState.initialTimelineBackfillRetryGeneration,
                     notificationTargetMessageId =
                         notificationLandingTarget?.messageIdFor(
                             controller.boundAccountRef,
@@ -2642,6 +2628,7 @@ internal fun ConversationScreen(
                         navigationState.lastFollowedLatestId = latestId
                     },
                     retireUnreadDivider = { entryUnreadDividerRetired = true },
+                    onSavedBackfillStalled = { navigationState.initialTimelineBackfillNoProgress = it },
                     notification =
                         ConversationNotificationLandingCallbacks(
                             beginNavigation = navigationState.targetNavigation::begin,
@@ -2924,7 +2911,7 @@ internal fun ConversationScreen(
             }
             val timelineIndex =
                 controller.timeline
-                    .filterNot { MessageProjector.isEdit(it.record) }
+                    .filter(::conversationTimelineRowVisible)
                     .indexOfFirst { it.record.messageIdHex == target }
             if (timelineIndex < 0) {
                 if (controller.error != null) navigationState.focusTargetRetry.failed(navigationRequest)
@@ -3196,10 +3183,7 @@ internal fun ConversationScreen(
             navigationState.searchOpen = true
         }
     val headerShortcuts = appState.headerShortcutPreferences.shortcuts
-    // Mute and Read aloud write through the active account, so like chat details they stay hidden while a
-    // notification-routed open is still waiting for its account switch.
     val headerSettingsOwner = controller.isCurrentGroupMutationOwner(appState, appState.runtimeGeneration)
-    // Read aloud mirrors the chat details auto-read choice and stays hidden without a usable speech engine.
     val headerReadAloudOn =
         if (headerSettingsOwner && HeaderShortcut.ReadAloud in headerShortcuts && appState.ttsHasUsableEngine) {
             val autoRead by appState.ttsAutoReadPreferences.state.collectAsState()
@@ -3292,6 +3276,10 @@ internal fun ConversationScreen(
                     autoOpenMembers = openMembersOnDetails,
                     onAutoOpenMembersConsumed = { openMembersOnDetails = false },
                     onOpenSearch = openConversationSearch,
+                    onOpenActivity = {
+                        showDetails = false
+                        agentActivity.show()
+                    },
                     onStartGroupWithPeer = onStartGroupWithPeer,
                     onStartGroupWithPeerMeasured = onStartGroupWithPeerMeasured,
                 )
@@ -3608,7 +3596,7 @@ internal fun ConversationScreen(
                                 actions = {
                                     ConversationHeaderShortcuts(
                                         shortcuts = headerShortcuts,
-                                        capacity = it,
+                                        capacity = it - agentActivity.headerSlots,
                                         muteControl = headerMuteControl,
                                         onSearch = openConversationSearch,
                                         readAloudOn = headerReadAloudOn,
@@ -3632,6 +3620,7 @@ internal fun ConversationScreen(
                                                 }
                                             },
                                     )
+                                    agentActivity.ActivityButton { keyboardController?.hide() }
                                 },
                             )
                         }
@@ -3997,6 +3986,8 @@ internal fun ConversationScreen(
                 LocalPollVotesHost provides pollVotesHost,
                 LocalKeptMessages provides keptMessagesController,
                 LocalReactionArtworkSource provides reactionArtwork,
+                LocalAgentRequestProgress provides agentActivity.requestProgress,
+                LocalOpenAgentThread provides agentActivity::showThread,
                 // Bubbles mark their own matches while search is open, so a hit is obvious on any
                 // bubble colour rather than only on the one the jump happened to land on.
                 LocalConversationSearchMarking provides
@@ -4004,6 +3995,7 @@ internal fun ConversationScreen(
                         .takeIf { navigationState.searchOpen && it.isNotBlank() }
                         ?.let { ConversationSearchMarking(it, effectiveSearchMatchIds.toSet()) },
             ) {
+                agentActivity.ActivitySheet(appState, readOnly = composerGate != ComposerGate.COMPOSER)
                 val overlayPadding = timelineViewport.overlayPadding(density, timelineUnderlayEnabled)
                 ConversationTransientNoticeLayout(
                     notice = appState.transientNotice,
@@ -4023,7 +4015,7 @@ internal fun ConversationScreen(
                             .consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
                 ) {
                     when {
-                        navigationState.initialTimelineBackfillNoProgress ->
+                        navigationState.initialTimelineBackfillNoProgress && !controller.inviteBlocksHistory ->
                             ConversationLoadErrorContent(
                                 error = InitialTimelineBackfillNoProgressError,
                                 onRetry = {
@@ -4044,7 +4036,7 @@ internal fun ConversationScreen(
                                     }
                                 },
                             )
-                        (controller.group.pendingConfirmation || controller.inviteAcceptanceResolutionPending) &&
+                        controller.inviteBlocksHistory &&
                             !controller.terminalConversationUnavailable &&
                             renderedTimeline.isEmpty() ->
                             InvitePreviewPlaceholder(
@@ -4233,11 +4225,7 @@ internal fun ConversationScreen(
                                         // Pool layouts by category so Compose can reuse
                                         // structurally similar rows across scroll.
                                         contentType = { _, item ->
-                                            when {
-                                                MessageProjector.isGroupSystem(item.record) -> "groupSystem"
-                                                MessageProjector.isAgentOperation(item.record) -> "agentOperation"
-                                                else -> "message"
-                                            }
+                                            if (MessageProjector.isGroupSystem(item.record)) "system" else "message"
                                         },
                                     ) { index, item ->
                                         val messageId = item.record.messageIdHex
@@ -4542,8 +4530,9 @@ internal fun ConversationScreen(
                                                 jumpToNextUnreadMention()
                                             }
                                         }
+                                        val showNewestJump = !nearBottom || controller.hasMoreAfterTimeline
                                         ConversationNavigationControl(
-                                            visible = !selectionMode && !nearBottom,
+                                            visible = !selectionMode && showNewestJump,
                                         ) {
                                             ConversationJumpToNewestButton(
                                                 unreadIncomingCount = unreadIncomingCount,

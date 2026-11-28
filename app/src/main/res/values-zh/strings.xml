@@ -1835,6 +1835,15 @@
     <string name="ai_agents_setup_title">设置 %1$s</string>
     <string name="ai_agents_setup_instruction">将此粘贴到 %1$s。只会分享你的公钥，并要求代理在安装前征得你的同意。仅用于你信任的代理。</string>
     <string name="ai_agents_copy_prompt">复制提示</string>
+    <string name="ai_agent_review_key">核对代理公钥</string>
+    <string name="ai_agent_setup_next">收到代理的公钥后，回到这里核对公钥并打开代理的个人资料。</string>
+    <string name="ai_agent_key_intro">粘贴连接器显示的公钥或个人资料链接。</string>
+    <string name="ai_agent_key_label">代理公钥</string>
+    <string name="ai_agent_check_key">检查公钥</string>
+    <string name="ai_agent_key_invalid">请输入有效的代理公钥或个人资料链接。</string>
+    <string name="ai_agent_key_self">这是你自己的公钥。请使用代理的公钥。</string>
+    <string name="ai_agent_key_compare">请将此公钥与连接器显示的公钥进行比较。如果一致，请打开个人资料并开始聊天。</string>
+    <string name="ai_agent_open_profile">打开个人资料</string>
     <string name="ai_agents_docs_opened">正在打开连接器文档。</string>
     <string name="ai_agents_docs_failed">无法打开连接器文档。</string>
     <string name="ai_agents_manual_setup_title">手动设置</string>
@@ -1852,7 +1861,7 @@
     <string name="agent_connector_opencode_prompt">这是一条安装提示，用于通过 Marmot 将此 OpenCode 设置连接到 White Noise。请阅读最新的连接器指南：https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md。请向我解释连接器的工作方式以及安装会带来哪些更改。然后针对我的公开 npub 提出安装步骤：%1$s，并在进行任何更改之前请求我的批准。我批准后，请安装并验证连接器，然后回复你的代理 npub。</string>
     <string name="agent_connector_codex_name">Codex</string>
     <string name="agent_connector_codex_subtitle">OpenAI Codex CLI 编码代理</string>
-    <string name="agent_connector_codex_prompt">这是一条安装提示，用于通过 Marmot 将此 Codex 设置连接到 White Noise。请阅读权威 Codex harness 指南：https://github.com/marmot-protocol/mdk/blob/master/integrations/codex/marmot/README.md，以及长期有效的连接器指南：https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md。请向我解释连接器的工作方式以及安装会带来哪些更改。确认前提条件：Codex CLI 已安装、已认证并可在 PATH 中使用，且此机器使用与手机相同的公共中继集合。然后针对我的公开 npub 提出安装步骤：%1$s，并在进行任何更改之前请求我的批准。我批准后，请使用经过校验和验证的 install-codex-marmot.sh 发布流程，为该 npub 引导 wn-agent 并使用允许的 welcomer，然后验证 wn-codex --version。接下来回复你的代理 npub，请我在 White Noise 中邀请它，并通过已配置的中继从这个允许的 npub 发送测试消息。在 wn-codex 通过 White Noise 回复之前，不要声称设置已完成；如果无法自动验证这一往返流程，请明确标记仍需设备验证。</string>
+    <string name="agent_connector_codex_prompt">这是一条安装提示，用于通过 Marmot 将此 Codex 设置连接到 White Noise。请阅读 Marmot Agents 安装指南（https://github.com/marmot-protocol/marmot-agents/blob/canary/README.md#installing-an-agent）。请向我解释连接器的工作方式以及安装会带来哪些更改。确认前提条件：Codex CLI 已安装、已认证并可在 PATH 中使用，且此机器使用与手机相同的公共中继集合。如果已安装 Marmot Agents，请在请求批准前说明更新共享程序对现有代理的影响。然后针对我的公开 npub 提出安装步骤：%1$s，并在进行任何更改之前请求我的批准。我批准后，请切换至 canary 分支并按指南从源代码安装。使用 install/codex.sh --from-source --owner 并传入我的 npub，再用 --cwd 指定连接器数据目录之外的项目文件夹。用 --name 指定尚未使用的名称。用 git rev-parse HEAD 记录源代码版本，并确认新服务已就绪。请回复代理的 npub，随后请我在 White Noise 中邀请代理并发送测试消息。收到代理在 White Noise 中的回复后，才确认设置完成。否则请注明仍需在设备上验证。</string>
     <string name="help">帮助</string>
     <string name="report_message">举报</string>
     <string name="report_message_title">举报此消息</string>

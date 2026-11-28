@@ -46,7 +46,8 @@ class MessageMultiSelectCoverageTest {
         assertTrue(screenSource.contains("if (transcriptReadyToReveal)"))
         assertTrue(screenSource.contains("visible = !selectionMode && readAloudFollow.showResumeAction"))
         assertTrue(screenSource.contains("val showMentionJump = !selectionMode && unreadMentionCount > 0"))
-        assertTrue(screenSource.contains("visible = !selectionMode && !nearBottom"))
+        assertTrue(screenSource.contains("val showNewestJump = !nearBottom || controller.hasMoreAfterTimeline"))
+        assertTrue(screenSource.contains("visible = !selectionMode && showNewestJump"))
     }
 
     @Test

@@ -7,6 +7,13 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ConversationInitialPresentationTest {
+    @Test
+    fun hiddenOnlyOpeningPageWithOlderHistoryMustBackfillBeforeSeedingTheTail() {
+        assertFalse(canSeedConversationTail(hasRenderableRows = false, hasMoreBefore = true))
+        assertTrue(canSeedConversationTail(hasRenderableRows = true, hasMoreBefore = true))
+        assertTrue(canSeedConversationTail(hasRenderableRows = false, hasMoreBefore = false))
+    }
+
     /** A settled empty ordinary route owns its presentation even though no row can be anchored. */
     @Test
     fun ordinaryAuthoritativeEmptyConversationCommitsPresentation() {

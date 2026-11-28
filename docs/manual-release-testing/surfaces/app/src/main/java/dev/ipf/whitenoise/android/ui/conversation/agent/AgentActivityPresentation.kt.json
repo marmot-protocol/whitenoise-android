@@ -1,0 +1,65 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityPresentation.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "R.string.agent_approval_answered",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityPresentation.kt",
+        "anchor": "R.string.agent_approval_answered",
+        "test_ids": [
+          "CON-058"
+        ]
+      },
+      {
+        "surface": "R.string.agent_approval_declined",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityPresentation.kt",
+        "anchor": "R.string.agent_approval_declined",
+        "test_ids": [
+          "CON-058"
+        ]
+      },
+      {
+        "surface": "R.string.agent_approval_expired",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityPresentation.kt",
+        "anchor": "R.string.agent_approval_expired",
+        "test_ids": [
+          "CON-058"
+        ]
+      },
+      {
+        "surface": "R.string.agent_question_answered",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityPresentation.kt",
+        "anchor": "R.string.agent_question_answered",
+        "test_ids": [
+          "CON-058"
+        ]
+      },
+      {
+        "surface": "R.string.agent_question_closed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityPresentation.kt",
+        "anchor": "R.string.agent_question_closed",
+        "test_ids": [
+          "CON-058"
+        ]
+      },
+      {
+        "surface": "R.string.agent_refused_busy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityPresentation.kt",
+        "anchor": "R.string.agent_refused_busy",
+        "test_ids": [
+          "CON-058"
+        ]
+      },
+      {
+        "surface": "R.string.agent_refused_not_allowed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityPresentation.kt",
+        "anchor": "R.string.agent_refused_not_allowed",
+        "test_ids": [
+          "CON-058"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -112,9 +112,9 @@
         ]
       },
       {
-        "surface": "string:ai_agents_manual_setup_body",
+        "surface": "string:ai_agent_setup_next",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
-        "anchor": "R.string.ai_agents_manual_setup_body",
+        "anchor": "R.string.ai_agent_setup_next",
         "test_ids": [
           "SET-016",
           "SET-017"
@@ -174,9 +174,9 @@
         ]
       },
       {
-        "surface": "string:new_message",
+        "surface": "string:ai_agent_review_key",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
-        "anchor": "R.string.new_message",
+        "anchor": "R.string.ai_agent_review_key",
         "test_ids": [
           "SET-016",
           "SET-017"

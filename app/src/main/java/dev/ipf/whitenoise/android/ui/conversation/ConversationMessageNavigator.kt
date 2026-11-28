@@ -8,7 +8,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameNanos
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ConversationSearchMatch
-import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.ReplyNavigation
 import dev.ipf.whitenoise.android.core.TimelineRowKind
 import dev.ipf.whitenoise.android.core.timelineRowKind
@@ -52,7 +51,7 @@ internal class ConversationMessageNavigator(
      * centering offset for a row that has not been measured yet.
      */
     private fun visibleBubbleHeights(layoutInfo: LazyListLayoutInfo): List<Int> {
-        val rendered = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
+        val rendered = controller.timeline.filter(::conversationTimelineRowVisible)
         val trailingRows = controller.conversationTrailingRowCount(rendered.size)
         val messageRows = trailingRows..(trailingRows + rendered.size - 1)
         return layoutInfo.visibleItemsInfo
@@ -178,7 +177,7 @@ internal class ConversationMessageNavigator(
                     // LazyColumn shows — an unfiltered index is off by the edits above it.
                     val timelineIndex =
                         controller.timeline
-                            .filterNot { MessageProjector.isEdit(it.record) }
+                            .filter(::conversationTimelineRowVisible)
                             .indexOfFirst { it.record.messageIdHex == targetMessageId }
                     if (timelineIndex < 0) {
                         appState.present(R.string.toast_original_message_unavailable)
@@ -253,7 +252,7 @@ internal class ConversationMessageNavigator(
     /** Centers and highlights a kept message when the open transcript still holds it. */
     fun jumpToKeptMessage(messageIdHex: String) {
         scope.launch {
-            val visibleRows = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
+            val visibleRows = controller.timeline.filter(::conversationTimelineRowVisible)
             val timelineIndex = visibleRows.indexOfFirst { it.record.messageIdHex == messageIdHex }
             if (timelineIndex >= 0) {
                 val centered =
@@ -279,7 +278,7 @@ internal class ConversationMessageNavigator(
         if (!navigationRequest.isCurrent()) return
         val timelineIndex =
             controller.timeline
-                .filterNot { MessageProjector.isEdit(it.record) }
+                .filter(::conversationTimelineRowVisible)
                 .indexOfFirst { it.record.messageIdHex == messageIdHex }
         if (timelineIndex >= 0 && navigationRequest.isCurrent()) {
             val centered =

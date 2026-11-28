@@ -21,6 +21,7 @@
     "conversation/PollVotesSheet.kt": "Loading/empty/result/paged votes and retry/load-more footers.",
     "conversation/GroupSystemRow.kt": "System-row native context menu open/closed and overflow.",
     "conversation/TtsTransportRatePicker.kt": "Read-aloud rate menu open/closed, selected rate and overflow.",
+    "conversation/agent": "Agent activity sheet, expandable work and history paging in a bounded viewport.",
     "conversation/composer": "Emoji categories/search/recents and grid; attachment menu, accessory preview, recovery actions, collapsed/expanded composer. Reading draft fades; active caret or text selection keeps editor unmasked.",
     "conversation/media": "Reader loading/error/source too long/plain/Markdown, seek/read-aloud and overflow menu; media-send additions and keyboard. Photo/video pan is not a vertical scroll viewport.",
     "conversation/messages": "Focused message/forward picker/progress/details/history/kept-message cards, expanded/collapsed and selection/read-aloud states; menus and keyboard.",
@@ -493,6 +494,21 @@
       "family": "conversation/TtsTransportRatePicker.kt",
       "policy": "ordinary",
       "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivitySheet.kt",
+      "calls": {
+        "WhiteNoiseLazyColumn": 1
+      },
+      "family": "conversation/agent",
+      "policy": "ordinary",
+      "test_ids": [
+        "CON-057",
         "SCR-001",
         "SCR-002",
         "SCR-003",
@@ -1392,6 +1408,20 @@
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ActionColorScreen.kt",
       "calls": {
         "SettingsList": 2
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentKeyReviewScreen.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
       },
       "family": "settings",
       "policy": "ordinary",

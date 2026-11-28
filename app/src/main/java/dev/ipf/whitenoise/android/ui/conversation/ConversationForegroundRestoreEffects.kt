@@ -24,7 +24,6 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.SoftwareKeyboardController
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
-import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationLoadFailureEdge
@@ -386,7 +385,7 @@ private fun foregroundTimelineMeasured(
  * this snapshot across a pause to decide whether a correction is owed.
  */
 internal fun ConversationController.conversationTimelineStructure(): ConversationTimelineStructure {
-    val liveTimeline = timeline.filterNot { MessageProjector.isEdit(it.record) }
+    val liveTimeline = timeline.filter(::conversationTimelineRowVisible)
     return ConversationTimelineStructure(
         rowKeys = liveTimeline.map { it.id to it.record.messageIdHex },
         olderHeaderCount = if (hasMoreBefore || isLoadingOlder) 1 else 0,

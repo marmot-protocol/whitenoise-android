@@ -6,7 +6,9 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTextReplacement
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.marmotkit.MemberRefFfi
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -22,6 +24,24 @@ import org.robolectric.annotation.GraphicsMode
 class AiAgentsScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    /** The full reference stays readable on AMOLED after a public key is checked. */
+    @Test
+    fun checkedAgentKey() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                AgentKeyReviewScreen(
+                    ownAccountId = "own",
+                    normalizeReference = { MemberRefFfi("agent", "agent", TEST_NPUB) },
+                    onBack = {},
+                    onOpenProfile = {},
+                )
+            }
+        }
+        composeRule.onNodeWithTag("ai_agents.key_input").performTextReplacement(TEST_NPUB)
+        composeRule.onNodeWithTag("ai_agents.key_action").performClick()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/ai_agents_checked_key_amoled.png")
+    }
 
     /** The screen baseline covers the explanatory and connector copy. */
     @Test

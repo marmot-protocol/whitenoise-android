@@ -4,7 +4,7 @@
   "categories": {
     "source_coverage": [
       {
-        "surface": "MarmotKit 0.20.0-rc.4 over populated 0.19.0. Verify account migrations 0219\u20130228, retained chats and attachments, cold restart, the original pending upload, both recovery relay modes with audit enabled and declined, and actionable agent alerts following standard message controls.",
+        "surface": "MarmotKit 0.20.0-rc.4 over populated 0.19.0. Verify account migrations 0219\u20130228, retained chats and attachments, cold restart, the original pending upload, both recovery relay modes with audit enabled and declined, actionable agent alerts following standard message controls, agent activity from MDK, and Android answers and Stop sent as kind 1202.",
         "source": "app/src/main/marmotkit/MARMOT_VERSION",
         "anchor": "artifact-id=0.20.0-rc.4",
         "test_ids": [
@@ -48,6 +48,9 @@
           "SET-066",
           "SET-067",
           "CON-004",
+          "CON-057",
+          "CON-058",
+          "CON-059",
           "NTF-031"
         ]
       }

@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
-import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.state.BlockListMirror
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.dmPeerAccount
@@ -64,7 +63,7 @@ internal fun ConversationSurfaceState.hasVisibleComposer(
         !searchOpen.value &&
         selectedMessages.isEmpty() &&
         !initialTimelineBackfillNoProgress.value &&
-        !(controller.error != null && controller.timeline.none { !MessageProjector.isEdit(it.record) }) &&
+        !(controller.error != null && controller.timeline.none(::conversationTimelineRowVisible)) &&
         blockedDmComposerGate(
             membershipGate = conversationControllerComposerGate(controller, notificationOpenRequestId),
             directPeerAccount = controller.dmPeerAccount,

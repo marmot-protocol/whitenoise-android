@@ -1,0 +1,66 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentApprovalCard.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "AgentApprovalCard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentApprovalCard.kt",
+        "anchor": "fun AgentApprovalCard(",
+        "test_ids": [
+          "CON-058"
+        ]
+      },
+      {
+        "surface": "AgentApprovalChoices",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentApprovalCard.kt",
+        "anchor": "fun AgentApprovalChoices(",
+        "test_ids": [
+          "CON-058"
+        ]
+      },
+      {
+        "surface": "AgentChoiceButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentApprovalCard.kt",
+        "anchor": "fun AgentChoiceButton(",
+        "test_ids": [
+          "CON-058"
+        ]
+      },
+      {
+        "surface": "AgentRequestStatusLabel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentApprovalCard.kt",
+        "anchor": "fun AgentRequestStatusLabel(",
+        "test_ids": [
+          "CON-058",
+          "CON-059"
+        ]
+      },
+      {
+        "surface": "AgentWaitingCard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentApprovalCard.kt",
+        "anchor": "fun AgentWaitingCard(",
+        "test_ids": [
+          "CON-058"
+        ]
+      },
+      {
+        "surface": "R.string.agent_request_sent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentApprovalCard.kt",
+        "anchor": "R.string.agent_request_sent",
+        "test_ids": [
+          "CON-058"
+        ]
+      },
+      {
+        "surface": "R.string.sending",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentApprovalCard.kt",
+        "anchor": "R.string.sending",
+        "test_ids": [
+          "CON-058"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

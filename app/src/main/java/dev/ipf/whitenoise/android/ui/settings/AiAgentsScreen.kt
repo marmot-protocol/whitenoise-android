@@ -14,9 +14,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -63,12 +65,33 @@ internal fun AiAgentsScreen(
     val clipboard = rememberClipboardCopier()
     val active = appState.activeAccount
     val npub = active?.let { appState.npub(it.accountIdHex) }?.takeIf { it.startsWith(NPUB_PREFIX) }
-    AiAgentsContent(
-        npub = npub,
-        onBack = onBack,
-        onCopy = { label, value -> clipboard.copy(value, label) },
-        onOpenDocs = { openAgentConnectorDocs(context) },
-    )
+    val accountRef = appState.activeAccountRef
+    val generation = appState.runtimeGeneration
+    key(accountRef, generation) {
+        var reviewingKey by rememberSaveable { mutableStateOf(false) }
+        if (reviewingKey && npub != null) {
+            AgentKeyReviewScreen(
+                ownAccountId = active.accountIdHex,
+                normalizeReference = { reference ->
+                    runCatching { appState.marmotOrNull()?.normalizeMemberRef(reference) }.getOrNull()
+                },
+                onBack = { reviewingKey = false },
+                onOpenProfile = { agentNpub ->
+                    if (appState.activeAccountRef == accountRef && appState.runtimeGeneration == generation) {
+                        appState.presentProfile(agentNpub)
+                    }
+                },
+            )
+        } else {
+            AiAgentsContent(
+                npub = npub,
+                onBack = onBack,
+                onCopy = { label, value -> clipboard.copy(value, label) },
+                onOpenDocs = { openAgentConnectorDocs(context) },
+                onReviewKey = { reviewingKey = true },
+            )
+        }
+    }
 }
 
 /**
@@ -82,11 +105,11 @@ internal fun AiAgentsContent(
     onBack: () -> Unit,
     onCopy: (String, String) -> Boolean,
     onOpenDocs: () -> Boolean,
+    onReviewKey: () -> Unit = {},
 ) {
     var selectedConnectorId by rememberSaveable(npub) { mutableStateOf<String?>(null) }
     var feedback by rememberSaveable(npub) { mutableStateOf<Int?>(null) }
     val publicKeyLabel = stringResource(R.string.public_key)
-    val manualSetup = stringResource(R.string.ai_agents_manual_setup_body, stringResource(R.string.new_message))
     SettingsScaffold(title = stringResource(R.string.ai_agents), onBack = onBack) {
         SettingsList {
             if (npub == null) {
@@ -127,6 +150,16 @@ internal fun AiAgentsContent(
             item(key = "search.AiAgents.6") { SettingsSection(stringResource(R.string.ai_agents_manual_setup_title)) }
             item(key = "search.AiAgents.7") {
                 SettingsGroup(modifier = Modifier.testTag("ai_agents.manual")) {
+                    row("review_agent_key") { rowContext ->
+                        SettingsLink(
+                            context = rowContext,
+                            title = stringResource(R.string.ai_agent_review_key),
+                            onClick = onReviewKey,
+                            enabled = npub != null,
+                            modifier = Modifier.testTag("ai_agents.review_key"),
+                            leading = { SettingsLeadingIcon(R.drawable.ic_cable) },
+                        )
+                    }
                     row("public_key") { rowContext ->
                         SettingsAction(
                             context = rowContext,
@@ -158,7 +191,6 @@ internal fun AiAgentsContent(
                     }
                 }
             }
-            item(key = "search.AiAgents.8") { SettingsExplainer(manualSetup) }
             feedback?.let { message ->
                 item(key = "search.AiAgents.10") {
                     SettingsCallout(
@@ -180,6 +212,7 @@ internal fun AiAgentsContent(
             npub = npub,
             onDismiss = { selectedConnectorId = null },
             onCopy = onCopy,
+            onReviewKey = onReviewKey,
         )
     }
 }
@@ -197,12 +230,12 @@ private fun AgentSetupSheet(
     npub: String,
     onDismiss: () -> Unit,
     onCopy: (String, String) -> Boolean,
+    onReviewKey: () -> Unit,
 ) {
     val name = stringResource(connector.nameRes)
     val title = stringResource(R.string.ai_agents_setup_title, name)
     val prompt = stringResource(connector.promptRes, npub)
     var copied by rememberSaveable(connector.id, npub) { mutableStateOf(false) }
-    val manualSetup = stringResource(R.string.ai_agents_manual_setup_body, stringResource(R.string.new_message))
     val copyLabel = stringResource(R.string.ai_agents_copy_prompt)
     val copyPrompt = {
         if (onCopy(title, prompt)) copied = true
@@ -248,7 +281,7 @@ private fun AgentSetupSheet(
                         fontFamily = FontFamily.Monospace,
                     )
                 }
-                SettingsExplainer(manualSetup)
+                SettingsExplainer(stringResource(R.string.ai_agent_setup_next))
                 SettingsExplainer(stringResource(R.string.ai_agents_project_groups_tip))
             }
             SettingsBottomAction(color = MaterialTheme.colorScheme.surfaceContainerLow, elevated = false) {
@@ -285,6 +318,14 @@ private fun AgentSetupSheet(
                         text = copyLabel,
                         modifier = Modifier.padding(start = WhiteNoiseSpacing.Related),
                     )
+                }
+                if (copied) {
+                    TextButton(
+                        onClick = { terminal.close(onReviewKey) },
+                        modifier = Modifier.fillMaxWidth().testTag("ai_agents.continue_setup"),
+                    ) {
+                        Text(stringResource(R.string.ai_agent_review_key))
+                    }
                 }
             }
         }

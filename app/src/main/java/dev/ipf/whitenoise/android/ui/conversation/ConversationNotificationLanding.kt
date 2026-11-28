@@ -107,10 +107,10 @@ internal suspend fun ConversationController.resolveLandingTarget(sourceId: Strin
         }
     }
     if (availability != MessageAvailability.AVAILABLE) return NotificationLandingResolution.Unavailable(availability)
-    val record =
-        timeline.firstOrNull { it.record.messageIdHex == targetId && !MessageProjector.isEdit(it.record) }?.record
+    val row =
+        timeline.firstOrNull { it.record.messageIdHex == targetId && !MessageProjector.isEdit(it.record) }
             ?: return NotificationLandingResolution.Unavailable(MessageAvailability.MISSING)
-    return if (isDerivedStateKind(record.kind)) {
+    return if (isDerivedStateKind(row.record.kind) || !conversationTimelineRowVisible(row)) {
         NotificationLandingResolution.KeepEntry
     } else {
         NotificationLandingResolution.Resolved(targetId)
@@ -334,6 +334,6 @@ internal class ConversationEntryPositioning(
     private fun committedStructure(structure: ConversationTimelineStructure) =
         structure.copy(groupRecoveryCount = if (controller.conversationGroupRecoveryRowVisible()) 1 else 0)
 
-    /** The edit-filtered rows the transcript actually renders, the same projection every scroll decision uses. */
-    private fun renderedTimeline() = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
+    /** The rows the transcript actually renders, the same projection every scroll decision uses. */
+    private fun renderedTimeline() = controller.timeline.filter(::conversationTimelineRowVisible)
 }
